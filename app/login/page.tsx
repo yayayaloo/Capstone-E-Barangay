@@ -8,8 +8,8 @@ import { supabase } from '@/lib/supabase'
 import styles from './login.module.css'
 
 export default function LoginPage() {
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
+    const [email, setEmail] = useState('resident@demo.com')
+    const [password, setPassword] = useState('password123')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const { signIn } = useAuth()
@@ -26,25 +26,10 @@ export default function LoginPage() {
             setError(error)
             setLoading(false)
         } else {
-            // Fetch user profile to determine role-based redirect
-            try {
-                const { data: { session } } = await supabase.auth.getSession()
-                if (session) {
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('role')
-                        .eq('id', session.user.id)
-                        .single()
-
-                    if (profile?.role === 'admin') {
-                        router.push('/admin')
-                    } else {
-                        router.push('/resident')
-                    }
-                } else {
-                    router.push('/resident')
-                }
-            } catch {
+            // Mock mode: role is determined by email keyword (see AuthProvider)
+            if (email.toLowerCase().includes('admin')) {
+                router.push('/admin')
+            } else {
                 router.push('/resident')
             }
         }
@@ -96,6 +81,12 @@ export default function LoginPage() {
                         />
                     </div>
 
+                    <div style={{ textAlign: 'right', marginTop: '-0.5rem' }}>
+                        <Link href="/forgot-password" className={styles.link} style={{ fontSize: '0.85rem' }}>
+                            Forgot Password?
+                        </Link>
+                    </div>
+
                     <button
                         type="submit"
                         className={styles.submitButton}
@@ -103,6 +94,8 @@ export default function LoginPage() {
                     >
                         {loading ? 'Signing In...' : 'Sign In'}
                     </button>
+
+
                 </form>
 
                 <div className={styles.footer}>

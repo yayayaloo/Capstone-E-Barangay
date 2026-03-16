@@ -31,14 +31,25 @@ function ResidentPortalContent() {
     const fetchRequests = async () => {
         setLoadingRequests(true)
         try {
-            const { data, error } = await supabase
-                .from('service_requests')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(5)
-
-            if (error) throw error
-            if (data) setRequests(data)
+            // Mock data bypass
+            setRequests([
+                {
+                    id: 'req-1',
+                    resident_id: profile?.id || 'mock',
+                    document_type: 'Barangay Clearance',
+                    purpose: 'Employment Requirement',
+                    status: 'completed',
+                    created_at: new Date(Date.now() - 86400000 * 3).toISOString() // 3 days ago
+                },
+                {
+                    id: 'req-2',
+                    resident_id: profile?.id || 'mock',
+                    document_type: 'Business Permit',
+                    purpose: 'New Sari-Sari Store',
+                    status: 'processing',
+                    created_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+                }
+            ] as unknown as ServiceRequest[])
         } catch {
             showToast('Failed to load your requests', 'error')
         } finally {
@@ -49,14 +60,25 @@ function ResidentPortalContent() {
     const fetchAnnouncements = async () => {
         setLoadingAnnouncements(true)
         try {
-            const { data, error } = await supabase
-                .from('announcements')
-                .select('*')
-                .order('published_at', { ascending: false })
-                .limit(4)
-
-            if (error) throw error
-            if (data) setAnnouncements(data)
+            // Mock data bypass
+            setAnnouncements([
+                {
+                    id: 'ann-1',
+                    title: 'Upcoming Barangay Assembly',
+                    content: 'Please join us for the general assembly this weekend at the barangay hall.',
+                    category: 'important',
+                    author_id: 'mock-admin',
+                    published_at: new Date().toISOString()
+                },
+                {
+                    id: 'ann-2',
+                    title: 'Free Rabies Vaccination',
+                    content: 'Bring your pets to the plaza for free vaccinations from 8AM to 12NN.',
+                    category: 'community_event',
+                    author_id: 'mock-admin',
+                    published_at: new Date(Date.now() - 86400000 * 2).toISOString()
+                }
+            ] as unknown as Announcement[])
         } catch {
             showToast('Failed to load announcements', 'error')
         } finally {
@@ -65,17 +87,18 @@ function ResidentPortalContent() {
     }
 
     const handleRequestSubmit = async (documentType: string, purpose: string) => {
-        const { error } = await supabase.from('service_requests').insert({
+        // Mock data insertion bypass
+        const newRequest = {
+            id: `req-${Date.now()}`,
             resident_id: profile!.id,
             document_type: documentType,
             purpose: purpose,
             status: 'pending',
-        })
+            created_at: new Date().toISOString()
+        } as unknown as ServiceRequest
 
-        if (error) throw new Error(error.message)
-
-        showToast(`${documentType} request submitted successfully!`, 'success')
-        await fetchRequests()
+        setRequests([newRequest, ...requests])
+        showToast(`${documentType} request submitted successfully! (Mocked)`, 'success')
     }
 
     const getStatusBadge = (status: string) => {

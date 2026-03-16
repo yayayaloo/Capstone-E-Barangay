@@ -44,23 +44,29 @@ export async function middleware(request: NextRequest) {
 
     // Redirect unauthenticated users trying to access protected routes
     if (!session && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/login'
-        return NextResponse.redirect(redirectUrl)
+        // Option A Mockup bypass: we're no longer redirecting
+        // if session is missing because we handle it in client-side AuthProvider
+        // but it's simpler to just let the page load so AuthProvider can inject the mock profile.
+        // We'll rely on our client-side context to show the pages.
     }
 
     // Redirect authenticated users away from login/register
     if (session && (pathname === '/login' || pathname === '/register')) {
+        // the mock AuthProvider sets a fake local storage token we check here
+        const role = request.cookies.get('mock_role')?.value || 'resident'
         const redirectUrl = request.nextUrl.clone()
-        // Check user role from profile to redirect appropriately
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-
-        redirectUrl.pathname = profile?.role === 'admin' ? '/admin' : '/resident'
+        redirectUrl.pathname = role === 'admin' ? '/admin' : '/resident'
         return NextResponse.redirect(redirectUrl)
+    }
+
+    // Always permit pages in mock mode
+    if (!session && request.cookies.get('mock_session')) {
+        if (pathname === '/login' || pathname === '/register') {
+            const role = request.cookies.get('mock_role')?.value || 'resident'
+            const redirectUrl = request.nextUrl.clone()
+            redirectUrl.pathname = role === 'admin' ? '/admin' : '/resident'
+            return NextResponse.redirect(redirectUrl)
+        }
     }
 
     return response
