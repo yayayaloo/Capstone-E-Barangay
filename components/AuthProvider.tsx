@@ -47,7 +47,23 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         let mounted = true;
 
         const initializeAuth = async () => {
+            // Safety timeout to prevent infinite spinner
+            const timeoutId = setTimeout(() => {
+                if (mounted) {
+                    console.error('Auth initialization timed out. Check your Supabase connection.')
+                    setLoading(false)
+                }
+            }, 8000)
+
             try {
+                // Check if Supabase is actually configured
+                if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+                    console.error('Supabase credentials missing in this environment.')
+                    if (mounted) setLoading(false)
+                    clearTimeout(timeoutId)
+                    return
+                }
+
                 // Get initial session
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession()
                 
@@ -66,6 +82,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
             } catch (error) {
                 console.error('Error fetching session:', error)
             } finally {
+                clearTimeout(timeoutId)
                 if (mounted) setLoading(false)
             }
         }
