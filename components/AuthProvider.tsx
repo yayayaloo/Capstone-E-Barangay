@@ -44,12 +44,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         let subscription: { unsubscribe: () => void } | null = null;
-        let mounted = true;
+        const mountedRef = { current: true };
 
         const initializeAuth = async () => {
             // Safety timeout to prevent infinite spinner
             const timeoutId = setTimeout(() => {
-                if (mounted) {
+                if (mountedRef.current) {
                     console.error('Auth initialization timed out. Check your Supabase connection.')
                     setLoading(false)
                 }
@@ -59,7 +59,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 // Check if Supabase is actually configured
                 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
                     console.error('Supabase credentials missing in this environment.')
-                    if (mounted) setLoading(false)
+                    if (mountedRef.current) setLoading(false)
                     clearTimeout(timeoutId)
                     return
                 }
@@ -69,12 +69,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 
                 if (sessionError) throw sessionError
 
-                if (mounted) {
+                if (mountedRef.current) {
                     setSession(session)
                     setUser(session?.user ?? null)
 
                     if (session?.user) {
-                        await fetchProfile(session.user.id)
+                        await fetchProfile(session.user.id, mountedRef)
                     } else {
                         setProfile(null)
                     }
@@ -83,7 +83,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 console.error('Error fetching session:', error)
             } finally {
                 clearTimeout(timeoutId)
-                if (mounted) setLoading(false)
+                if (mountedRef.current) setLoading(false)
             }
         }
 
@@ -92,7 +92,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         // Listen for auth changes
         const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
             async (event, newSession) => {
-                if (!mounted) return;
+                if (!mountedRef.current) return;
                 
                 const currentUser = userRef.current
                 const currentProfile = profileRef.current
@@ -111,14 +111,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                     if (!currentProfile || currentUser?.id !== newSession.user.id) {
                         // We only show loading screen if it's a completely new sign in
                         if (event === 'SIGNED_IN') setLoading(true)
-                        await fetchProfile(newSession.user.id)
-                        if (mounted) setLoading(false)
+                        await fetchProfile(newSession.user.id, mountedRef)
+                        if (mountedRef.current) setLoading(false)
                     } else {
                         // We already have the user and profile, so just update session quietly
                     }
                 } else {
                     setProfile(null)
-                    if (mounted) setLoading(false)
+                    if (mountedRef.current) setLoading(false)
                 }
             }
         )
@@ -126,14 +126,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         subscription = authSubscription
 
         return () => {
-            mounted = false;
+            mountedRef.current = false;
             if (subscription) {
                 subscription.unsubscribe()
             }
         }
     }, [])
 
-    const fetchProfile = async (userId: string) => {
+    const fetchProfile = async (userId: string, mountedRef: { current: boolean }) => {
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -142,10 +142,25 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 .single()
 
             if (error) {
-                console.error('Error fetching profile:', error)
-                setProfile(null)
+                console.error('Error fetching profile from DB:', error)
+                // FALLBACK: Use user metadata if profile table row is missing
+                const currentUser = userRef.current
+                if (currentUser && mountedRef.current) {
+                    setProfile({
+                        id: currentUser.id,
+                        full_name: currentUser.user_metadata?.full_name || 'Resident',
+                        email: currentUser.email || '',
+                        address: currentUser.user_metadata?.address || '',
+                        phone: currentUser.user_metadata?.phone || '',
+                        role: currentUser.user_metadata?.role || 'resident',
+                        created_at: currentUser.created_at,
+                        updated_at: currentUser.created_at
+                    } as Profile)
+                } else {
+                    setProfile(null)
+                }
             } else {
-                setProfile(data as Profile)
+                if (mountedRef.current) setProfile(data as Profile)
             }
         } catch (error) {
             console.error('Exception fetching profile', error)
@@ -204,7 +219,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const refreshProfile = async () => {
-        if (user) await fetchProfile(user.id)
+        if (user) await fetchProfile(user.id, { current: true })
     }
 
     return (

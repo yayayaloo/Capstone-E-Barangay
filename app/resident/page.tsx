@@ -256,7 +256,7 @@ function ResidentPortalContent() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Account ID</span>
-                            <strong style={{ fontSize: '0.8rem' }}>{profile?.id.split('-')[0]}</strong>
+                            <strong style={{ fontSize: '0.8rem' }}>{profile?.id?.split('-')[0] || 'REF'}</strong>
                         </div>
                     </div>
                 </div>
