@@ -126,9 +126,9 @@ function ResidentPortalContent() {
                         <div className={styles.idCardIcon}>🆔</div>
                         <div className={styles.idCardDetails}>
                             <h4 className={styles.idCardLabel}>E-Barangay ID</h4>
-                            <strong className={styles.idCardName}>{profile?.full_name || 'Resident User'}</strong>
+                            <strong className={styles.idCardName}>{profile?.full_name || 'Resident'}</strong>
                             <span className={styles.idCardSub}>RESIDENT | Gordon Heights</span>
-                            <div className={styles.idCardFoot}>ID: {profile?.id.slice(0, 8).toUpperCase()}</div>
+                            <div className={styles.idCardFoot}>ID: {profile?.id?.slice(0, 8).toUpperCase() || 'REF-LOAD'}</div>
                         </div>
                         <div className={styles.idCardQR}>
                             {profile?.id ? (
@@ -247,8 +247,8 @@ function ResidentPortalContent() {
                             </div>
                         )}
                     </div>
-                    <h2 style={{ marginBottom: '0.5rem' }}>{profile?.full_name}</h2>
-                    <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>RESIDENT PASS | {profile?.id.slice(0, 8).toUpperCase()}</p>
+                    <h2 style={{ marginBottom: '0.5rem' }}>{profile?.full_name || 'Barangay Resident'}</h2>
+                    <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>RESIDENT PASS | {profile?.id?.slice(0, 8).toUpperCase() || 'UNLINKED'}</p>
                     <div style={{ marginTop: '2rem', width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Resident Since</span>

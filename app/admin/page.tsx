@@ -238,23 +238,28 @@ function AdminDashboardContent() {
 
     const handleScan = async (results: any[]) => {
         if (!results || results.length === 0) return;
-        const rawValue = results[0].rawValue;
-        if (!rawValue || verifying) return;
+        const scannedValue = results[0].rawValue?.trim();
+        if (!scannedValue || verifying) return;
         
         setVerifying(true)
         setScanResult(null)
 
         try {
-            // First search for document service requests
-            const { data: docData, error: docError } = await supabase
+            // 1. Try to find if it's a Document/Service Request QR
+            const { data: docData } = await supabase
                 .from('service_requests')
                 .select('*, profiles!inner(full_name)')
-                .eq('qr_code_ref', rawValue)
-                .single()
+                .eq('qr_code_ref', scannedValue)
+                .maybeSingle()
 
-            if (docData && !docError) {
+            if (docData) {
                 if (docData.status !== 'ready' && docData.status !== 'completed') {
-                    setScanResult({ valid: false, message: `Document is ${docData.status}. Not ready yet.`, holder: (docData.profiles as any)?.full_name, docType: docData.document_type })
+                    setScanResult({ 
+                        valid: false, 
+                        message: `Document is still in ${docData.status} status.`, 
+                        holder: (docData.profiles as any)?.full_name, 
+                        docType: docData.document_type 
+                    })
                 } else {
                     setScanResult({ 
                         valid: true, 
@@ -267,17 +272,17 @@ function AdminDashboardContent() {
                     const log = { name: (docData.profiles as any)?.full_name, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: '✅ Valid Doc' }
                     setRecentVerifications(prev => [log, ...prev].slice(0, 5))
                 }
-                return;
+                return
             }
 
-            // If not a document, search for a resident profile
-            const { data: resData, error: resError } = await supabase
+            // 2. Try to find if it's a Resident ID (using ID or old Resident QR ID)
+            const { data: resData } = await supabase
                 .from('profiles')
                 .select('*')
-                .or(`resident_qr_id.eq.${rawValue},id.eq.${rawValue}`)
-                .single()
+                .or(`id.eq."${scannedValue}",resident_qr_id.eq."${scannedValue}"`)
+                .maybeSingle()
 
-            if (resData && !resError) {
+            if (resData) {
                 setScanResult({
                     valid: true,
                     isResident: true,
@@ -290,13 +295,18 @@ function AdminDashboardContent() {
                 
                 const log = { name: resData.full_name, doc: 'Resident ID', time: new Date().toLocaleTimeString(), result: '✅ Verified Resident' }
                 setRecentVerifications(prev => [log, ...prev].slice(0, 5))
-                return;
+                return
             }
 
-            // If both fail
-            setScanResult({ valid: false, message: 'Unrecognized entry. Please ensure it is an E-Barangay QR Code.' })
-        } catch(e) {
-            setScanResult({ valid: false, message: 'Verification error occurred' })
+            // 3. Fallback: If no match found
+            setScanResult({ 
+                valid: false, 
+                message: 'No record found. Please ensure this is an official E-Barangay QR Code.' 
+            })
+
+        } catch(e: any) {
+            console.error('Scan error:', e)
+            setScanResult({ valid: false, message: 'Process error: Could not verify QR code.' })
         } finally {
             setTimeout(() => setVerifying(false), 2000)
         }
