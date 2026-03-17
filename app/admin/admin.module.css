@@ -727,41 +727,40 @@
 @media (max-width: 968px) {
     .dashboardLayout {
         grid-template-columns: 1fr;
+        min-height: calc(100vh - 145px); /* Header + BottomNav */
+        margin-bottom: 65px; /* BottomNav height */
     }
 
     .sidebar {
-        flex-direction: row;
-        padding: 0.75rem;
-        flex-wrap: wrap;
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
+        display: none; /* Hide sidebar in favor of BottomNav */
     }
 
-    .sidebarBrand {
-        border-bottom: none;
-        padding: 0.5rem 0.75rem;
-    }
-
-    .sidebarNav {
-        flex-direction: row;
-        overflow-x: auto;
-        padding: 0;
-    }
-
-    .sidebarNav button {
-        white-space: nowrap;
-        padding: 0.6rem 0.9rem;
-        font-size: 0.82rem;
-    }
-
-    .sidebarFooter {
-        display: none;
+    .mainContent {
+        padding: 1rem 0;
     }
 }
 
 @media (max-width: 640px) {
     .statsGrid {
         grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .statCard {
+        padding: 1rem 0.5rem !important;
+    }
+
+    .statIcon {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .statValue {
+        font-size: 1.5rem;
+    }
+
+    .statLabel {
+        font-size: 0.7rem;
     }
 
     .quickActions {
@@ -775,5 +774,19 @@
 
     .analyticsLabel {
         min-width: 100px;
+    }
+
+    .pageHeader h1 {
+        font-size: 1.5rem;
+    }
+
+    .table th {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.7rem;
+    }
+
+    .table td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.8rem;
     }
 }

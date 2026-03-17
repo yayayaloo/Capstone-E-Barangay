@@ -2,20 +2,31 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 import styles from './forgot-password.module.css'
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('')
     const [submitted, setSubmitted] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState('')
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        // Mock delay to simulate sending email
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+        setError('')
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password`,
+        })
+
         setLoading(false)
-        setSubmitted(true)
+
+        if (error) {
+            setError(error.message)
+        } else {
+            setSubmitted(true)
+        }
     }
 
     return (
@@ -41,6 +52,11 @@ export default function ForgotPasswordPage() {
 
                 {!submitted ? (
                     <form onSubmit={handleSubmit} className={styles.form}>
+                        {error && (
+                            <div className={styles.errorMessage} style={{ color: 'red', textAlign: 'center', marginBottom: '1rem', background: '#ffebee', padding: '0.5rem', borderRadius: '4px' }}>
+                                ⚠️ {error}
+                            </div>
+                        )}
                         <div className={styles.inputGroup}>
                             <label htmlFor="email">Email Address</label>
                             <input

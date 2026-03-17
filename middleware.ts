@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-    let response = NextResponse.next({
+    let supabaseResponse = NextResponse.next({
         request: {
             headers: request.headers,
         },
@@ -18,21 +18,30 @@ export async function middleware(request: NextRequest) {
                 },
                 set(name: string, value: string, options: CookieOptions) {
                     request.cookies.set({ name, value, ...options })
-                    response = NextResponse.next({
+                    supabaseResponse = NextResponse.next({
                         request: {
                             headers: request.headers,
                         },
                     })
-                    response.cookies.set({ name, value, ...options })
+                    // Set all existing cookies again on the new response
+                    request.cookies.getAll().forEach((cookie) => {
+                        supabaseResponse.cookies.set({ name: cookie.name, value: cookie.value })
+                    })
+                    // Now set the new cookie
+                    supabaseResponse.cookies.set({ name, value, ...options })
                 },
                 remove(name: string, options: CookieOptions) {
                     request.cookies.set({ name, value: '', ...options })
-                    response = NextResponse.next({
+                    supabaseResponse = NextResponse.next({
                         request: {
                             headers: request.headers,
                         },
                     })
-                    response.cookies.set({ name, value: '', ...options })
+                    // Set all existing cookies again on the new response
+                    request.cookies.getAll().forEach((cookie) => {
+                        supabaseResponse.cookies.set({ name: cookie.name, value: cookie.value })
+                    })
+                    supabaseResponse.cookies.set({ name, value: '', ...options })
                 },
             },
         }
@@ -44,34 +53,29 @@ export async function middleware(request: NextRequest) {
 
     // Redirect unauthenticated users trying to access protected routes
     if (!session && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
-        // Option A Mockup bypass: we're no longer redirecting
-        // if session is missing because we handle it in client-side AuthProvider
-        // but it's simpler to just let the page load so AuthProvider can inject the mock profile.
-        // We'll rely on our client-side context to show the pages.
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        return NextResponse.redirect(redirectUrl)
     }
 
-    // Redirect authenticated users away from login/register
-    if (session && (pathname === '/login' || pathname === '/register')) {
-        // the mock AuthProvider sets a fake local storage token we check here
-        const role = request.cookies.get('mock_role')?.value || 'resident'
+    // Redirect authenticated users away from landing, login, and register pages
+    if (session && (pathname === '/' || pathname === '/login' || pathname === '/register')) {
+        // Fallback to checking DB for role if not in user_metadata
+        let role = session.user.user_metadata?.role;
+        
+        if (!role) {
+            const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+            role = data?.role || 'resident';
+        }
+        
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = role === 'admin' ? '/admin' : '/resident'
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Always permit pages in mock mode
-    if (!session && request.cookies.get('mock_session')) {
-        if (pathname === '/login' || pathname === '/register') {
-            const role = request.cookies.get('mock_role')?.value || 'resident'
-            const redirectUrl = request.nextUrl.clone()
-            redirectUrl.pathname = role === 'admin' ? '/admin' : '/resident'
-            return NextResponse.redirect(redirectUrl)
-        }
-    }
-
-    return response
+    return supabaseResponse
 }
 
 export const config = {
-    matcher: ['/admin/:path*', '/resident/:path*', '/login', '/register'],
+    matcher: ['/', '/admin/:path*', '/resident/:path*', '/login', '/register'],
 }

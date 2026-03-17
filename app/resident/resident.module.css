@@ -6,7 +6,39 @@
 
 /* Main Content */
 .main {
-    padding-top: 2rem;
+    padding-top: 1.5rem;
+}
+
+/* Tab Navigation */
+.tabNav {
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.5rem 0;
+    position: sticky;
+    top: 60px;
+    z-index: 10;
+}
+
+.tabBtn {
+    background: transparent;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-base);
+    font-size: 0.95rem;
+}
+
+.tabBtn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.activeTab {
+    background: var(--primary-50) !important;
+    color: var(--primary-600) !important;
 }
 
 /* Welcome Section */
@@ -134,6 +166,8 @@
     padding: 1.5rem;
     border-bottom: 1px solid var(--border-color);
     transition: background var(--transition-base);
+    flex-wrap: wrap; /* allow wrapping on small screens */
+    gap: 1rem;
 }
 
 .applicationItem:hover {
@@ -235,7 +269,7 @@
 .chatButton {
     position: fixed;
     bottom: 2rem;
-    right: 2rem;
+    right: 1.5rem;
     width: 60px;
     height: 60px;
     border-radius: 50%;
@@ -246,6 +280,9 @@
     box-shadow: var(--shadow-lg);
     transition: all var(--transition-base);
     z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .chatButton:hover {
@@ -254,20 +291,197 @@
     box-shadow: var(--shadow-xl);
 }
 
+/* Progressive Features */
+.idCard {
+    background: linear-gradient(135deg, var(--primary-600), var(--primary-800));
+    color: white;
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin-top: 1.5rem;
+    transition: all var(--transition-base);
+}
+
+.idCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    filter: brightness(1.05);
+}
+
+.idCardMain {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    width: 100%;
+    z-index: 1;
+    position: relative;
+}
+
+.idCardIcon {
+    font-size: 3rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.idCardDetails {
+    flex: 1;
+    min-width: 0;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.idCardLabel {
+    margin: 0;
+    text-transform: uppercase;
+    opacity: 0.85;
+    font-size: 0.7rem;
+    letter-spacing: 1.2px;
+    font-weight: 700;
+}
+
+.idCardName {
+    font-size: 1.25rem;
+    display: block;
+    margin: 0.15rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 800;
+}
+
+.idCardSub {
+    font-size: 0.8rem;
+    opacity: 0.9;
+    font-family: var(--font-inter), sans-serif;
+    display: block;
+}
+
+.idCardFoot {
+    font-size: 0.65rem;
+    margin-top: 0.5rem;
+    opacity: 0.7;
+    font-family: monospace;
+    letter-spacing: 0.5px;
+}
+
+.idCardQR {
+    background: #fff;
+    padding: 6px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+.idCard:hover .idCardQR {
+    transform: scale(1.05);
+}
+
+.idCard::after {
+    content: '';
+    position: absolute;
+    bottom: -30px;
+    right: -30px;
+    width: 120px;
+    height: 120px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+    z-index: 0;
+}
+
+.hotlineGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.hotlineCard {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: all var(--transition-base);
+}
+
+.hotlineCard:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-500);
+    box-shadow: var(--shadow-sm);
+}
+
+.hotlineIcon {
+    font-size: 1.5rem;
+    background: var(--bg-secondary);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+/* Profile Section */
+.profileSection {
+    animation: fadeIn 0.3s ease;
+}
+
+.infoGroup p {
+    color: var(--text-primary);
+    margin: 0;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+    .tabNav {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-left: 1rem;
+    }
+    
+    .tabNav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tabBtn {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+    }
+
     .actionCard {
         flex-direction: column;
         text-align: center;
+        padding: 1.5rem 1rem;
     }
 
     .appInfo {
-        flex-direction: column;
-        text-align: center;
+        align-items: flex-start;
     }
 
-    .applicationItem {
-        flex-direction: column;
-        gap: 1rem;
+    .actionIcon {
+        font-size: 2.5rem;
+    }
+
+    .chatButton {
+        bottom: 1.5rem;
+        right: 1.5rem;
+        width: 55px;
+        height: 55px;
+        font-size: 1.75rem;
     }
 }

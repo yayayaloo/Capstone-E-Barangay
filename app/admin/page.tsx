@@ -6,8 +6,11 @@ import Header from '@/components/Header'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
+import { supabase } from '@/lib/supabase'
 import { ServiceRequest, Announcement, Profile } from '@/lib/types'
+import { Scanner } from '@yudiel/react-qr-scanner'
 import styles from './admin.module.css'
+import BottomNav from '@/components/BottomNav'
 
 // ─── Rich Mock Data ───────────────────────────────────────────────────────────
 
@@ -23,14 +26,14 @@ const MOCK_REQUESTS: ServiceRequest[] = [
 ] as unknown as ServiceRequest[]
 
 const MOCK_RESIDENTS: Profile[] = [
-    { id: 'r1', full_name: 'Juan Dela Cruz', email: 'juan@example.com', role: 'resident', address: 'Block 4 Lot 12, Gordon Heights', phone: '09123456789', created_at: new Date(Date.now() - 86400000 * 90).toISOString() },
-    { id: 'r2', full_name: 'Maria Santos', email: 'maria@example.com', role: 'resident', address: 'Block 2 Lot 5, Gordon Heights', phone: '09987654321', created_at: new Date(Date.now() - 86400000 * 60).toISOString() },
-    { id: 'r3', full_name: 'Roberto Reyes', email: 'roberto@example.com', role: 'resident', address: 'Block 1 Lot 8, Gordon Heights', phone: '09171234567', created_at: new Date(Date.now() - 86400000 * 45).toISOString() },
-    { id: 'r4', full_name: 'Ana Lim', email: 'ana@example.com', role: 'resident', address: 'Block 7 Lot 3, Gordon Heights', phone: '09281234567', created_at: new Date(Date.now() - 86400000 * 30).toISOString() },
-    { id: 'r5', full_name: 'Carlos Mendoza', email: 'carlos@example.com', role: 'resident', address: 'Block 5 Lot 20, Gordon Heights', phone: '09391234567', created_at: new Date(Date.now() - 86400000 * 20).toISOString() },
-    { id: 'r6', full_name: 'Luisa Garcia', email: 'luisa@example.com', role: 'resident', address: 'Block 3 Lot 14, Gordon Heights', phone: '09501234567', created_at: new Date(Date.now() - 86400000 * 15).toISOString() },
-    { id: 'r7', full_name: 'Pedro Aquino', email: 'pedro@example.com', role: 'resident', address: 'Block 6 Lot 9, Gordon Heights', phone: '09611234567', created_at: new Date(Date.now() - 86400000 * 10).toISOString() },
-    { id: 'r8', full_name: 'Natividad Villanueva', email: 'nati@example.com', role: 'resident', address: 'Block 8 Lot 1, Gordon Heights', phone: '09721234567', created_at: new Date(Date.now() - 86400000 * 5).toISOString() },
+    { id: 'r1', full_name: 'Juan Dela Cruz', email: 'juan@example.com', role: 'resident', address: 'Block 4 Lot 12, Gordon Heights', phone: '09123456789', resident_qr_id: 'res-qr-001', created_at: new Date(Date.now() - 86400000 * 90).toISOString() },
+    { id: 'r2', full_name: 'Maria Santos', email: 'maria@example.com', role: 'resident', address: 'Block 2 Lot 5, Gordon Heights', phone: '09987654321', resident_qr_id: 'res-qr-002', created_at: new Date(Date.now() - 86400000 * 60).toISOString() },
+    { id: 'r3', full_name: 'Roberto Reyes', email: 'roberto@example.com', role: 'resident', address: 'Block 1 Lot 8, Gordon Heights', phone: '09171234567', resident_qr_id: 'res-qr-003', created_at: new Date(Date.now() - 86400000 * 45).toISOString() },
+    { id: 'r4', full_name: 'Ana Lim', email: 'ana@example.com', role: 'resident', address: 'Block 7 Lot 3, Gordon Heights', phone: '09281234567', resident_qr_id: 'res-qr-004', created_at: new Date(Date.now() - 86400000 * 30).toISOString() },
+    { id: 'r5', full_name: 'Carlos Mendoza', email: 'carlos@example.com', role: 'resident', address: 'Block 5 Lot 20, Gordon Heights', phone: '09391234567', resident_qr_id: 'res-qr-005', created_at: new Date(Date.now() - 86400000 * 20).toISOString() },
+    { id: 'r6', full_name: 'Luisa Garcia', email: 'luisa@example.com', role: 'resident', address: 'Block 3 Lot 14, Gordon Heights', phone: '09501234567', resident_qr_id: 'res-qr-006', created_at: new Date(Date.now() - 86400000 * 15).toISOString() },
+    { id: 'r7', full_name: 'Pedro Aquino', email: 'pedro@example.com', role: 'resident', address: 'Block 6 Lot 9, Gordon Heights', phone: '09611234567', resident_qr_id: 'res-qr-007', created_at: new Date(Date.now() - 86400000 * 10).toISOString() },
+    { id: 'r8', full_name: 'Natividad Villanueva', email: 'nati@example.com', role: 'resident', address: 'Block 8 Lot 1, Gordon Heights', phone: '09721234567', resident_qr_id: 'res-qr-008', created_at: new Date(Date.now() - 86400000 * 5).toISOString() },
 ] as Profile[]
 
 const MOCK_ANNOUNCEMENTS: Announcement[] = [
@@ -97,14 +100,51 @@ function AdminDashboardContent() {
     const [annCategory, setAnnCategory] = useState('community_event')
     const [publishing, setPublishing] = useState(false)
 
+    // Scanner state
+    const [scanResult, setScanResult] = useState<any>(null)
+    const [verifying, setVerifying] = useState(false)
+    const [recentVerifications, setRecentVerifications] = useState<any[]>([])
+
     useEffect(() => {
-        setTimeout(() => {
-            setRequests(MOCK_REQUESTS)
-            setResidents(MOCK_RESIDENTS)
-            setAnnouncements(MOCK_ANNOUNCEMENTS)
-            setLoading(false)
-        }, 600)
+        fetchAdminData()
     }, [])
+
+    const fetchAdminData = async () => {
+        setLoading(true)
+        try {
+            // Fetch requests with joined resident data (if schema allows, otherwise fetch separately and merge)
+            // Note: Since Supabase doesn't support complex joins without a view in plain select, we'll fetch separately
+            const [reqRes, profilesRes, annRes] = await Promise.all([
+                supabase.from('service_requests').select('*').order('created_at', { ascending: false }),
+                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+                supabase.from('announcements').select('*').order('published_at', { ascending: false })
+            ])
+
+            if (reqRes.error) throw reqRes.error
+            if (profilesRes.error) throw profilesRes.error
+            if (annRes.error) throw annRes.error
+
+            const fetchedProfiles = profilesRes.data as Profile[]
+            
+            // Map resident names manually
+            const mappedRequests = (reqRes.data as ServiceRequest[]).map(req => {
+                const residentData = fetchedProfiles.find(p => p.id === req.resident_id)
+                return {
+                    ...req,
+                    resident_name: residentData?.full_name || 'Unknown Resident'
+                }
+            })
+
+            setRequests(mappedRequests)
+            setResidents(fetchedProfiles)
+            setAnnouncements(annRes.data as Announcement[])
+        } catch (error: any) {
+            console.error('Error fetching admin data:', error)
+            showToast('Failed to load dashboard data', 'error')
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const pendingCount = requests.filter(r => r.status === 'pending').length
     const processingCount = requests.filter(r => r.status === 'processing').length
@@ -114,40 +154,158 @@ function AdminDashboardContent() {
         ? Math.round((completedCount / requests.length) * 100)
         : 0
 
-    const updateStatus = (id: string, status: string) => {
-        setRequests(prev => prev.map(r => r.id === id ? { ...r, status } as ServiceRequest : r))
-        showToast(`Status updated to "${status}"`, 'success')
+    const updateStatus = async (id: string, status: string) => {
+        try {
+            const reqToUpdate = requests.find(r => r.id === id)
+            let newQrRef = reqToUpdate?.qr_code_ref || null
+
+            // If we mark it ready/completed and it doesn't have a QR ref yet, generate one
+            if ((status === 'ready' || status === 'completed') && !newQrRef) {
+                newQrRef = crypto.randomUUID()
+            }
+
+            // Optimistic update
+            setRequests(prev => prev.map(r => r.id === id ? { ...r, status, qr_code_ref: newQrRef } as ServiceRequest : r))
+            
+            const { error } = await supabase
+                .from('service_requests')
+                .update({ status, qr_code_ref: newQrRef })
+                .eq('id', id)
+
+            if (error) {
+                // Revert optimistic update
+                fetchAdminData()
+                throw error
+            }
+            showToast(`Status updated to "${status}"`, 'success')
+        } catch (error: any) {
+             console.error('Error updating status:', error)
+             showToast('Failed to update status', 'error')
+        }
     }
 
-    const publishAnnouncement = () => {
+    const publishAnnouncement = async () => {
         if (!annTitle.trim() || !annContent.trim()) return
         setPublishing(true)
-        setTimeout(() => {
-            const newAnn = {
-                id: `ann-${Date.now()}`,
-                title: annTitle,
-                content: annContent,
-                category: annCategory,
-                author_id: profile?.id ?? 'mock-admin',
-                published_at: new Date().toISOString(),
-            } as unknown as Announcement
-            setAnnouncements(prev => [newAnn, ...prev])
+        
+        try {
+            const { data, error } = await supabase
+                .from('announcements')
+                .insert({
+                    title: annTitle,
+                    content: annContent,
+                    category: annCategory,
+                    author_id: profile?.id
+                })
+                .select()
+                .single()
+
+            if (error) throw error
+
+            setAnnouncements(prev => [data as Announcement, ...prev])
             setAnnTitle('')
             setAnnContent('')
             setAnnCategory('community_event')
-            setPublishing(false)
             showToast('Announcement published!', 'success')
-        }, 800)
+        } catch (error: any) {
+            console.error('Error publishing announcement:', error)
+            showToast('Failed to publish announcement', 'error')
+        } finally {
+            setPublishing(false)
+        }
     }
 
-    const deleteAnnouncement = (id: string) => {
-        setAnnouncements(prev => prev.filter(a => a.id !== id))
-        showToast('Announcement deleted', 'success')
+    const deleteAnnouncement = async (id: string) => {
+        try {
+            // Optimistic deletion
+            setAnnouncements(prev => prev.filter(a => a.id !== id))
+            
+            const { error } = await supabase
+                .from('announcements')
+                .delete()
+                .eq('id', id)
+
+            if (error) {
+                fetchAdminData()
+                throw error
+            }
+            showToast('Announcement deleted', 'success')
+        } catch (error) {
+            console.error('Error deleting announcement:', error)
+            showToast('Failed to delete announcement', 'error')
+        }
+    }
+
+    const handleScan = async (results: any[]) => {
+        if (!results || results.length === 0) return;
+        const rawValue = results[0].rawValue;
+        if (!rawValue || verifying) return;
+        
+        setVerifying(true)
+        setScanResult(null)
+
+        try {
+            // First search for document service requests
+            const { data: docData, error: docError } = await supabase
+                .from('service_requests')
+                .select('*, profiles!inner(full_name)')
+                .eq('qr_code_ref', rawValue)
+                .single()
+
+            if (docData && !docError) {
+                if (docData.status !== 'ready' && docData.status !== 'completed') {
+                    setScanResult({ valid: false, message: `Document is ${docData.status}. Not ready yet.`, holder: (docData.profiles as any)?.full_name, docType: docData.document_type })
+                } else {
+                    setScanResult({ 
+                        valid: true, 
+                        isResident: false,
+                        docType: docData.document_type, 
+                        holder: (docData.profiles as any)?.full_name, 
+                        date: docData.updated_at 
+                    })
+                    
+                    const log = { name: (docData.profiles as any)?.full_name, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: '✅ Valid Doc' }
+                    setRecentVerifications(prev => [log, ...prev].slice(0, 5))
+                }
+                return;
+            }
+
+            // If not a document, search for a resident profile
+            const { data: resData, error: resError } = await supabase
+                .from('profiles')
+                .select('*')
+                .or(`resident_qr_id.eq.${rawValue},id.eq.${rawValue}`)
+                .single()
+
+            if (resData && !resError) {
+                setScanResult({
+                    valid: true,
+                    isResident: true,
+                    holder: resData.full_name,
+                    docType: 'Resident ID Card',
+                    address: resData.address,
+                    phone: resData.phone,
+                    date: resData.created_at
+                })
+                
+                const log = { name: resData.full_name, doc: 'Resident ID', time: new Date().toLocaleTimeString(), result: '✅ Verified Resident' }
+                setRecentVerifications(prev => [log, ...prev].slice(0, 5))
+                return;
+            }
+
+            // If both fail
+            setScanResult({ valid: false, message: 'Unrecognized entry. Please ensure it is an E-Barangay QR Code.' })
+        } catch(e) {
+            setScanResult({ valid: false, message: 'Verification error occurred' })
+        } finally {
+            setTimeout(() => setVerifying(false), 2000)
+        }
     }
 
     const filteredRequests = requests.filter(r => {
+        const reqName = r.resident_name || ''
         const matchSearch =
-            r.resident_name.toLowerCase().includes(requestSearch.toLowerCase()) ||
+            reqName.toLowerCase().includes(requestSearch.toLowerCase()) ||
             r.document_type.toLowerCase().includes(requestSearch.toLowerCase())
         const matchStatus = statusFilter === 'all' || r.status === statusFilter
         return matchSearch && matchStatus
@@ -204,6 +362,12 @@ function AdminDashboardContent() {
                         <div className={styles.adminName}>{profile?.full_name || 'Admin User'}</div>
                     </div>
                 </aside>
+
+                <BottomNav 
+                    items={navItems} 
+                    activeTab={activeTab} 
+                    setActiveTab={setActiveTab} 
+                />
 
                 {/* Main Content */}
                 <main className={styles.mainContent}>
@@ -579,28 +743,39 @@ function AdminDashboardContent() {
                                 <div className="grid grid-2">
                                     <div className={`glass-card ${styles.qrScanner}`}>
                                         <h3>Scan QR Code</h3>
-                                        <div className={styles.scannerPlaceholder}>
-                                            <div className={styles.scannerFrame}>
-                                                <div className={styles.scannerCorner} style={{ top: 0, left: 0 }} />
-                                                <div className={styles.scannerCorner} style={{ top: 0, right: 0 }} />
-                                                <div className={styles.scannerCorner} style={{ bottom: 0, left: 0 }} />
-                                                <div className={styles.scannerCorner} style={{ bottom: 0, right: 0 }} />
-                                                <div className={styles.scannerLine} />
-                                            </div>
-                                            <p>Position QR code within frame</p>
+                                        <div style={{ marginTop: '1rem', background: '#000', borderRadius: '8px', overflow: 'hidden' }}>
+                                            <Scanner
+                                                onScan={handleScan}
+                                                components={{ zoom: false }}
+                                                styles={{ container: { width: '100%', maxWidth: '400px', margin: '0 auto' } }}
+                                            />
                                         </div>
-                                        <button className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-                                            📷 Activate Camera
-                                        </button>
+                                        {verifying && <div style={{ marginTop: '1rem', textAlign: 'center' }}><LoadingSpinner text="Verifying..." size="sm" /></div>}
+                                        {scanResult && !verifying && (
+                                            <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: scanResult.valid ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', border: `1px solid ${scanResult.valid ? '#22c55e' : '#ef4444'}` }}>
+                                                <h4 style={{ color: scanResult.valid ? '#22c55e' : '#ef4444', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    {scanResult.valid ? (scanResult.isResident ? '👤 VERIFIED RESIDENT' : '✅ VERIFIED DOCUMENT') : '❌ INVALID / WARNING'}
+                                                </h4>
+                                                {scanResult.holder && <p><strong>{scanResult.isResident ? 'Name' : 'Holder'}:</strong> {scanResult.holder}</p>}
+                                                {scanResult.docType && <p><strong>Type:</strong> {scanResult.docType}</p>}
+                                                {scanResult.isResident && (
+                                                    <div style={{ marginTop: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.35rem' }}>
+                                                        {scanResult.address && <p style={{ fontSize: '0.85rem' }}>📍 {scanResult.address}</p>}
+                                                        {scanResult.phone && <p style={{ fontSize: '0.85rem' }}>📞 {scanResult.phone}</p>}
+                                                    </div>
+                                                )}
+                                                <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', opacity: 0.8 }}>
+                                                    {scanResult.valid ? `${scanResult.isResident ? 'Registered' : 'Issued'}: ${fmtDate(scanResult.date)}` : scanResult.message}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="glass-card">
                                         <h3>Recent Verifications</h3>
                                         <div className={styles.verificationList}>
-                                            {[
-                                                { name: 'Juan Dela Cruz', doc: 'Barangay Clearance', time: '2 hrs ago', result: '✅ Valid' },
-                                                { name: 'Ana Lim', doc: 'Certificate of Indigency', time: '5 hrs ago', result: '✅ Valid' },
-                                                { name: 'Carlos Mendoza', doc: 'Barangay Clearance', time: 'Yesterday', result: '✅ Valid' },
-                                            ].map((v, i) => (
+                                            {recentVerifications.length === 0 ? (
+                                                 <p className={styles.emptyMessage} style={{ padding: '2rem 0' }}>No scans performed yet in this session.</p>
+                                            ) : recentVerifications.map((v, i) => (
                                                 <div key={i} className={styles.activityItem} style={{ padding: '1rem' }}>
                                                     <div className={styles.activityIcon} style={{ fontSize: '1.25rem' }}>🔍</div>
                                                     <div className={styles.activityDetails}>

@@ -14,7 +14,7 @@ export default function Header({ title, userName, onSignOut, variant = 'resident
     return (
         <header className={`${styles.header} ${variant === 'admin' ? styles.adminHeader : ''}`}>
             <div className="container flex-between">
-                <Link href="/" className={styles.logo}>
+                <Link href={variant === 'admin' ? '/admin' : '/resident'} className={styles.logo}>
                     <span className={styles.logoIcon}>🏛️</span>
                     <span>{title}</span>
                 </Link>

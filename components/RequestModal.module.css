@@ -111,6 +111,69 @@
     line-height: 1.4;
 }
 
+.typeReqs {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border-color);
+    font-size: 0.7rem;
+    color: var(--primary-600);
+}
+
+.fileUploadArea {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.fileInput {
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.fileLabel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.fileLabel:hover {
+    border-color: var(--primary-400);
+    background: var(--bg-primary);
+}
+
+.uploadIcon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.fileName {
+    color: var(--success-600);
+    font-weight: 600;
+}
+
+.clearFile {
+    background: none;
+    border: none;
+    color: var(--error-600);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-align: center;
+}
+
 .errorMessage {
     padding: 0.75rem 1rem;
     background: #fef2f2;

@@ -13,6 +13,7 @@ export interface Profile {
     address: string | null
     phone: string | null
     role: UserRole
+    resident_qr_id: string | null
     created_at: string
     updated_at: string
 }
@@ -25,6 +26,7 @@ export interface ServiceRequest {
     status: RequestStatus
     notes: string | null
     qr_code_ref: string | null
+    attachment_url: string | null
     created_at: string
     updated_at: string
     // Joined fields

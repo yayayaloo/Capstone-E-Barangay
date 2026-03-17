@@ -1,18 +1,20 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Profile } from '@/lib/types'
+import { useRouter } from 'next/navigation'
 
 interface AuthContextType {
     user: User | null
     profile: Profile | null
     session: Session | null
     loading: boolean
-    signIn: (email: string, password: string) => Promise<{ error: string | null }>
+    signIn: (email: string, password?: string) => Promise<{ error: string | null }>
     signUp: (email: string, password: string, fullName: string, address?: string, phone?: string) => Promise<{ error: string | null }>
     signOut: () => Promise<void>
+    refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -25,93 +27,131 @@ export function useAuth() {
     return context
 }
 
-// MOCK DATA for local testing
-const MOCK_RESIDENT_PROFILE: Profile = {
-    id: 'mock-resident-123',
-    full_name: 'Juan Dela Cruz',
-    role: 'resident',
-    address: 'Block 4 Lot 12, Gordon Heights',
-    phone: '09123456789',
-    created_at: new Date().toISOString()
-}
-
-const MOCK_ADMIN_PROFILE: Profile = {
-    id: 'mock-admin-456',
-    full_name: 'Admin User',
-    role: 'admin',
-    address: 'Barangay Hall, Gordon Heights',
-    phone: '09987654321',
-    created_at: new Date().toISOString()
-}
-
-// Generate base mock user
-const getMockUser = (id: string, email: string) => ({
-    id,
-    app_metadata: {},
-    user_metadata: {},
-    aud: 'authenticated',
-    created_at: new Date().toISOString(),
-    email
-} as User)
-
 export default function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
+    const router = useRouter()
+    const userRef = useRef<User | null>(null)
+    const profileRef = useRef<Profile | null>(null)
+
+    // Keep refs updated
+    useEffect(() => {
+        userRef.current = user
+        profileRef.current = profile
+    }, [user, profile])
 
     useEffect(() => {
-        // Read pseudo-session from cookies
-        const checkMockSession = () => {
-            const mockSession = document.cookie.split('; ').find(row => row.startsWith('mock_session='))
-            const mockRole = document.cookie.split('; ').find(row => row.startsWith('mock_role='))
+        let subscription: { unsubscribe: () => void } | null = null;
+        let mounted = true;
 
-            if (mockSession && mockRole) {
-                const role = mockRole.split('=')[1]
-                const isResident = role === 'resident'
-                const mockProfile = isResident ? MOCK_RESIDENT_PROFILE : MOCK_ADMIN_PROFILE
-                const mockUser = getMockUser(mockProfile.id, isResident ? 'resident@demo.com' : 'admin@demo.com')
+        const initializeAuth = async () => {
+            try {
+                // Get initial session
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+                
+                if (sessionError) throw sessionError
 
-                setSession({
-                    access_token: 'mock-token',
-                    refresh_token: 'mock-refresh',
-                    expires_in: 3600,
-                    expires_at: 0,
-                    token_type: 'bearer',
-                    user: mockUser
-                } as Session)
-                setUser(mockUser)
-                setProfile(mockProfile)
+                if (mounted) {
+                    setSession(session)
+                    setUser(session?.user ?? null)
+
+                    if (session?.user) {
+                        await fetchProfile(session.user.id)
+                    } else {
+                        setProfile(null)
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching session:', error)
+            } finally {
+                if (mounted) setLoading(false)
             }
-            setLoading(false)
         }
 
-        checkMockSession()
+        initializeAuth()
+
+        // Listen for auth changes
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+            async (event, newSession) => {
+                if (!mounted) return;
+                
+                const currentUser = userRef.current
+                const currentProfile = profileRef.current
+                
+                setSession(newSession)
+                setUser(newSession?.user ?? null)
+
+                if (event === 'SIGNED_OUT') {
+                    setProfile(null)
+                    setLoading(false)
+                    return
+                }
+
+                if (newSession?.user) {
+                    // Only fetch profile if user changed or we don't have a profile yet
+                    if (!currentProfile || currentUser?.id !== newSession.user.id) {
+                        // We only show loading screen if it's a completely new sign in
+                        if (event === 'SIGNED_IN') setLoading(true)
+                        await fetchProfile(newSession.user.id)
+                        if (mounted) setLoading(false)
+                    } else {
+                        // We already have the user and profile, so just update session quietly
+                    }
+                } else {
+                    setProfile(null)
+                    if (mounted) setLoading(false)
+                }
+            }
+        )
+
+        subscription = authSubscription
+
+        return () => {
+            mounted = false;
+            if (subscription) {
+                subscription.unsubscribe()
+            }
+        }
     }, [])
 
+    const fetchProfile = async (userId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single()
+
+            if (error) {
+                console.error('Error fetching profile:', error)
+                setProfile(null)
+            } else {
+                setProfile(data as Profile)
+            }
+        } catch (error) {
+            console.error('Exception fetching profile', error)
+            setProfile(null)
+        }
+    }
+
     const signIn = async (email: string, password?: string) => {
-        // Mock SignIn bypass based on email keyword or fallback
-        const role = email.includes('admin') ? 'admin' : 'resident'
+        if (!password) {
+            // Passwordless unsupported for now
+            return { error: 'Please enter a password' }
+        }
 
-        // Save mock state to cookies for middleware compatibility
-        document.cookie = `mock_session=true; path=/`
-        document.cookie = `mock_role=${role}; path=/`
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            })
 
-        const mockProfile = role === 'admin' ? MOCK_ADMIN_PROFILE : MOCK_RESIDENT_PROFILE
-        const mockUser = getMockUser(mockProfile.id, email)
-
-        setSession({
-            access_token: 'mock-token',
-            refresh_token: 'mock-refresh',
-            expires_in: 3600,
-            expires_at: 0,
-            token_type: 'bearer',
-            user: mockUser
-        } as Session)
-        setUser(mockUser)
-        setProfile(mockProfile)
-
-        return { error: null }
+            return { error: error?.message || null }
+        } catch (error: any) {
+            return { error: error.message || 'An error occurred during sign in' }
+        }
     }
 
     const signUp = async (
@@ -121,21 +161,37 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         address?: string,
         phone?: string
     ) => {
-        // Fallback simulate signup logic
-        return signIn(email)
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: fullName,
+                        address: address || null,
+                        phone: phone || null,
+                        role: 'resident', // By default new signups are residents
+                    }
+                }
+            })
+
+            return { error: error?.message || null }
+        } catch (error: any) {
+            return { error: error.message || 'An error occurred during sign up' }
+        }
     }
 
     const signOut = async () => {
-        document.cookie = `mock_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-        document.cookie = `mock_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-        setUser(null)
-        setProfile(null)
-        setSession(null)
-        window.location.href = '/login'
+        await supabase.auth.signOut()
+        router.push('/login')
+    }
+
+    const refreshProfile = async () => {
+        if (user) await fetchProfile(user.id)
     }
 
     return (
-        <AuthContext.Provider value={{ user, profile, session, loading, signIn, signUp, signOut }}>
+        <AuthContext.Provider value={{ user, profile, session, loading, signIn, signUp, signOut, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     )

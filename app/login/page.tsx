@@ -8,8 +8,8 @@ import { supabase } from '@/lib/supabase'
 import styles from './login.module.css'
 
 export default function LoginPage() {
-    const [email, setEmail] = useState('resident@demo.com')
-    const [password, setPassword] = useState('password123')
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const { signIn } = useAuth()
@@ -18,16 +18,36 @@ export default function LoginPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
+        
+        if (!email.trim() || !password.trim()) {
+            setError('Please enter both email and password.')
+            return
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(email)) {
+            setError('Please enter a valid email address.')
+            return
+        }
+
         setLoading(true)
 
         const { error } = await signIn(email, password)
 
         if (error) {
-            setError(error)
+            if (error.includes('Invalid login credentials')) {
+                setError('Incorrect email or password. Please try again.')
+            } else if (error.includes('Email not confirmed')) {
+                setError('Please verify your email address before logging in.')
+            } else {
+                setError(error)
+            }
             setLoading(false)
         } else {
-            // Mock mode: role is determined by email keyword (see AuthProvider)
-            if (email.toLowerCase().includes('admin')) {
+            // Once sign-in succeeds, fetch their profile or use user metadata 
+            // to dynamically route them. Middleware will also handle fallback routing.
+            const { data } = await supabase.from('profiles').select('role').eq('email', email).single()
+            if (data?.role === 'admin') {
                 router.push('/admin')
             } else {
                 router.push('/resident')

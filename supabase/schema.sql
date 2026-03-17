@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     address TEXT,
     phone TEXT,
     role TEXT NOT NULL DEFAULT 'resident' CHECK (role IN ('resident', 'admin')),
+    resident_qr_id TEXT UNIQUE DEFAULT gen_random_uuid(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -24,6 +25,7 @@ CREATE TABLE IF NOT EXISTS service_requests (
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'ready', 'completed', 'rejected')),
     notes TEXT,
     qr_code_ref TEXT UNIQUE,
+    attachment_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
