@@ -1,10 +1,34 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 import styles from './page.module.css'
 
 export default function Home() {
+    const [stats, setStats] = useState({ residents: '...', requests: '...' })
+
+    useEffect(() => {
+        async function fetchStats() {
+            try {
+                const [resRes, reqRes] = await Promise.all([
+                    supabase.from('profiles').select('*', { count: 'exact', head: true }),
+                    supabase.from('service_requests').select('*', { count: 'exact', head: true })
+                ])
+                setStats({
+                    residents: resRes.count?.toLocaleString() || '0',
+                    requests: reqRes.count?.toLocaleString() || '0'
+                })
+            } catch (e) {
+                console.error(e)
+            }
+        }
+        fetchStats()
+    }, [])
+
     return (
         <main className={styles.main}>
-            {/* Navigation */}
+            {/* Navigation (unchanged part) */}
             <nav className={styles.nav}>
                 <div className="container flex-between">
                     <div className={styles.logo}>
@@ -26,14 +50,14 @@ export default function Home() {
                 <div className={`container ${styles.heroContainer}`}>
                     <div className={styles.heroContent}>
                         <div className={`${styles.badge} badge badge-info`}>
-                            ✨ Now Live - 24/7 Service
+                            ✨ Now Live - 24/7 Digital Services
                         </div>
                         <h1 className="animate-fadeIn">
                             E-Barangay<br />Gordon Heights
                         </h1>
                         <p className={styles.heroSubtitle}>
-                            Your intelligent cloud-based portal for automated resident inquiries and QR-enabled services.
-                            Access barangay services anytime, anywhere.
+                            The most advanced community portal with AI assistance and secure QR document verification.
+                            Processing {stats.requests} requests for our {stats.residents} residents.
                         </p>
                         <div className={styles.heroCTA}>
                             <Link href="/register" className="btn btn-primary">
@@ -46,14 +70,14 @@ export default function Home() {
                             </Link>
                         </div>
 
-                        {/* Stats */}
+                        {/* Real Stats */}
                         <div className={styles.stats}>
                             <div className={styles.statItem}>
                                 <div className={styles.statNumber}>24/7</div>
                                 <div className={styles.statLabel}>Available</div>
                             </div>
                             <div className={styles.statItem}>
-                                <div className={styles.statNumber}>1,500+</div>
+                                <div className={styles.statNumber}>{stats.residents}</div>
                                 <div className={styles.statLabel}>Residents</div>
                             </div>
                             <div className={styles.statItem}>

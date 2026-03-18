@@ -7,10 +7,11 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import Header from '@/components/Header'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import RequestModal from '@/components/RequestModal'
+import ProfileModal from '@/components/ProfileModal'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
-import { ServiceRequest, Announcement } from '@/lib/types'
+import { ServiceRequest, Announcement, Profile } from '@/lib/types'
 import { QRCodeSVG } from 'qrcode.react'
 import styles from './resident.module.css'
 
@@ -20,6 +21,7 @@ function ResidentPortalContent() {
     const [activeTab, setActiveTab] = useState('overview')
     const [showChatBot, setShowChatBot] = useState(false)
     const [showRequestModal, setShowRequestModal] = useState(false)
+    const [showProfileModal, setShowProfileModal] = useState(false)
     const [requests, setRequests] = useState<ServiceRequest[]>([])
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [loadingRequests, setLoadingRequests] = useState(true)
@@ -78,15 +80,20 @@ function ResidentPortalContent() {
         try {
             let attachmentUrl = null
             
-            // In a real app, we would upload the file to Supabase Storage here
             if (attachment) {
-                // Simulate an upload path
-                attachmentUrl = `requirements/${profile.id}/${Date.now()}_${attachment.name}`
+                const fileName = `${Date.now()}_${attachment.name.replace(/\s+/g, '_')}`
+                const filePath = `${profile.id}/${fileName}`
                 
-                // Note: Actual upload logic would be:
-                // const { data, error } = await supabase.storage
-                //   .from('resident-requirements')
-                //   .upload(attachmentUrl, attachment)
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('resident-requirements')
+                    .upload(filePath, attachment)
+
+                if (uploadError) {
+                    console.error('Upload error:', uploadError)
+                    throw new Error(`Failed to upload requirement: ${uploadError.message}`)
+                }
+                
+                attachmentUrl = filePath
             }
 
             const { data, error } = await supabase
@@ -95,7 +102,7 @@ function ResidentPortalContent() {
                     resident_id: profile.id,
                     document_type: documentType,
                     purpose: purpose,
-                    attachment_url: attachmentUrl, // Save the path/url to the database
+                    attachment_url: attachmentUrl,
                     status: 'pending'
                 })
                 .select()
@@ -104,12 +111,32 @@ function ResidentPortalContent() {
             if (error) throw error
 
             setRequests([data as ServiceRequest, ...requests])
-            showToast(`${documentType} request submitted successfully! ${attachment ? 'Requirement attached.' : ''}`, 'success')
+            showToast(`${documentType} request submitted successfully! ${attachment ? 'Requirement uploaded.' : ''}`, 'success')
             setShowRequestModal(false)
             setActiveTab('requests')
         } catch (error: any) {
             console.error('Error submitting request:', error)
             showToast(error.message || `Failed to submit request for ${documentType}`, 'error')
+        }
+    }
+
+    const handleProfileUpdate = async (updates: Partial<Profile>) => {
+        if (!profile?.id) return
+        
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update(updates)
+                .eq('id', profile.id)
+
+            if (error) throw error
+            
+            await refreshProfile()
+            showToast('Profile updated successfully!', 'success')
+            setShowProfileModal(false)
+        } catch (error: any) {
+            console.error('Error updating profile:', error)
+            showToast(error.message || 'Failed to update profile', 'error')
         }
     }
 
@@ -281,8 +308,8 @@ function ResidentPortalContent() {
                             <p>{profile?.phone || 'Not specified'}</p>
                         </div>
                     </div>
-                    <button className="btn btn-outline" style={{ marginTop: '2.5rem', width: '100%' }} onClick={() => showToast('Profile editing coming soon!', 'info')}>
-                        Edit Profile
+                    <button className="btn btn-primary" style={{ marginTop: '2.5rem', width: '100%' }} onClick={() => setShowProfileModal(true)}>
+                        Edit Profile Information
                     </button>
                 </div>
             </div>
@@ -330,6 +357,11 @@ function ResidentPortalContent() {
                                     <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                                         {req.purpose && (
                                             <p className={styles.appPurpose}>Purpose: {req.purpose}</p>
+                                        )}
+                                        {req.notes && (
+                                            <p className={styles.appNotes} style={{ color: 'var(--warning-600)', borderLeft: '2px solid' }}>
+                                                Admin Note: {req.notes}
+                                            </p>
                                         )}
                                         {req.attachment_url && (
                                             <span style={{ fontSize: '0.75rem', color: 'var(--success-600)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -465,6 +497,15 @@ function ResidentPortalContent() {
                 <RequestModal
                     onClose={() => setShowRequestModal(false)}
                     onSubmit={handleRequestSubmit}
+                />
+            )}
+
+            {/* Profile Edit Modal */}
+            {showProfileModal && profile && (
+                <ProfileModal
+                    profile={profile}
+                    onClose={() => setShowProfileModal(false)}
+                    onSubmit={handleProfileUpdate}
                 />
             )}
 

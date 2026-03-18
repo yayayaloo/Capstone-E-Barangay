@@ -105,6 +105,10 @@ function AdminDashboardContent() {
     const [verifying, setVerifying] = useState(false)
     const [recentVerifications, setRecentVerifications] = useState<any[]>([])
 
+    // Status update with note
+    const [noteModal, setNoteModal] = useState<{ id: string, status: string } | null>(null)
+    const [adminNote, setAdminNote] = useState('')
+
     useEffect(() => {
         fetchAdminData()
     }, [])
@@ -135,9 +139,25 @@ function AdminDashboardContent() {
                 }
             })
 
+            // Fetch recent verifications from DB
+            const { data: qrligs } = await supabase
+                .from('qr_verifications')
+                .select('*')
+                .order('verified_at', { ascending: false })
+                .limit(5)
+
             setRequests(mappedRequests)
             setResidents(fetchedProfiles)
             setAnnouncements(annRes.data as Announcement[])
+            
+            if (qrligs) {
+                setRecentVerifications(qrligs.map(v => ({
+                    name: v.holder_name,
+                    doc: v.document_type,
+                    time: new Date(v.verified_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    result: v.is_valid ? '✅ Valid' : '❌ Invalid'
+                })))
+            }
         } catch (error: any) {
             console.error('Error fetching admin data:', error)
             showToast('Failed to load dashboard data', 'error')
@@ -154,7 +174,7 @@ function AdminDashboardContent() {
         ? Math.round((completedCount / requests.length) * 100)
         : 0
 
-    const updateStatus = async (id: string, status: string) => {
+    const updateStatus = async (id: string, status: string, note?: string) => {
         try {
             const reqToUpdate = requests.find(r => r.id === id)
             let newQrRef = reqToUpdate?.qr_code_ref || null
@@ -165,11 +185,14 @@ function AdminDashboardContent() {
             }
 
             // Optimistic update
-            setRequests(prev => prev.map(r => r.id === id ? { ...r, status, qr_code_ref: newQrRef } as ServiceRequest : r))
+            setRequests(prev => prev.map(r => r.id === id ? { ...r, status, qr_code_ref: newQrRef, notes: note || r.notes } as ServiceRequest : r))
             
+            const updatePayload: any = { status, qr_code_ref: newQrRef }
+            if (note !== undefined) updatePayload.notes = note
+
             const { error } = await supabase
                 .from('service_requests')
-                .update({ status, qr_code_ref: newQrRef })
+                .update(updatePayload)
                 .eq('id', id)
 
             if (error) {
@@ -178,6 +201,8 @@ function AdminDashboardContent() {
                 throw error
             }
             showToast(`Status updated to "${status}"`, 'success')
+            setNoteModal(null)
+            setAdminNote('')
         } catch (error: any) {
              console.error('Error updating status:', error)
              showToast('Failed to update status', 'error')
@@ -236,6 +261,48 @@ function AdminDashboardContent() {
         }
     }
 
+    const viewAttachment = async (path: string) => {
+        if (!path) return
+        try {
+            const { data, error } = await supabase.storage
+                .from('resident-requirements')
+                .createSignedUrl(path, 3600) // Increased to 1 hour
+
+            if (error) {
+                console.error('Supabase Storage Error:', error)
+                throw error
+            }
+
+            if (data?.signedUrl) {
+                window.open(data.signedUrl, '_blank')
+            }
+        } catch (error: any) {
+            console.error('Error opening attachment:', error)
+            const msg = error.message || 'Unknown error'
+            showToast(`Failed to open file: ${msg}. Make sure the "resident-requirements" bucket exists and RLS policies are set.`, 'error')
+        }
+    }
+
+    const exportToCSV = (data: any[], filename: string) => {
+        if (data.length === 0) return
+        const headers = Object.keys(data[0]).join(',')
+        const rows = data.map(obj => 
+            Object.values(obj).map(val => 
+                typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
+            ).join(',')
+        )
+        const csvContent = [headers, ...rows].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
     const handleScan = async (results: any[]) => {
         if (!results || results.length === 0) return;
         const scannedValue = results[0].rawValue?.trim();
@@ -253,11 +320,14 @@ function AdminDashboardContent() {
                 .maybeSingle()
 
             if (docData) {
-                if (docData.status !== 'ready' && docData.status !== 'completed') {
+                const isValid = docData.status === 'ready' || docData.status === 'completed'
+                const holderName = (docData.profiles as any)?.full_name || 'Unknown'
+                
+                if (!isValid) {
                     setScanResult({ 
                         valid: false, 
                         message: `Document is still in ${docData.status} status.`, 
-                        holder: (docData.profiles as any)?.full_name, 
+                        holder: holderName, 
                         docType: docData.document_type 
                     })
                 } else {
@@ -265,13 +335,23 @@ function AdminDashboardContent() {
                         valid: true, 
                         isResident: false,
                         docType: docData.document_type, 
-                        holder: (docData.profiles as any)?.full_name, 
+                        holder: holderName, 
                         date: docData.updated_at 
                     })
                     
-                    const log = { name: (docData.profiles as any)?.full_name, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: '✅ Valid Doc' }
+                    const log = { name: holderName, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: '✅ Valid Doc' }
                     setRecentVerifications(prev => [log, ...prev].slice(0, 5))
                 }
+
+                // SAVE TO DB LOGS
+                await supabase.from('qr_verifications').insert({
+                    document_ref: scannedValue,
+                    document_type: docData.document_type,
+                    holder_name: holderName,
+                    is_valid: isValid,
+                    verified_by: profile?.id
+                })
+                
                 return
             }
 
@@ -295,6 +375,16 @@ function AdminDashboardContent() {
                 
                 const log = { name: resData.full_name, doc: 'Resident ID', time: new Date().toLocaleTimeString(), result: '✅ Verified Resident' }
                 setRecentVerifications(prev => [log, ...prev].slice(0, 5))
+
+                // SAVE TO DB LOGS
+                await supabase.from('qr_verifications').insert({
+                    document_ref: scannedValue,
+                    document_type: 'Resident ID Card',
+                    holder_name: resData.full_name,
+                    is_valid: true,
+                    verified_by: profile?.id
+                })
+
                 return
             }
 
@@ -404,25 +494,25 @@ function AdminDashboardContent() {
                                                 <div className={styles.statIcon}>⏳</div>
                                                 <div className={styles.statValue}>{pendingCount}</div>
                                                 <div className={styles.statLabel}>Pending</div>
-                                                <div className={styles.statTrend}>↑ 2 new today</div>
+                                                <div className={styles.statTrend}>requires immediate action</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statProcessing}`}>
                                                 <div className={styles.statIcon}>🔄</div>
                                                 <div className={styles.statValue}>{processingCount}</div>
                                                 <div className={styles.statLabel}>Processing</div>
-                                                <div className={styles.statTrend}>In progress</div>
+                                                <div className={styles.statTrend}>in queue</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statCompleted}`}>
                                                 <div className={styles.statIcon}>✅</div>
                                                 <div className={styles.statValue}>{completedCount}</div>
                                                 <div className={styles.statLabel}>Completed</div>
-                                                <div className={styles.statTrend}>↑ {completionRate}% rate</div>
+                                                <div className={styles.statTrend}>{completionRate}% efficiency</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statResidents}`}>
                                                 <div className={styles.statIcon}>👥</div>
                                                 <div className={styles.statValue}>{residents.length}</div>
                                                 <div className={styles.statLabel}>Residents</div>
-                                                <div className={styles.statTrend}>↑ 3 this week</div>
+                                                <div className={styles.statTrend}>Total registered</div>
                                             </div>
                                         </div>
 
@@ -514,6 +604,9 @@ function AdminDashboardContent() {
                                         <h1>Document Requests</h1>
                                         <p className={styles.pageSubtitle}>{requests.length} total requests — {pendingCount} pending action</p>
                                     </div>
+                                    <button className="btn btn-outline" onClick={() => exportToCSV(requests, 'Document_Requests')}>
+                                        📥 Export Requests CSV
+                                    </button>
                                 </div>
 
                                 <div className={styles.filterBar}>
@@ -548,6 +641,7 @@ function AdminDashboardContent() {
                                                         <th>#</th>
                                                         <th>Applicant</th>
                                                         <th>Document Type</th>
+                                                        <th>Requirements</th>
                                                         <th>Purpose</th>
                                                         <th>Date Applied</th>
                                                         <th>Status</th>
@@ -562,6 +656,19 @@ function AdminDashboardContent() {
                                                             </td>
                                                             <td><strong>{req.resident_name}</strong></td>
                                                             <td>{req.document_type}</td>
+                                                            <td>
+                                                                {req.attachment_url ? (
+                                                                    <button 
+                                                                        className="btn btn-outline" 
+                                                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
+                                                                        onClick={() => viewAttachment(req.attachment_url!)}
+                                                                    >
+                                                                        📎 View File
+                                                                    </button>
+                                                                ) : (
+                                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No Attachment</span>
+                                                                )}
+                                                            </td>
                                                             <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{req.purpose}</td>
                                                             <td>{fmtDate(req.created_at)}</td>
                                                             <td><span className={statusBadge(req.status)}>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</span></td>
@@ -577,7 +684,7 @@ function AdminDashboardContent() {
                                                                         <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
                                                                     )}
                                                                     {(req.status === 'pending' || req.status === 'processing') && (
-                                                                        <button className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'rejected')}>Reject</button>
+                                                                        <button className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setNoteModal({ id: req.id, status: 'rejected' })}>Reject</button>
                                                                     )}
                                                                     {(req.status === 'completed' || req.status === 'rejected') && (
                                                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
@@ -607,6 +714,9 @@ function AdminDashboardContent() {
                                         <h1>Registered Residents</h1>
                                         <p className={styles.pageSubtitle}>{residents.length} registered accounts in the system</p>
                                     </div>
+                                    <button className="btn btn-outline" onClick={() => exportToCSV(residents, 'Resident_List')}>
+                                        📥 Export Residents CSV
+                                    </button>
                                 </div>
 
                                 <div className={styles.filterBar}>
@@ -903,6 +1013,28 @@ function AdminDashboardContent() {
                     </div>
                 </main>
             </div>
+            {/* Status Note Modal */}
+            {noteModal && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setNoteModal(null)}>
+                    <div className="glass-card" style={{ maxWidth: '400px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: '1rem' }}>Reason for {noteModal.status === 'rejected' ? 'Rejection' : 'Update'}</h3>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Please provide a reason or note for the resident.</p>
+                        
+                        <textarea
+                            value={adminNote}
+                            onChange={(e) => setAdminNote(e.target.value)}
+                            placeholder="e.g., Missing valid ID, Requirements not met..."
+                            rows={4}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: 'white', marginBottom: '1.5rem' }}
+                        />
+                        
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setNoteModal(null)}>Cancel</button>
+                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateStatus(noteModal.id, noteModal.status, adminNote)}>Confirm Rejection</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
