@@ -4,9 +4,16 @@ import { cookies } from 'next/headers'
 export function createSupabaseServerClient() {
     const cookieStore = cookies()
 
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key'
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.warn('BUILD-TIME WARNING: Skipping Supabase client creation or using placeholders.')
+    }
+
     return createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        url,
+        key,
         {
             cookies: {
                 get(name: string) {
