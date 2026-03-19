@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Header from '@/components/Header'
 import LoadingSpinner from '@/components/LoadingSpinner'
@@ -8,8 +9,19 @@ import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 import { ServiceRequest, Announcement, Profile } from '@/lib/types'
-import { Scanner } from '@yudiel/react-qr-scanner'
 import styles from './admin.module.css'
+
+const Scanner = dynamic(
+    () => import('@yudiel/react-qr-scanner').then(m => ({ default: m.Scanner })),
+    {
+        ssr: false,
+        loading: () => (
+            <div style={{ color: 'white', textAlign: 'center', padding: '2rem', minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                Loading camera...
+            </div>
+        )
+    }
+)
 import BottomNav from '@/components/BottomNav'
 
 // ─── Rich Mock Data ───────────────────────────────────────────────────────────
