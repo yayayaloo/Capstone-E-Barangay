@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/Toast'
 import styles from './forgot-password.module.css'
 
 export default function ForgotPasswordPage() {
@@ -10,6 +11,7 @@ export default function ForgotPasswordPage() {
     const [submitted, setSubmitted] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const { showToast } = useToast()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -24,8 +26,10 @@ export default function ForgotPasswordPage() {
 
         if (error) {
             setError(error.message)
+            showToast(error.message, 'error')
         } else {
             setSubmitted(true)
+            showToast('Reset link sent! Check your inbox.', 'success')
         }
     }
 
@@ -53,7 +57,7 @@ export default function ForgotPasswordPage() {
                 {!submitted ? (
                     <form onSubmit={handleSubmit} className={styles.form}>
                         {error && (
-                            <div className={styles.errorMessage} style={{ color: 'red', textAlign: 'center', marginBottom: '1rem', background: '#ffebee', padding: '0.5rem', borderRadius: '4px' }}>
+                            <div className={styles.errorMessage} style={{ color: '#ef4444', textAlign: 'center', marginBottom: '1rem', background: '#fee2e2', padding: '0.75rem', borderRadius: '12px', fontSize: '0.875rem', border: '1px solid #fecaca' }}>
                                 ⚠️ {error}
                             </div>
                         )}
@@ -78,22 +82,29 @@ export default function ForgotPasswordPage() {
                         </button>
                     </form>
                 ) : (
-                    <div className={styles.successBox}>
-                        <p>Didn&apos;t receive an email? Check your spam folder or try again.</p>
-                        <button
-                            className={styles.retryButton}
-                            onClick={() => { setSubmitted(false); setEmail('') }}
-                        >
-                            Try Again
-                        </button>
+                    <div className={styles.successContainer}>
+                        <Link href="/login" className={styles.submitButton} style={{ textDecoration: 'none', display: 'block', textAlign: 'center' }}>
+                            Return to Login
+                        </Link>
+                        <div className={styles.resendSection}>
+                            <p>Didn&apos;t receive it? </p>
+                            <button
+                                className={styles.resendButton}
+                                onClick={() => setSubmitted(false)}
+                            >
+                                Try another email
+                            </button>
+                        </div>
                     </div>
                 )}
 
-                <div className={styles.footer}>
-                    <p>Remember your password?{' '}
-                        <Link href="/login" className={styles.link}>Sign In</Link>
-                    </p>
-                </div>
+                {!submitted && (
+                    <div className={styles.footer}>
+                        <p>Remember your password?{' '}
+                            <Link href="/login" className={styles.link}>Sign In</Link>
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     )

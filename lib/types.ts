@@ -14,6 +14,9 @@ export interface Profile {
     phone: string | null
     role: UserRole
     resident_qr_id: string | null
+    is_verified: boolean
+    resident_id_number: string | null
+
     created_at: string
     updated_at: string
 }

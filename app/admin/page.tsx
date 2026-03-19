@@ -174,38 +174,31 @@ function AdminDashboardContent() {
         ? Math.round((completedCount / requests.length) * 100)
         : 0
 
-    const updateStatus = async (id: string, status: string, note?: string) => {
+    const updateStatus = async (requestId: string, newStatus: string, note?: string) => {
         try {
-            const reqToUpdate = requests.find(r => r.id === id)
-            let newQrRef = reqToUpdate?.qr_code_ref || null
+            const request = requests.find(r => r.id === requestId)
+            if (!request) return
 
-            // If we mark it ready/completed and it doesn't have a QR ref yet, generate one
-            if ((status === 'ready' || status === 'completed') && !newQrRef) {
-                newQrRef = crypto.randomUUID()
-            }
-
-            // Optimistic update
-            setRequests(prev => prev.map(r => r.id === id ? { ...r, status, qr_code_ref: newQrRef, notes: note || r.notes } as ServiceRequest : r))
-            
-            const updatePayload: any = { status, qr_code_ref: newQrRef }
-            if (note !== undefined) updatePayload.notes = note
-
-            const { error } = await supabase
+            // 1. Update the request status
+            const { error: reqError } = await supabase
                 .from('service_requests')
-                .update(updatePayload)
-                .eq('id', id)
+                .update({ 
+                    status: newStatus, 
+                    notes: note || null, 
+                    updated_at: new Date().toISOString() 
+                })
+                .eq('id', requestId)
 
-            if (error) {
-                // Revert optimistic update
-                fetchAdminData()
-                throw error
-            }
-            showToast(`Status updated to "${status}"`, 'success')
+            if (reqError) throw reqError
+
+            showToast(`Request marked as ${newStatus}`, 'success')
+
+            fetchAdminData()
             setNoteModal(null)
             setAdminNote('')
         } catch (error: any) {
-             console.error('Error updating status:', error)
-             showToast('Failed to update status', 'error')
+            console.error('Error updating status:', error)
+            showToast(error.message || 'Failed to update status', 'error')
         }
     }
 
@@ -258,6 +251,35 @@ function AdminDashboardContent() {
         } catch (error) {
             console.error('Error deleting announcement:', error)
             showToast('Failed to delete announcement', 'error')
+        }
+    }
+
+
+
+    const verifyResident = async (residentId: string) => {
+        try {
+            const idNumber = `GH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`
+            
+            // Optimistic update
+            setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, resident_id_number: idNumber } : r))
+            
+            const { error } = await supabase
+                .from('profiles')
+                .update({ 
+                    is_verified: true, 
+                    resident_id_number: idNumber 
+                })
+                .eq('id', residentId)
+
+            if (error) {
+                fetchAdminData() // Revert
+                throw error
+            }
+
+            showToast('Resident verified successfully!', 'success')
+        } catch (error: any) {
+            console.error('Error verifying resident:', error)
+            showToast('Failed to verify resident', 'error')
         }
     }
 
@@ -388,6 +410,8 @@ function AdminDashboardContent() {
                 return
             }
 
+
+
             // 3. Fallback: If no match found
             setScanResult({ 
                 valid: false, 
@@ -398,7 +422,8 @@ function AdminDashboardContent() {
             console.error('Scan error:', e)
             setScanResult({ valid: false, message: 'Process error: Could not verify QR code.' })
         } finally {
-            setTimeout(() => setVerifying(false), 2000)
+            // Keep verifying state for 3 seconds to prevent immediate re-scan
+            setTimeout(() => setVerifying(false), 3000)
         }
     }
 
@@ -412,9 +437,11 @@ function AdminDashboardContent() {
     })
 
     const filteredResidents = residents.filter(r =>
-        r.full_name.toLowerCase().includes(residentSearch.toLowerCase()) ||
-        r.email.toLowerCase().includes(residentSearch.toLowerCase()) ||
-        (r.address ?? '').toLowerCase().includes(residentSearch.toLowerCase())
+        r.role === 'resident' && (
+            r.full_name.toLowerCase().includes(residentSearch.toLowerCase()) ||
+            r.email.toLowerCase().includes(residentSearch.toLowerCase()) ||
+            (r.address ?? '').toLowerCase().includes(residentSearch.toLowerCase())
+        )
     )
 
     const navItems = [
@@ -472,10 +499,9 @@ function AdminDashboardContent() {
                 {/* Main Content */}
                 <main className={styles.mainContent}>
                     <div className="container">
-
                         {/* ── OVERVIEW ── */}
                         {activeTab === 'overview' && (
-                            <>
+                            <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
                                         <h1>Dashboard Overview</h1>
@@ -565,6 +591,7 @@ function AdminDashboardContent() {
                                                             </span>
                                                         </div>
                                                     ))}
+                                                    {requests.length === 0 && <p className={styles.emptyMessage}>No requests yet.</p>}
                                                 </div>
                                             </div>
 
@@ -575,7 +602,7 @@ function AdminDashboardContent() {
                                                     <button className={styles.viewAll} onClick={() => setActiveTab('announcements')}>Manage</button>
                                                 </div>
                                                 <div className={styles.activityList}>
-                                                    {announcements.map(ann => (
+                                                    {announcements.slice(0, 5).map(ann => (
                                                         <div className={styles.activityItem} key={ann.id}>
                                                             <div className={styles.activityIcon}>📢</div>
                                                             <div className={styles.activityDetails}>
@@ -588,23 +615,24 @@ function AdminDashboardContent() {
                                                             <span className={categoryBadge(ann.category)}>{categoryLabel(ann.category)}</span>
                                                         </div>
                                                     ))}
+                                                    {announcements.length === 0 && <p className={styles.emptyMessage}>No announcements yet.</p>}
                                                 </div>
                                             </div>
                                         </div>
                                     </>
                                 )}
-                            </>
+                            </div>
                         )}
 
                         {/* ── DOCUMENT REQUESTS ── */}
                         {activeTab === 'requests' && (
-                            <>
+                            <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
                                         <h1>Document Requests</h1>
                                         <p className={styles.pageSubtitle}>{requests.length} total requests — {pendingCount} pending action</p>
                                     </div>
-                                    <button className="btn btn-outline" onClick={() => exportToCSV(requests, 'Document_Requests')}>
+                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToCSV(requests, 'Document_Requests')}>
                                         📥 Export Requests CSV
                                     </button>
                                 </div>
@@ -632,89 +660,87 @@ function AdminDashboardContent() {
                                     <span className={styles.searchCount}>{filteredRequests.length} result{filteredRequests.length !== 1 ? 's' : ''}</span>
                                 </div>
 
-                                <div className="glass-card">
+                                <div className={`${styles.tableContainer} ${styles.glassTable}`}>
                                     {loading ? <LoadingSpinner text="Loading requests..." /> : (
-                                        <div className={styles.tableContainer}>
-                                            <table className={styles.table}>
-                                                <thead>
-                                                    <tr>
-                                                        <th>#</th>
-                                                        <th>Applicant</th>
-                                                        <th>Document Type</th>
-                                                        <th>Requirements</th>
-                                                        <th>Purpose</th>
-                                                        <th>Date Applied</th>
-                                                        <th>Status</th>
-                                                        <th>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {filteredRequests.map(req => (
-                                                        <tr key={req.id}>
-                                                            <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                                                                {req.id.slice(0, 7).toUpperCase()}
-                                                            </td>
-                                                            <td><strong>{req.resident_name}</strong></td>
-                                                            <td>{req.document_type}</td>
-                                                            <td>
-                                                                {req.attachment_url ? (
-                                                                    <button 
-                                                                        className="btn btn-outline" 
-                                                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
-                                                                        onClick={() => viewAttachment(req.attachment_url!)}
-                                                                    >
-                                                                        📎 View File
-                                                                    </button>
-                                                                ) : (
-                                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No Attachment</span>
+                                        <table className={styles.table}>
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Applicant</th>
+                                                    <th>Document Type</th>
+                                                    <th>Requirements</th>
+                                                    <th>Purpose</th>
+                                                    <th>Date Applied</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredRequests.map(req => (
+                                                    <tr key={req.id}>
+                                                        <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                                            {req.id.slice(0, 7).toUpperCase()}
+                                                        </td>
+                                                        <td><strong>{req.resident_name}</strong></td>
+                                                        <td>{req.document_type}</td>
+                                                        <td>
+                                                            {req.attachment_url ? (
+                                                                <button 
+                                                                    className="btn btn-outline" 
+                                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
+                                                                    onClick={() => viewAttachment(req.attachment_url!)}
+                                                                >
+                                                                    📎 View File
+                                                                </button>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No Attachment</span>
+                                                            )}
+                                                        </td>
+                                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{req.purpose}</td>
+                                                        <td>{fmtDate(req.created_at)}</td>
+                                                        <td><span className={statusBadge(req.status)}>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</span></td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                {req.status === 'pending' && (
+                                                                    <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'processing')}>Process</button>
                                                                 )}
-                                                            </td>
-                                                            <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{req.purpose}</td>
-                                                            <td>{fmtDate(req.created_at)}</td>
-                                                            <td><span className={statusBadge(req.status)}>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</span></td>
-                                                            <td>
-                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                                    {req.status === 'pending' && (
-                                                                        <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'processing')}>Process</button>
-                                                                    )}
-                                                                    {req.status === 'processing' && (
-                                                                        <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'ready')}>Mark Ready</button>
-                                                                    )}
-                                                                    {req.status === 'ready' && (
-                                                                        <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
-                                                                    )}
-                                                                    {(req.status === 'pending' || req.status === 'processing') && (
-                                                                        <button className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setNoteModal({ id: req.id, status: 'rejected' })}>Reject</button>
-                                                                    )}
-                                                                    {(req.status === 'completed' || req.status === 'rejected') && (
-                                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                    {filteredRequests.length === 0 && (
-                                                        <tr>
-                                                            <td colSpan={7} className={styles.emptyMessage}>No matching requests found.</td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                                                {req.status === 'processing' && (
+                                                                    <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'ready')}>Mark Ready</button>
+                                                                )}
+                                                                {req.status === 'ready' && (
+                                                                    <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
+                                                                )}
+                                                                {(req.status === 'pending' || req.status === 'processing') && (
+                                                                    <button className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setNoteModal({ id: req.id, status: 'rejected' })}>Reject</button>
+                                                                )}
+                                                                {(req.status === 'completed' || req.status === 'rejected') && (
+                                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {filteredRequests.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={8} className={styles.emptyMessage}>No matching requests found.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     )}
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         {/* ── RESIDENTS ── */}
                         {activeTab === 'residents' && (
-                            <>
+                            <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
                                         <h1>Registered Residents</h1>
                                         <p className={styles.pageSubtitle}>{residents.length} registered accounts in the system</p>
                                     </div>
-                                    <button className="btn btn-outline" onClick={() => exportToCSV(residents, 'Resident_List')}>
+                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToCSV(residents, 'Resident_List')}>
                                         📥 Export Residents CSV
                                     </button>
                                 </div>
@@ -730,65 +756,79 @@ function AdminDashboardContent() {
                                     <span className={styles.searchCount}>{filteredResidents.length} resident{filteredResidents.length !== 1 ? 's' : ''}</span>
                                 </div>
 
-                                <div className="glass-card">
+                                <div className={`${styles.tableContainer} ${styles.glassTable}`}>
                                     {loading ? <LoadingSpinner text="Loading residents..." /> : (
-                                        <div className={styles.tableContainer}>
-                                            <table className={styles.table}>
-                                                <thead>
-                                                    <tr>
-                                                        <th>#</th>
-                                                        <th>Full Name</th>
-                                                        <th>Email</th>
-                                                        <th>Address</th>
-                                                        <th>Phone</th>
-                                                        <th>Registered</th>
-                                                        <th>Requests</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {filteredResidents.map((res, i) => {
-                                                        const reqCount = requests.filter(r => r.resident_id === res.id).length
-                                                        return (
-                                                            <tr key={res.id}>
-                                                                <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{String(i + 1).padStart(3, '0')}</td>
-                                                                <td>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                                        <div className={styles.avatarCircle}>
-                                                                            {res.full_name.charAt(0)}
-                                                                        </div>
-                                                                        <strong>{res.full_name}</strong>
+                                        <table className={styles.table}>
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Full Name</th>
+                                                    <th>Email</th>
+                                                    <th>Address</th>
+                                                    <th>Phone</th>
+                                                    <th>Registered</th>
+                                                    <th>Requests</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredResidents.map((res, i) => {
+                                                    const reqCount = requests.filter(r => r.resident_id === res.id).length
+                                                    return (
+                                                        <tr key={res.id}>
+                                                            <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{String(i + 1).padStart(3, '0')}</td>
+                                                            <td>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                                    <div className={styles.avatarCircle}>
+                                                                        {res.full_name.charAt(0)}
                                                                     </div>
-                                                                </td>
-                                                                <td style={{ color: 'var(--text-muted)' }}>{res.email}</td>
-                                                                <td>{res.address || '—'}</td>
-                                                                <td>{res.phone || '—'}</td>
-                                                                <td>{fmtDate(res.created_at)}</td>
-                                                                <td>
-                                                                    <span className={reqCount > 0 ? 'badge badge-info' : 'badge'} style={{ minWidth: '2rem', textAlign: 'center' }}>
-                                                                        {reqCount}
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
-                                                        )
-                                                    })}
-                                                    {filteredResidents.length === 0 && (
-                                                        <tr>
-                                                            <td colSpan={7} className={styles.emptyMessage}>
-                                                                {residentSearch ? 'No residents match your search.' : 'No registered residents yet.'}
+                                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                        <strong>{res.full_name}</strong>
+                                                                        <div style={{ marginTop: '0.4rem' }}>
+                                                                            {res.is_verified ? (
+                                                                                <div className={styles.verifiedBadge}>
+                                                                                    🛡️ VERIFIED
+                                                                                </div>
+                                                                            ) : (
+                                                                                <button 
+                                                                                    className={styles.verifyBtn}
+                                                                                    onClick={() => verifyResident(res.id)}
+                                                                                >
+                                                                                    Verify
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ color: 'var(--text-muted)' }}>{res.email}</td>
+                                                            <td>{res.address || '—'}</td>
+                                                            <td>{res.phone || '—'}</td>
+                                                            <td>{fmtDate(res.created_at)}</td>
+                                                            <td>
+                                                                <span className={reqCount > 0 ? 'badge badge-info' : 'badge'} style={{ minWidth: '2rem', textAlign: 'center' }}>
+                                                                    {reqCount}
+                                                                </span>
                                                             </td>
                                                         </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                                    )
+                                                })}
+                                                {filteredResidents.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={7} className={styles.emptyMessage}>
+                                                            {residentSearch ? 'No residents match your search.' : 'No registered residents yet.'}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     )}
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         {/* ── ANNOUNCEMENTS ── */}
                         {activeTab === 'announcements' && (
-                            <>
+                            <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
                                         <h1>Manage Announcements</h1>
@@ -848,12 +888,12 @@ function AdminDashboardContent() {
                                         </div>
                                     )}
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         {/* ── QR VERIFY ── */}
                         {activeTab === 'verify' && (
-                            <>
+                            <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
                                         <h1>QR Code Verification</h1>
@@ -863,12 +903,26 @@ function AdminDashboardContent() {
                                 <div className="grid grid-2">
                                     <div className={`glass-card ${styles.qrScanner}`}>
                                         <h3>Scan QR Code</h3>
-                                        <div style={{ marginTop: '1rem', background: '#000', borderRadius: '8px', overflow: 'hidden' }}>
-                                            <Scanner
-                                                onScan={handleScan}
-                                                components={{ zoom: false }}
-                                                styles={{ container: { width: '100%', maxWidth: '400px', margin: '0 auto' } }}
-                                            />
+                                        <div style={{ marginTop: '1rem', background: '#000', borderRadius: '8px', overflow: 'hidden', minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {(!scanResult || verifying) ? (
+                                                <Scanner
+                                                    onScan={handleScan}
+                                                    components={{ zoom: false }}
+                                                    styles={{ container: { width: '100%', maxWidth: '400px', margin: '0 auto' } }}
+                                                />
+                                            ) : (
+                                                <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>
+                                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                                                    <p>Scan Complete</p>
+                                                    <button 
+                                                        className="btn btn-outline" 
+                                                        style={{ marginTop: '1rem', color: 'white', borderColor: 'white' }}
+                                                        onClick={() => setScanResult(null)}
+                                                    >
+                                                        Scan Another
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                         {verifying && <div style={{ marginTop: '1rem', textAlign: 'center' }}><LoadingSpinner text="Verifying..." size="sm" /></div>}
                                         {scanResult && !verifying && (
@@ -894,7 +948,7 @@ function AdminDashboardContent() {
                                         <h3>Recent Verifications</h3>
                                         <div className={styles.verificationList}>
                                             {recentVerifications.length === 0 ? (
-                                                 <p className={styles.emptyMessage} style={{ padding: '2rem 0' }}>No scans performed yet in this session.</p>
+                                                  <p className={styles.emptyMessage} style={{ padding: '2rem 0' }}>No scans performed yet in this session.</p>
                                             ) : recentVerifications.map((v, i) => (
                                                 <div key={i} className={styles.activityItem} style={{ padding: '1rem' }}>
                                                     <div className={styles.activityIcon} style={{ fontSize: '1.25rem' }}>🔍</div>
@@ -909,12 +963,12 @@ function AdminDashboardContent() {
                                         </div>
                                     </div>
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         {/* ── ANALYTICS ── */}
                         {activeTab === 'analytics' && (
-                            <>
+                            <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
                                         <h1>Analytics & Reports</h1>
@@ -1007,9 +1061,8 @@ function AdminDashboardContent() {
                                         </div>
                                     </>
                                 )}
-                            </>
+                            </div>
                         )}
-
                     </div>
                 </main>
             </div>

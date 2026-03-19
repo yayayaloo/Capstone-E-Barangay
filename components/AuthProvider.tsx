@@ -131,40 +131,70 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 subscription.unsubscribe()
             }
         }
-    }, [])
+    }, [])    // Real-time Profile Synchronization
+    // This allows the resident's portal to unlock instantly when an admin verifies them
+    useEffect(() => {
+        if (!user?.id) return
+
+        const profileChannel = supabase
+            .channel(`profile_realtime_${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: `id=eq.${user.id}`
+                },
+                (payload) => {
+                    console.log('Profile update received:', payload.new)
+                    // We call fetchProfile to get the full updated row safely
+                    // This prevents any "partial record" mess from before
+                    if (user?.id) fetchProfile(user.id, { current: true })
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(profileChannel)
+        }
+    }, [user?.id])
 
     const fetchProfile = async (userId: string, mountedRef: { current: boolean }) => {
         try {
-            const { data, error } = await supabase
+            const { data: dbData, error: dbError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
                 .single()
 
-            if (error) {
-                console.error('Error fetching profile from DB:', error)
-                // FALLBACK: Use user metadata if profile table row is missing
-                const currentUser = userRef.current
+            if (dbError) {
+                console.warn('DB Profile error, attempting metadata fallback:', dbError.message)
+                
+                // FALLBACK: Use session user metadata if profile table row or columns are missing
+                const { data: { user: currentUser } } = await supabase.auth.getUser()
+                
                 if (currentUser && mountedRef.current) {
-                    setProfile({
+                    const fallbackProfile: Profile = {
                         id: currentUser.id,
                         full_name: currentUser.user_metadata?.full_name || 'Resident',
                         email: currentUser.email || '',
                         address: currentUser.user_metadata?.address || '',
                         phone: currentUser.user_metadata?.phone || '',
                         role: currentUser.user_metadata?.role || 'resident',
+                        is_verified: false,
+                        resident_id_number: null,
+                        resident_qr_id: null,
                         created_at: currentUser.created_at,
                         updated_at: currentUser.created_at
-                    } as Profile)
-                } else {
-                    setProfile(null)
+                    }
+                    setProfile(fallbackProfile)
                 }
             } else {
-                if (mountedRef.current) setProfile(data as Profile)
+                if (mountedRef.current) setProfile(dbData as Profile)
             }
         } catch (error) {
-            console.error('Exception fetching profile', error)
-            setProfile(null)
+            console.error('Critical exception fetching profile', error)
         }
     }
 

@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS profiles (
     address TEXT,
     phone TEXT,
     role TEXT NOT NULL DEFAULT 'resident' CHECK (role IN ('resident', 'admin')),
+    is_verified BOOLEAN NOT NULL DEFAULT false,
+    resident_id_number TEXT UNIQUE,
     resident_qr_id TEXT UNIQUE DEFAULT gen_random_uuid(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -97,6 +99,10 @@ CREATE POLICY "Users can update own profile"
 CREATE POLICY "Users can insert own profile"
     ON profiles FOR INSERT
     WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Admins can update all profiles"
+    ON profiles FOR UPDATE
+    USING (is_admin());
 
 -- SERVICE_REQUESTS policies
 CREATE POLICY "Residents can view own requests"

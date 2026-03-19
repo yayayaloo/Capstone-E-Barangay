@@ -13,6 +13,7 @@ const documentTypes = [
     { value: 'Business Permit', label: '🏠 Business Permit', desc: 'Register or renew a business permit', reqs: 'DTI/SEC registration, Occupancy permit' },
     { value: 'Barangay ID', label: '🆔 Barangay ID', desc: 'Official barangay identification card', reqs: 'Birth Certificate, 2x2 Photo' },
     { value: 'Certificate', label: '📝 Certificate', desc: 'Indigency, residency, or other certificates', reqs: 'Valid ID, Purpose statement' },
+
 ]
 
 export default function RequestModal({ onClose, onSubmit }: RequestModalProps) {

@@ -16,7 +16,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import styles from './resident.module.css'
 
 function ResidentPortalContent() {
-    const { profile, signOut, refreshProfile } = useAuth()
+    const { user, profile, signOut, refreshProfile } = useAuth()
     const { showToast } = useToast()
     const [activeTab, setActiveTab] = useState('overview')
     const [showChatBot, setShowChatBot] = useState(false)
@@ -142,37 +142,72 @@ function ResidentPortalContent() {
 
     const renderOverview = () => (
         <>
-            {/* Welcome & ID Section */}
             <section className={styles.welcome} style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1 style={{ fontSize: '1.8rem' }}>Welcome back, {profile?.full_name?.split(' ')[0] || 'Resident'}! 👋</h1>
                     <p>Access barangay services, track your requests, and stay updated</p>
                 </div>
-                <div className={styles.idCard} style={{ flex: '1 1 auto', minWidth: '300px', maxWidth: '450px', cursor: 'pointer' }} onClick={() => setActiveTab('profile')}>
+                <div 
+                    className={`${styles.idCard} ${profile?.is_verified ? styles.idCardVerified : ''}`} 
+                    style={{ flex: '1 1 auto', minWidth: '350px', maxWidth: '450px', cursor: 'pointer' }}
+                    onClick={() => setActiveTab('profile')}
+                >
                     <div className={styles.idCardMain}>
-                        <div className={styles.idCardIcon}>🆔</div>
+                        <div className={styles.idCardIcon}>
+                            {profile?.is_verified ? '🛡️' : '👤'}
+                        </div>
                         <div className={styles.idCardDetails}>
-                            <h4 className={styles.idCardLabel}>E-Barangay ID</h4>
+                            <div className={styles.idCardLabel}>E-Barangay Digital ID</div>
                             <strong className={styles.idCardName}>{profile?.full_name || 'Resident'}</strong>
-                            <span className={styles.idCardSub}>RESIDENT | Gordon Heights</span>
-                            <div className={styles.idCardFoot}>ID: {profile?.id?.slice(0, 8).toUpperCase() || 'REF-LOAD'}</div>
+                            <div className={styles.idCardSub}>
+                                <span>Gordon Heights Resident</span>
+                                {profile?.is_verified ? (
+                                    <span className={styles.verifiedBadge}>✅ Verified Account</span>
+                                ) : (
+                                    <span className={styles.pendingBadge}>⏳ Account for Review</span>
+                                )}
+                            </div>
+                            <div className={styles.idCardFoot}>
+                                {profile?.is_verified 
+                                    ? `ID NO: ${profile?.resident_id_number || 'Official Issued'}`
+                                    : `USER REF: ${profile?.id?.slice(0, 8).toUpperCase() || 'UNVERIFIED'}`
+                                }
+                            </div>
                         </div>
                         <div className={styles.idCardQR}>
-                            {profile?.id ? (
-                                <QRCodeSVG value={profile.id} size={55} level="M" />
+                            {(profile?.id || user?.id) ? (
+                                <QRCodeSVG value={profile?.id || user?.id || ''} size={60} level="M" />
                             ) : (
-                                <div style={{ width: 55, height: 55, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc' }}>...</div>
+                                <div style={{ width: 60, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc' }}>...</div>
                             )}
                         </div>
                     </div>
                 </div>
             </section>
 
+            {/* Verification Restriction Notice */}
+            {!profile?.is_verified && (
+                <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.05)' }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                        <div>
+                            <strong style={{ display: 'block' }}>Account Under Review</strong>
+                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                Some features are restricted. Please wait for the Barangay Admin to verify your account to access all digital services.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Quick Actions */}
             <section className={styles.quickActions}>
                 <h2>Quick Actions</h2>
                 <div className="grid grid-3">
-                    <button className={`glass-card ${styles.actionCard}`} onClick={() => setShowRequestModal(true)}>
+                    <button 
+                        className={`glass-card ${styles.actionCard} ${!profile?.is_verified ? styles.actionDisabled : ''}`} 
+                        onClick={() => profile?.is_verified ? setShowRequestModal(true) : showToast('Verification Required: Please wait for admin approval to request documents.', 'info')}
+                    >
                         <div className={styles.actionIcon}>📄</div>
                         <div>
                             <h3>Request Document</h3>
@@ -203,28 +238,94 @@ function ResidentPortalContent() {
 
             {/* Emergency Hotlines */}
             <section style={{ marginBottom: '3rem' }}>
-                <h2>🚨 Emergency Hotlines</h2>
-                <div className={styles.hotlineGrid}>
-                    <a href="tel:911" className={styles.hotlineCard}>
-                        <div className={styles.hotlineIcon}>🚓</div>
-                        <strong>Police</strong>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>911 / 166</span>
-                    </a>
-                    <a href="tel:160" className={styles.hotlineCard}>
-                        <div className={styles.hotlineIcon}>🚒</div>
-                        <strong>Fire Station</strong>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>160</span>
-                    </a>
-                    <a href="tel:143" className={styles.hotlineCard}>
-                        <div className={styles.hotlineIcon}>🚑</div>
-                        <strong>Red Cross</strong>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>143</span>
-                    </a>
-                    <a href="tel:09123456789" className={styles.hotlineCard}>
-                        <div className={styles.hotlineIcon}>🏥</div>
-                        <strong>Brgy. Health</strong>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>0912-345-6789</span>
-                    </a>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <h2 style={{ margin: 0 }}>🚨 Emergency Hotlines</h2>
+                    <span className="badge badge-error animate-pulse" style={{ fontSize: '0.7rem' }}>24/7 SUPPORT</span>
+                </div>
+                
+                <div className="grid grid-2" style={{ gap: '1.5rem' }}>
+                    {/* Barangay Gordon Heights Group */}
+                    <div className="glass-card" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '1.2rem' }}>🏘️</span> Barangay Gordon Heights
+                        </h3>
+                        <div className={styles.hotlineList}>
+                            <a href="tel:2235497" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle}>📞</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>Barangay Hall</strong>
+                                    <span>223-5497</span>
+                                </div>
+                            </a>
+                            <a href="tel:09664632688" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle} style={{ background: '#00539c20', color: '#00539c' }}>🌐</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>Brgy. Mobile (Globe)</strong>
+                                    <span>0966-463-2688</span>
+                                </div>
+                            </a>
+                            <a href="tel:09208278618" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle} style={{ background: '#58b44b20', color: '#58b44b' }}>📶</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>Brgy. Mobile (Smart)</strong>
+                                    <span>0920-827-86-18</span>
+                                </div>
+                            </a>
+                            <a href="tel:2220402" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle}>🚓</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>Police Station 5</strong>
+                                    <span>222-0402</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    {/* Olongapo City Group */}
+                    <div className="glass-card" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '1.2rem' }}>🏢</span> Olongapo City Central
+                        </h3>
+                        <div className={styles.hotlineList}>
+                            <a href="tel:09985937446" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle} style={{ background: 'var(--error-50, #fee2e2)', color: 'var(--error, #ef4444)' }}>🚑</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>City Rescue (DRRMO)</strong>
+                                    <span>0998-593-7446 | 0917-306-5966</span>
+                                </div>
+                            </a>
+                            <a href="tel:2235731" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle}>👮</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>City Police Office</strong>
+                                    <span>223-5731</span>
+                                </div>
+                            </a>
+                            <a href="tel:2231415" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle}>🔥</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>BFP Fire Station</strong>
+                                    <span>223-1415</span>
+                                </div>
+                            </a>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                <a href="tel:6114818" className={styles.hotlineItem} style={{ padding: '0.5rem 0.75rem' }}>
+                                    <div className={styles.hotlineCircle} style={{ width: '30px', height: '30px', fontSize: '1rem' }}>🚧</div>
+                                    <div className={styles.hotlineContent}>
+                                        <strong style={{ fontSize: '0.75rem' }}>Traffic</strong>
+                                        <span style={{ fontSize: '0.7rem' }}>611-4818</span>
+                                    </div>
+                                </a>
+                                <a href="tel:2222565" className={styles.hotlineItem} style={{ padding: '0.5rem 0.75rem' }}>
+                                    <div className={styles.hotlineCircle} style={{ width: '30px', height: '30px', fontSize: '1rem' }}>👔</div>
+                                    <div className={styles.hotlineContent}>
+                                        <strong style={{ fontSize: '0.75rem' }}>Mayor</strong>
+                                        <span style={{ fontSize: '0.7rem' }}>222-2565</span>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -354,14 +455,9 @@ function ResidentPortalContent() {
                                     <p className={styles.appDate}>
                                         Applied: {new Date(req.created_at).toLocaleDateString()}
                                     </p>
-                                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem', width: '100%' }}>
                                         {req.purpose && (
                                             <p className={styles.appPurpose}>Purpose: {req.purpose}</p>
-                                        )}
-                                        {req.notes && (
-                                            <p className={styles.appNotes} style={{ color: 'var(--warning-600)', borderLeft: '2px solid' }}>
-                                                Admin Note: {req.notes}
-                                            </p>
                                         )}
                                         {req.attachment_url && (
                                             <span style={{ fontSize: '0.75rem', color: 'var(--success-600)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -369,6 +465,7 @@ function ResidentPortalContent() {
                                             </span>
                                         )}
                                     </div>
+                                    {req.notes && renderAdminNote(req.notes)}
                                 </div>
                             </div>
                             <div className={getStatusBadge(req.status)}>{getStatusLabel(req.status)}</div>
@@ -447,6 +544,33 @@ function ResidentPortalContent() {
             general: 'General',
         }
         return labelMap[category] || category
+    }
+
+    const renderAdminNote = (note: string) => {
+        if (!note) return null;
+
+        const isAttachment = note.startsWith('ATTACHMENT:');
+        const content = isAttachment ? note.replace('ATTACHMENT:', '') : note;
+
+        return (
+            <div className={styles.adminNote}>
+                <div className={styles.adminNoteHeader}>
+                    <span>💬</span> Official Admin Note
+                </div>
+                {isAttachment ? (
+                    <a 
+                        href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-requirements/${content}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.adminNoteAttachment}
+                    >
+                        <span>📎</span> View Attached File / Response
+                    </a>
+                ) : (
+                    <p className={styles.adminNoteText}>{content}</p>
+                )}
+            </div>
+        );
     }
 
     return (

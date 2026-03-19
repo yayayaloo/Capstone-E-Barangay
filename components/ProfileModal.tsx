@@ -41,10 +41,25 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
             <div className="glass-card" style={{ maxWidth: '500px', width: '100%', padding: '2.5rem', background: 'var(--bg-secondary, #1a1a2e)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                     <h2 style={{ margin: 0 }}>Update Profile 👤</h2>
-                    <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer' }} onClick={onClose}>✕</button>
+                    <button style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', cursor: 'pointer' }} onClick={onClose}>✕</button>
                 </div>
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {/* Verification Status Banner */}
+                    <div style={{ padding: '0.9rem 1.25rem', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                        <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: profile.is_verified ? 'rgba(37, 99, 235, 0.1)' : 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', border: `1px solid ${profile.is_verified ? '#2563eb' : 'var(--border-color)'}` }}>
+                            {profile.is_verified ? '🛡️' : '👤'}
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: profile.is_verified ? 'var(--primary-600)' : 'var(--text-muted)' }}>
+                                {profile.is_verified ? '✨ Verified Account' : '⚪ Pending Review'}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                {profile.is_verified ? `ID: ${profile.resident_id_number || 'Official Issued'}` : 'Verify your profile at the Brgy. Hall'}
+                            </div>
+                        </div>
+                    </div>
+
                     {error && (
                         <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '8px', color: '#ef4444' }}>
                             ⚠️ {error}
@@ -58,7 +73,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                             value={fullName}
                             onChange={(e) => setFullName(e.target.value)}
                             required
-                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
                         />
                     </div>
 
@@ -69,7 +84,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
                             placeholder="e.g., Blk 1 Lot 2, Gordon Heights"
-                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
                         />
                     </div>
 
@@ -80,7 +95,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
                             placeholder="e.g., 09123456789"
-                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
                         />
                     </div>
 

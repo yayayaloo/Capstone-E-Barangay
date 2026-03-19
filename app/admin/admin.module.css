@@ -486,6 +486,60 @@
     background: var(--bg-secondary);
 }
 
+.glassTable {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    overflow: hidden;
+}
+
+.verifyBtn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white !important;
+    border: none !important;
+    padding: 0.4rem 1rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.verifyBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(217, 119, 6, 0.35);
+    filter: brightness(1.1);
+}
+
+.verifyBtn:active {
+    transform: translateY(0);
+}
+
+.verifiedBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    padding: 0.4rem 0.8rem;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.05);
+    animation: slideInLeft 0.4s ease-out;
+}
+
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
 /* ─── Avatar ──────────────────────────────────────────────── */
 .avatarCircle {
     width: 34px;

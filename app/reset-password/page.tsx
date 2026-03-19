@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import styles from '../login/login.module.css' // Reusing login styles for simplicity
+import { useToast } from '@/components/Toast'
+import styles from '../login/login.module.css'
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState('')
@@ -13,40 +14,71 @@ export default function ResetPasswordPage() {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const { showToast } = useToast()
 
     useEffect(() => {
-        // Verify they reached this page with a recovery token
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === "PASSWORD_RECOVERY") {
-                // Good to go
+        const code = searchParams.get('code')
+        
+        // If there's a code in the URL, we might need to exchange it
+        // Supabase usually handles this, but we can verify session
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session && !code) {
+                // If no session and no code, this is an invalid access
+                // But we'll let them try anyway or they'll get an error on submit
             }
-        });
-    }, [])
+        }
+        checkSession()
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === "PASSWORD_RECOVERY") {
+                console.log("Password recovery event triggered")
+            }
+        })
+
+        return () => subscription.unsubscribe()
+    }, [searchParams])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
 
         if (password !== confirmPassword) {
-            setError('Passwords do not match')
+            const msg = 'Passwords do not match'
+            setError(msg)
+            showToast(msg, 'error')
             return
         }
 
         if (password.length < 6) {
-            setError('Password must be at least 6 characters')
+            const msg = 'Password must be at least 6 characters'
+            setError(msg)
+            showToast(msg, 'error')
             return
         }
 
         setLoading(true)
 
-        const { error } = await supabase.auth.updateUser({ password })
+        try {
+            const { error } = await supabase.auth.updateUser({ password })
 
-        if (error) {
-            setError(error.message)
+            if (error) {
+                setError(error.message)
+                showToast(error.message, 'error')
+                setLoading(false)
+            } else {
+                // Explicitly sign out to ensure they have to log in with the new password
+                await supabase.auth.signOut()
+                setSuccess(true)
+                showToast('Password updated! Please sign in with your new password.', 'success')
+                setTimeout(() => router.push('/login'), 3000)
+            }
+        } catch (err: any) {
+            const msg = err.message || 'An unexpected error occurred'
+            setError(msg)
+            showToast(msg, 'error')
             setLoading(false)
-        } else {
-            setSuccess(true)
-            setTimeout(() => router.push('/login'), 3000)
         }
     }
 
