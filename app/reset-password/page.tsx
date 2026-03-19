@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
 import styles from '../login/login.module.css'
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [error, setError] = useState('')
@@ -85,10 +85,6 @@ export default function ResetPasswordPage() {
     if (success) {
         return (
             <div className={styles.loginContainer}>
-                <div className={styles.loginBackground}>
-                    <div className={styles.gradientOrb1} />
-                    <div className={styles.gradientOrb2} />
-                </div>
                 <div className={styles.loginCard}>
                     <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
@@ -156,5 +152,19 @@ export default function ResetPasswordPage() {
                 </form>
             </div>
         </div>
+    )
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={
+            <div className={styles.loginContainer}>
+                <div className={styles.loginCard}>
+                    <p>Loading...</p>
+                </div>
+            </div>
+        }>
+            <ResetPasswordContent />
+        </Suspense>
     )
 }
