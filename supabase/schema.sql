@@ -88,7 +88,7 @@ RETURNS BOOLEAN AS $$
         SELECT 1 FROM profiles
         WHERE id = auth.uid() AND role = 'admin'
     );
-$$ LANGUAGE sql SECURITY DEFINER;
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 -- PROFILES policies
 CREATE POLICY "Users can view own profile"
@@ -186,7 +186,7 @@ CREATE TRIGGER announcements_updated_at
 -- =============================================
 -- Verification Function (Bypasses RLS for secure QR lookups)
 -- =============================================
-(from CREATE OR REPLACE FUNCTION verify_document_qr(qr_code_string TEXT)
+CREATE OR REPLACE FUNCTION verify_document_qr(qr_code_string TEXT)
 RETURNS jsonb AS $$
 DECLARE
     found_request RECORD;
@@ -238,4 +238,4 @@ BEGIN
         'message', 'QR Code is not recognized by the E-Barangay system.'
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
