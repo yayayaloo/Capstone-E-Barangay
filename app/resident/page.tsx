@@ -2,8 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import ChatBot from '@/components/ChatBot'
 import ProtectedRoute from '@/components/ProtectedRoute'
+
+const Scanner = dynamic(
+    () => import('@yudiel/react-qr-scanner').then(m => ({ default: m.Scanner })),
+    { ssr: false }
+)
 import Header from '@/components/Header'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import RequestModal from '@/components/RequestModal'
@@ -22,6 +28,14 @@ function ResidentPortalContent() {
     const [showChatBot, setShowChatBot] = useState(false)
     const [showRequestModal, setShowRequestModal] = useState(false)
     const [showProfileModal, setShowProfileModal] = useState(false)
+    const [showScanner, setShowScanner] = useState(false)
+    const [scanning, setScanning] = useState(false)
+    const [scanResult, setScanResult] = useState<{
+        isValid: boolean;
+        type?: string;
+        details?: any;
+        message?: string;
+    } | null>(null)
     const [requests, setRequests] = useState<ServiceRequest[]>([])
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [loadingRequests, setLoadingRequests] = useState(true)
@@ -140,6 +154,45 @@ function ResidentPortalContent() {
         }
     }
 
+    const handleScan = async (result: any) => {
+        if (!result || !result[0] || !result[0].rawValue || scanning) return;
+        setScanning(true);
+        const qrData = result[0].rawValue;
+        
+        try {
+            // Securely verify QR Code via Postgres Function (bypasses RLS read-restrictions for known QRs)
+            const { data: verificationResult, error: verificationError } = await supabase
+                .rpc('verify_document_qr', { qr_code_string: qrData });
+
+            if (verificationError) {
+                console.error('RPC Error:', verificationError);
+                throw new Error('Database verification failed.');
+            }
+
+            if (verificationResult && verificationResult.isValid !== undefined) {
+                setScanResult({
+                    isValid: verificationResult.isValid,
+                    type: verificationResult.type,
+                    details: verificationResult.details,
+                    message: verificationResult.message
+                });
+            } else {
+                setScanResult({
+                    isValid: false,
+                    message: 'QR Code format not recognized by the E-Barangay system.'
+                });
+            }
+
+        } catch (error) {
+            console.error('QR Scan error:', error);
+            setScanResult({
+                isValid: false,
+                message: 'Error verifying QR code. It may be invalid or the system is offline.'
+            });
+        }
+        setScanning(false);
+    };
+
     const renderOverview = () => (
         <>
             <section className={styles.welcome} style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -239,6 +292,17 @@ function ResidentPortalContent() {
                         <div>
                             <h3>Ask AI Assistant</h3>
                             <p>Get instant answers 24/7</p>
+                        </div>
+                    </button>
+
+                    <button
+                        className={`glass-card ${styles.actionCard}`}
+                        onClick={() => { setShowScanner(true); setScanResult(null); }}
+                    >
+                        <div className={styles.actionIcon}>📸</div>
+                        <div>
+                            <h3>Scan QR</h3>
+                            <p>Verify documents & IDs</p>
                         </div>
                     </button>
                 </div>
@@ -683,6 +747,62 @@ function ResidentPortalContent() {
                         
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setSelectedQR(null)}>
                             Close
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Scanner Modal */}
+            {showScanner && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', padding: '1rem' }} onClick={() => !scanning && setShowScanner(false)}>
+                    <div className="glass-card" style={{ maxWidth: '450px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <h2 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Scan QR Code</h2>
+                        
+                        {!scanResult ? (
+                            <>
+                                <div style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem', border: '2px solid var(--primary-500)', position: 'relative' }}>
+                                    <Scanner
+                                        onScan={handleScan}
+                                        onError={(error) => console.error(error)}
+                                        styles={{ container: { width: '100%', paddingTop: '100%' } }}
+                                    />
+                                    {scanning && (
+                                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', color: 'white' }}>
+                                            <LoadingSpinner />
+                                        </div>
+                                    )}
+                                </div>
+                                <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Position the QR code within the frame to verify document authenticity.</p>
+                            </>
+                        ) : (
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>
+                                    {scanResult.isValid ? '✅' : '❌'}
+                                </div>
+                                <h3 style={{ color: scanResult.isValid ? 'var(--success-500)' : 'var(--error-500)', marginBottom: '0.5rem' }}>
+                                    {scanResult.type || 'Unrecognized QR'}
+                                </h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{scanResult.message}</p>
+                                
+                                {scanResult.details && (
+                                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
+                                        {Object.entries(scanResult.details).map(([key, value]) => (
+                                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                                <span style={{ color: 'var(--text-muted)' }}>{key}:</span>
+                                                <strong style={{ color: 'var(--text-primary)', textAlign: 'right' }}>{value as any}</strong>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                <button className="btn btn-secondary" style={{ width: '100%', marginBottom: '0.5rem' }} onClick={() => setScanResult(null)}>
+                                    Scan Another
+                                </button>
+                            </div>
+                        )}
+                        
+                        <button className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={() => setShowScanner(false)}>
+                            Close Scanner
                         </button>
                     </div>
                 </div>

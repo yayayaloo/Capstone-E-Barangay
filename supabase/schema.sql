@@ -182,3 +182,60 @@ CREATE TRIGGER announcements_updated_at
 -- =============================================
 
 -- Sample announcements will be inserted by admin users through the app
+
+-- =============================================
+-- Verification Function (Bypasses RLS for secure QR lookups)
+-- =============================================
+(from CREATE OR REPLACE FUNCTION verify_document_qr(qr_code_string TEXT)
+RETURNS jsonb AS $$
+DECLARE
+    found_request RECORD;
+    found_profile RECORD;
+BEGIN
+    -- Check if it's a resident profile QR
+    SELECT p.id, p.full_name, p.resident_id_number, p.is_verified 
+    INTO found_profile
+    FROM profiles p
+    WHERE p.id::text = qr_code_string;
+
+    IF FOUND THEN
+        RETURN jsonb_build_object(
+            'isValid', found_profile.is_verified,
+            'type', 'Barangay Identification',
+            'details', jsonb_build_object(
+                'Holder Name', found_profile.full_name,
+                'Resident ID', COALESCE(found_profile.resident_id_number, 'Pending'),
+                'Verification Status', CASE WHEN found_profile.is_verified THEN 'Verified Resident' ELSE 'Unverified' END
+            ),
+            'message', CASE WHEN found_profile.is_verified THEN 'Valid Resident ID recognized.' ELSE 'Resident account is not yet verified.' END
+        );
+    END IF;
+
+    -- Check if it's a service request / document
+    SELECT sr.id, sr.document_type, sr.purpose, sr.status, sr.created_at, p.full_name as holder_name
+    INTO found_request
+    FROM service_requests sr
+    JOIN profiles p ON p.id = sr.resident_id
+    WHERE sr.qr_code_ref = qr_code_string;
+
+    IF FOUND THEN
+        RETURN jsonb_build_object(
+            'isValid', found_request.status IN ('completed', 'ready'),
+            'type', found_request.document_type,
+            'details', jsonb_build_object(
+                'Holder Name', found_request.holder_name,
+                'Purpose', COALESCE(found_request.purpose, 'N/A'),
+                'Status', INITCAP(found_request.status),
+                'Date Issued', TO_CHAR(found_request.created_at, 'YYYY-MM-DD')
+            ),
+            'message', CASE WHEN found_request.status IN ('completed', 'ready') THEN 'Valid official barangay document recognized.' ELSE 'Document is not yet fully processed or approved.' END
+        );
+    END IF;
+
+    -- Not found
+    RETURN jsonb_build_object(
+        'isValid', false,
+        'message', 'QR Code is not recognized by the E-Barangay system.'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
