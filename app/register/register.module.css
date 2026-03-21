@@ -288,6 +288,51 @@
     color: #10b981;
 }
 
+.requirementList {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    background: #f8fafc;
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.requirementItem {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.validRequirement {
+    color: #10b981;
+}
+
+.invalidRequirement {
+    color: #94a3b8;
+}
+
+.matchStatus {
+    margin-top: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.matchSuccess {
+    color: #10b981;
+}
+
+.matchError {
+    color: #ef4444;
+}
+
 .errorMessage {
     padding: 0.75rem 1rem;
     background: #fef2f2;

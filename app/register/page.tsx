@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import styles from './register.module.css'
@@ -32,6 +32,18 @@ export default function RegisterPage() {
     const { signUp } = useAuth()
     const router = useRouter()
 
+    // Real-time validation logic
+    const hasMinLength = password.length >= 6
+    const hasUppercase = /[A-Z]/.test(password)
+    const hasLowercase = /[a-z]/.test(password)
+    const hasNumber = /\d/.test(password)
+    const hasSpecial = /[@$!%*#?&]/.test(password)
+    const allCriteriaMet = hasMinLength && hasUppercase && hasLowercase && hasNumber && hasSpecial
+    
+    // Live confirmation logic
+    const passwordsMatch = password === confirmPassword && confirmPassword.length > 0
+    const showMatchStatus = confirmPassword.length > 0
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
@@ -46,9 +58,8 @@ export default function RegisterPage() {
             return
         }
 
-        const complexityRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])/
-        if (!complexityRegex.test(password)) {
-            setError('Password must contain letters, numbers, and special symbols')
+        if (!allCriteriaMet) {
+            setError('Password does not meet all security requirements')
             return
         }
 
@@ -264,15 +275,26 @@ export default function RegisterPage() {
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
-                            <div className={styles.passwordStrength}>
-                                <div className={`${styles.strengthIndicator} ${
-                                    password.length >= 6 && /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])/.test(password) 
-                                    ? styles.acceptable : styles.invalid
-                                }`}>
-                                    {password.length > 0 ? (
-                                        password.length >= 6 && /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])/.test(password)
-                                        ? '✓ Password Acceptable' : '× Weak Password (needs 6+ chars, letter, number, & symbol)'
-                                    ) : ''}
+                            <div className={styles.requirementList}>
+                                <div className={`${styles.requirementItem} ${hasMinLength ? styles.validRequirement : styles.invalidRequirement}`}>
+                                    {hasMinLength ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                    <span>At least 6 characters</span>
+                                </div>
+                                <div className={`${styles.requirementItem} ${hasUppercase ? styles.validRequirement : styles.invalidRequirement}`}>
+                                    {hasUppercase ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                    <span>Uppercase letter</span>
+                                </div>
+                                <div className={`${styles.requirementItem} ${hasLowercase ? styles.validRequirement : styles.invalidRequirement}`}>
+                                    {hasLowercase ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                    <span>Lowercase letter</span>
+                                </div>
+                                <div className={`${styles.requirementItem} ${hasNumber ? styles.validRequirement : styles.invalidRequirement}`}>
+                                    {hasNumber ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                    <span>Number</span>
+                                </div>
+                                <div className={`${styles.requirementItem} ${hasSpecial ? styles.validRequirement : styles.invalidRequirement}`}>
+                                    {hasSpecial ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                    <span>Special character (@$!%*#?&)</span>
                                 </div>
                             </div>
                         </div>
@@ -296,6 +318,21 @@ export default function RegisterPage() {
                                     {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
+                            {showMatchStatus && (
+                                <div className={`${styles.matchStatus} ${passwordsMatch ? styles.matchSuccess : styles.matchError}`}>
+                                    {passwordsMatch ? (
+                                        <>
+                                            <ShieldCheck size={14} />
+                                            <span>Passwords match</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ShieldAlert size={14} />
+                                            <span>Passwords do not match</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
