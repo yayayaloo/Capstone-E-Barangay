@@ -67,16 +67,24 @@
 }
 
 .backLink {
-    display: inline-block;
-    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: #f3f4f6;
     color: #6b7280;
     text-decoration: none;
-    font-size: 0.875rem;
-    transition: color 0.2s;
+    border-radius: 50%;
+    transition: all 0.2s;
+    margin-bottom: 1.5rem;
+    font-size: 1.25rem;
 }
 
 .backLink:hover {
+    background: #e5e7eb;
     color: #6366f1;
+    transform: scale(1.1);
 }
 
 .logoIcon {
@@ -138,6 +146,38 @@
     border-color: #6366f1;
     background: #ffffff;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.passwordInputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.passwordInputWrapper input {
+    width: 100%;
+    padding-right: 3rem;
+}
+
+.passwordToggle {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    z-index: 3;
+}
+
+.passwordToggle:hover {
+    color: #6366f1;
 }
 
 .errorMessage {

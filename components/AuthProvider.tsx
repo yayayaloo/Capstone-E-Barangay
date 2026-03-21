@@ -12,7 +12,22 @@ interface AuthContextType {
     session: Session | null
     loading: boolean
     signIn: (email: string, password?: string) => Promise<{ error: string | null }>
-    signUp: (email: string, password: string, fullName: string, address?: string, phone?: string) => Promise<{ error: string | null }>
+    signUp: (
+        email: string,
+        password: string,
+        metadata: {
+            fullName: string
+            firstName: string
+            middleName?: string
+            lastName: string
+            suffix?: string
+            gender: 'Male' | 'Female'
+            relationshipStatus: string
+            address?: string
+            phone?: string
+            birthdate?: string
+        }
+    ) => Promise<{ error: string | null }>
     signOut: () => Promise<void>
     refreshProfile: () => Promise<void>
 }
@@ -178,9 +193,17 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                     const fallbackProfile: Profile = {
                         id: currentUser.id,
                         full_name: currentUser.user_metadata?.full_name || 'Resident',
+                        first_name: currentUser.user_metadata?.first_name || null,
+                        middle_name: currentUser.user_metadata?.middle_name || null,
+                        last_name: currentUser.user_metadata?.last_name || null,
+                        suffix: currentUser.user_metadata?.suffix || null,
+                        gender: currentUser.user_metadata?.gender || null,
+                        relationship_status: currentUser.user_metadata?.relationship_status || null,
+                        id_document_url: currentUser.user_metadata?.id_document_url || null,
                         email: currentUser.email || '',
                         address: currentUser.user_metadata?.address || '',
                         phone: currentUser.user_metadata?.phone || '',
+                        birthdate: currentUser.user_metadata?.birthdate || null,
                         role: currentUser.user_metadata?.role || 'resident',
                         is_verified: false,
                         resident_id_number: null,
@@ -219,9 +242,18 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const signUp = async (
         email: string,
         password: string,
-        fullName: string,
-        address?: string,
-        phone?: string
+        metadata: {
+            fullName: string
+            firstName: string
+            middleName?: string
+            lastName: string
+            suffix?: string
+            gender: 'Male' | 'Female'
+            relationshipStatus: string
+            address?: string
+            phone?: string
+            birthdate?: string
+        }
     ) => {
         try {
             const { data, error } = await supabase.auth.signUp({
@@ -229,9 +261,16 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 password,
                 options: {
                     data: {
-                        full_name: fullName,
-                        address: address || null,
-                        phone: phone || null,
+                        full_name: metadata.fullName,
+                        first_name: metadata.firstName,
+                        middle_name: metadata.middleName || null,
+                        last_name: metadata.lastName,
+                        suffix: metadata.suffix || null,
+                        gender: metadata.gender,
+                        relationship_status: metadata.relationshipStatus,
+                        address: metadata.address || null,
+                        phone: metadata.phone || null,
+                        birthdate: metadata.birthdate || null,
                         role: 'resident', // By default new signups are residents
                     }
                 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import styles from './login.module.css'
@@ -10,6 +11,7 @@ import styles from './login.module.css'
 export default function LoginPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const { signIn } = useAuth()
@@ -64,7 +66,7 @@ export default function LoginPage() {
 
             <div className={styles.loginCard}>
                 <div className={styles.logoSection}>
-                    <Link href="/" className={styles.backLink}>← Back to Home</Link>
+                    <Link href="/" className={styles.backLink} title="Back to Home">←</Link>
                     <div className={styles.logoIcon}>🏛️</div>
                     <h1>Welcome Back</h1>
                     <p>Sign in to your E-Barangay account</p>
@@ -91,14 +93,24 @@ export default function LoginPage() {
 
                     <div className={styles.inputGroup}>
                         <label htmlFor="password">Password</label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                        />
+                        <div className={styles.passwordInputWrapper}>
+                            <input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                            />
+                                <button
+                                    type="button"
+                                    className={styles.passwordToggle}
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                        </div>
                     </div>
 
                     <div style={{ textAlign: 'right', marginTop: '-0.5rem' }}>

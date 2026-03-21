@@ -9,6 +9,13 @@ export type AnnouncementCategory = 'community_event' | 'important' | 'emergency'
 export interface Profile {
     id: string
     full_name: string
+    first_name: string | null
+    middle_name: string | null
+    last_name: string | null
+    suffix: string | null
+    gender: 'Male' | 'Female' | null
+    relationship_status: string | null
+    id_document_url: string | null
     email: string
     address: string | null
     phone: string | null
@@ -16,6 +23,7 @@ export interface Profile {
     resident_qr_id: string | null
     is_verified: boolean
     resident_id_number: string | null
+    birthdate: string | null
 
     created_at: string
     updated_at: string

@@ -7,6 +7,13 @@
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name TEXT NOT NULL,
+    first_name TEXT,
+    middle_name TEXT,
+    last_name TEXT,
+    suffix TEXT,
+    gender TEXT CHECK (gender IN ('Male', 'Female')),
+    relationship_status TEXT,
+    id_document_url TEXT,
     email TEXT NOT NULL,
     address TEXT,
     phone TEXT,

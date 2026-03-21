@@ -53,7 +53,7 @@
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 520px;
+    max-width: 600px;
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 24px;
@@ -67,16 +67,24 @@
 }
 
 .backLink {
-    display: inline-block;
-    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: #f3f4f6;
     color: #6b7280;
     text-decoration: none;
-    font-size: 0.875rem;
-    transition: color 0.2s;
+    border-radius: 50%;
+    transition: all 0.2s;
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
 }
 
 .backLink:hover {
+    background: #e5e7eb;
     color: #6366f1;
+    transform: scale(1.1);
 }
 
 .logoIcon {
@@ -144,6 +152,140 @@
     border-color: #6366f1;
     background: #ffffff;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.nameGrid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+}
+
+.select {
+    padding: 0.75rem 1rem;
+    background: #f1f5f9;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    color: #1e293b;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    outline: none;
+    width: 100%;
+}
+
+.select:focus {
+    border-color: #6366f1;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.idUploadSection {
+    margin: 0.5rem 0;
+    background: #f8faff;
+    padding: 1.25rem;
+    border-radius: 16px;
+    border: 1px dashed #cbd5e1;
+}
+
+.idUploadSection label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.uploadInfo {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+.fileInputWrapper {
+    position: relative;
+    width: 100%;
+    height: 3.5rem;
+}
+
+.fileInput {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.fileInputPlaceholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    color: #475569;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    pointer-events: none;
+}
+
+.fileInput:hover + .fileInputPlaceholder {
+    border-color: #6366f1;
+    background: #f1f5f9;
+}
+
+.passwordInputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.passwordInputWrapper input {
+    width: 100%;
+    padding-right: 2.5rem;
+}
+
+.passwordToggle {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    z-index: 3;
+}
+
+.passwordToggle:hover {
+    color: #6366f1;
+}
+
+.passwordStrength {
+    margin-top: 0.4rem;
+    min-height: 1rem;
+}
+
+.strengthIndicator {
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.strengthIndicator.invalid {
+    color: #ef4444;
+}
+
+.strengthIndicator.acceptable {
+    color: #10b981;
 }
 
 .errorMessage {
@@ -221,6 +363,37 @@
 
 .link:hover {
     color: #818cf8;
+}
+
+.checkboxGroup {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 0.5rem 0;
+}
+
+.checkboxGroup input[type="checkbox"] {
+    margin-top: 0.25rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    cursor: pointer;
+}
+
+.checkboxGroup label {
+    font-size: 0.85rem;
+    color: #4b5563;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.inlineLink {
+    color: #6366f1;
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.inlineLink:hover {
+    color: #4f46e5;
 }
 
 @media (max-width: 480px) {
