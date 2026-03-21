@@ -154,7 +154,15 @@ function ResidentPortalContent() {
                 >
                     <div className={styles.idCardMain}>
                         <div className={styles.idCardIcon}>
-                            {profile?.is_verified ? '🛡️' : '👤'}
+                            {profile?.profile_picture_url ? (
+                                <img 
+                                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`} 
+                                    alt="Profile" 
+                                    className={styles.idCardImage}
+                                />
+                            ) : (
+                                profile?.is_verified ? '🛡️' : '👤'
+                            )}
                         </div>
                         <div className={styles.idCardDetails}>
                             <div className={styles.idCardLabel}>E-Barangay Digital ID</div>
@@ -365,52 +373,71 @@ function ResidentPortalContent() {
     const renderProfile = () => (
         <section className={styles.profileSection}>
             <div className="grid grid-2" style={{ gap: '2rem' }}>
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3rem 2rem' }}>
-                    <div style={{ background: '#fff', padding: '1rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', marginBottom: '1.5rem', minWidth: '232px', minHeight: '232px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {profile?.id ? (
-                            <QRCodeSVG value={profile.id} size={200} level="H" />
+                <div className={`glass-card ${styles.profileCard}`}>
+                    <div className={styles.profileImageContainer}>
+                        {profile?.profile_picture_url ? (
+                            <img 
+                                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`} 
+                                alt="Profile" 
+                                className={styles.profileImage}
+                            />
                         ) : (
-                            <div style={{ textAlign: 'center' }}>
-                                <LoadingSpinner size="sm" text="Identifying user..." />
-                            </div>
+                            <div className={styles.placeholderImage}>👤</div>
                         )}
                     </div>
                     <h2 style={{ marginBottom: '0.5rem' }}>{profile?.full_name || 'Barangay Resident'}</h2>
-                    <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>RESIDENT PASS | {profile?.id?.slice(0, 8).toUpperCase() || 'UNLINKED'}</p>
-                    <div style={{ marginTop: '2rem', width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                    <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '1.5rem' }}>
+                        RESIDENT PASS | {profile?.id?.slice(0, 8).toUpperCase() || 'UNLINKED'}
+                    </p>
+                    
+                    <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Resident Since</span>
                             <strong>{new Date(profile?.created_at || '').toLocaleDateString()}</strong>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Account ID</span>
                             <strong style={{ fontSize: '0.8rem' }}>{profile?.id?.split('-')[0] || 'REF'}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Status</span>
+                            <strong style={{ color: profile?.is_verified ? 'var(--success-600)' : 'var(--warning-600)' }}>
+                                {profile?.is_verified ? 'Verified Citizen' : 'Verification Pending'}
+                            </strong>
                         </div>
                     </div>
                 </div>
 
                 <div className="glass-card" style={{ padding: '2rem' }}>
                     <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>👤 Profile Information</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div className={styles.infoGrid}>
                         <div className={styles.infoGroup}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '1px', marginBottom: '0.25rem' }}>Full Name</label>
-                            <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{profile?.full_name}</p>
+                            <label className={styles.infoLabel}>Full Name</label>
+                            <p className={styles.infoValue}>{profile?.full_name}</p>
                         </div>
                         <div className={styles.infoGroup}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '1px', marginBottom: '0.25rem' }}>Email Address</label>
-                            <p>{profile?.email}</p>
+                            <label className={styles.infoLabel}>Gender</label>
+                            <p className={styles.infoValue}>{profile?.gender || 'Not specified'}</p>
                         </div>
                         <div className={styles.infoGroup}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '1px', marginBottom: '0.25rem' }}>Home Address</label>
-                            <p>{profile?.address || 'Not specified'}</p>
+                            <label className={styles.infoLabel}>Relationship Status</label>
+                            <p className={styles.infoValue}>{profile?.relationship_status || 'Not specified'}</p>
                         </div>
                         <div className={styles.infoGroup}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '1px', marginBottom: '0.25rem' }}>Phone Number</label>
-                            <p>{profile?.phone || 'Not specified'}</p>
+                            <label className={styles.infoLabel}>Email Address</label>
+                            <p className={styles.infoValue}>{profile?.email}</p>
+                        </div>
+                        <div className={styles.infoGroup}>
+                            <label className={styles.infoLabel}>Home Address</label>
+                            <p className={styles.infoValue}>{profile?.address || 'Not specified'}</p>
+                        </div>
+                        <div className={styles.infoGroup}>
+                            <label className={styles.infoLabel}>Phone Number</label>
+                            <p className={styles.infoValue}>{profile?.phone || 'Not specified'}</p>
                         </div>
                     </div>
                     <button className="btn btn-primary" style={{ marginTop: '2.5rem', width: '100%' }} onClick={() => setShowProfileModal(true)}>
-                        Edit Profile Information
+                        Edit Information
                     </button>
                 </div>
             </div>
@@ -614,7 +641,13 @@ function ResidentPortalContent() {
             </button>
 
             {/* ChatBot Component */}
-            {showChatBot && <ChatBot onClose={() => setShowChatBot(false)} />}
+            {showChatBot && (
+                <ChatBot 
+                    onClose={() => setShowChatBot(false)} 
+                    userProfile={profile}
+                    userRequests={requests}
+                />
+            )}
 
             {/* Request Document Modal */}
             {showRequestModal && (

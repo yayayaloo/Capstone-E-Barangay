@@ -183,12 +183,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 .eq('id', userId)
                 .single()
 
+            const { data: { user: currentUser } } = await supabase.auth.getUser()
+
             if (dbError) {
                 console.warn('DB Profile error, attempting metadata fallback:', dbError.message)
                 
                 // FALLBACK: Use session user metadata if profile table row or columns are missing
-                const { data: { user: currentUser } } = await supabase.auth.getUser()
-                
                 if (currentUser && mountedRef.current) {
                     const fallbackProfile: Profile = {
                         id: currentUser.id,
@@ -200,6 +200,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                         gender: currentUser.user_metadata?.gender || null,
                         relationship_status: currentUser.user_metadata?.relationship_status || null,
                         id_document_url: currentUser.user_metadata?.id_document_url || null,
+                        profile_picture_url: currentUser.user_metadata?.profile_picture_url || null,
                         email: currentUser.email || '',
                         address: currentUser.user_metadata?.address || '',
                         phone: currentUser.user_metadata?.phone || '',
@@ -214,7 +215,19 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                     setProfile(fallbackProfile)
                 }
             } else {
-                if (mountedRef.current) setProfile(dbData as Profile)
+                if (mountedRef.current && dbData) {
+                    // Merge DB data with user_metadata in case the DB row is missing registration fields
+                    const mergedProfile: Profile = {
+                        ...(dbData as Profile),
+                        gender: dbData.gender || currentUser?.user_metadata?.gender || null,
+                        relationship_status: dbData.relationship_status || currentUser?.user_metadata?.relationship_status || null,
+                        address: dbData.address || currentUser?.user_metadata?.address || null,
+                        phone: dbData.phone || currentUser?.user_metadata?.phone || null,
+                        full_name: dbData.full_name || currentUser?.user_metadata?.full_name || 'Resident',
+                        email: dbData.email || currentUser?.email || ''
+                    }
+                    setProfile(mergedProfile)
+                }
             }
         } catch (error) {
             console.error('Critical exception fetching profile', error)

@@ -24,6 +24,7 @@ export interface Profile {
     is_verified: boolean
     resident_id_number: string | null
     birthdate: string | null
+    profile_picture_url: string | null
 
     created_at: string
     updated_at: string

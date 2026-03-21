@@ -73,10 +73,12 @@ export default function RegisterPage() {
             return
         }
 
+        /* Temporarily disabled for testing
         if (!idDocument) {
             setError('Please upload a valid ID to prove residency in Gordon Heights')
             return
         }
+        */
 
         if (!agreedToTerms) {
             setError('Please agree to the Terms and Conditions and Privacy Policy')
@@ -107,34 +109,51 @@ export default function RegisterPage() {
         }
 
         try {
-            // Upload ID Document
-            // First get the user to get the ID (since auth metadata might not have synced yet)
             const { data: { user: newUser }, error: userError } = await supabase.auth.getUser()
             
             if (userError || !newUser) {
-                throw new Error('Failed to retrieve user ID for document upload')
+                throw new Error('Failed to retrieve user ID for profile creation')
             }
 
-            const fileName = `id_verification_${Date.now()}_${idDocument.name.replace(/\s+/g, '_')}`
-            const filePath = `${newUser.id}/${fileName}`
-            
-            const { error: uploadError } = await supabase.storage
-                .from('resident-requirements')
-                .upload(filePath, idDocument)
+            let filePath = null;
 
-            if (uploadError) {
-                throw new Error(`Failed to upload ID document: ${uploadError.message}`)
+            if (idDocument) {
+                // Upload ID Document
+                const fileName = `id_verification_${Date.now()}_${idDocument.name.replace(/\s+/g, '_')}`
+                filePath = `${newUser.id}/${fileName}`
+                
+                const { error: uploadError } = await supabase.storage
+                    .from('resident-requirements')
+                    .upload(filePath, idDocument)
+
+                if (uploadError) {
+                    throw new Error(`Failed to upload ID document: ${uploadError.message}`)
+                }
             }
 
-            // Update profile with ID document URL
-            const { error: updateError } = await supabase
+            // Create profile record
+            const { error: insertError } = await supabase
                 .from('profiles')
-                .update({ id_document_url: filePath })
-                .eq('id', newUser.id)
+                .insert({
+                    id: newUser.id,
+                    email: email,
+                    full_name: fullName,
+                    first_name: firstName,
+                    middle_name: middleName || null,
+                    last_name: lastName,
+                    suffix: suffix || null,
+                    gender: gender,
+                    relationship_status: relationshipStatus,
+                    address: address || null,
+                    phone: phone || null,
+                    role: 'resident',
+                    is_verified: false,
+                    id_document_url: filePath
+                })
 
-            if (updateError) {
-                console.warn('Profile ID update failed (DB may not be ready):', updateError.message)
-                // We'll proceed as metadata should have the info and admin can check storage
+            if (insertError) {
+                console.error('Failed to create profile record:', insertError.message)
+                throw new Error(`Profile creation failed: ${insertError.message}`)
             }
 
             setSuccess(true)

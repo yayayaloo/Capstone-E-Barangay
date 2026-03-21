@@ -3,42 +3,69 @@
 import { useState, useRef, useEffect } from 'react'
 import styles from './ChatBot.module.css'
 
+import { ServiceRequest, Profile } from '@/lib/types'
+
 interface Message {
     id: number
-    text: string
+    text: string | React.ReactNode
     sender: 'user' | 'bot'
     timestamp: Date
 }
 
 interface ChatBotProps {
     onClose: () => void
+    userProfile?: Profile | null
+    userRequests?: ServiceRequest[]
 }
 
-// Mock responses for demonstration
-const mockResponses: Record<string, string> = {
-    'hello': 'Hello! I\'m your E-Barangay AI assistant. How can I help you today?',
-    'hi': 'Hi there! Welcome to E-Barangay Gordon Heights. What can I assist you with?',
-    'clearance': 'To apply for a Barangay Clearance, you\'ll need: (1) Valid ID, (2) Proof of residency, and (3) 1x1 photo. You can start your application by clicking "Request Document" on your dashboard.',
-    'requirements': 'It depends on the service you need. Which document would you like to apply for? We offer Barangay Clearance, Business Permits, Barangay ID, and various Certificates.',
-    'hours': 'Our online portal is available 24/7! However, the Barangay Hall is open Monday to Friday, 8:00 AM to 5:00 PM. Document pickup is available during office hours.',
-    'contact': 'You can reach us at:\n📞 Phone: (123) 456-7890\n✉️ Email: info@ebarangay-gh.gov.ph\n📍 Address: Barangay Hall, Gordon Heights',
-    'status': 'You can track your application status by clicking "Track Status" on your dashboard. You\'ll see all your pending and completed requests there.',
-    'qr': 'QR codes on our documents allow instant verification of authenticity. Anyone can scan the QR code to verify that the document was officially issued by our office.',
-    'help': 'I can help you with:\n• Document requirements\n• Application process\n• Office hours and contact info\n• Tracking your requests\n• General barangay information\n\nWhat would you like to know?',
+// Expert Knowledge Base
+const KNOWLEDGE_BASE = {
+    clearance: {
+        keywords: ['clearance', 'barangay clearance', 'certificate of clearance'],
+        response: (name: string) => `To apply for a **Barangay Clearance**, ${name ? name + ', ' : ''}you'll need:\n\n1. **Valid ID** (Government issued)\n2. **Recent Cedula** (Community Tax Certificate)\n3. **Application Fee** (approx. ₱50-100)\n\nYou can submit your request directly through the "Request Document" button on your dashboard.`,
+        action: 'Request Document'
+    },
+    permits: {
+        keywords: ['permit', 'business permit', 'construction', 'building permit'],
+        response: () => `For **Business or Construction Permits**, the requirements include:\n\n• DTI/SEC Registration\n• Contract of Lease or Title\n• Detailed Plan (for construction)\n• Clearance from Barangay Office\n\nWould you like me to show you where to upload these documents?`,
+    },
+    id_request: {
+        keywords: ['id', 'barangay id', 'digital id', 'identification'],
+        response: (isVerified: boolean) => isVerified 
+            ? `Your **E-Barangay Digital ID** is already active and verified! You can view the QR code on your profile tab for instant verification.`
+            : `To get your **Barangay ID**, ensure your profile is complete with a valid ID upload. Once the Admin verifies your residency, your Digital ID will be automatically generated.`,
+    },
+    qr_verification: {
+        keywords: ['qr', 'verify', 'verification', 'scan'],
+        response: () => `Our **QR Verification system** ensures all documents are authentic. Each issued clearance or ID has a unique QR code that, when scanned by authorities, confirms your record in our secure database.`,
+    },
+    status_check: {
+        keywords: ['status', 'my request', 'track', 'pending', 'check'],
+        response: (requests?: ServiceRequest[]) => {
+            if (!requests || requests.length === 0) return "You don't have any active service requests at the moment. Would you like to start one?";
+            const pending = requests.filter(r => r.status === 'pending' || r.status === 'processing');
+            if (pending.length === 0) return `All your recent requests are completed! You can view them in the "My Requests" tab.`;
+            return `You have **${pending.length} pending request(s)**:\n${pending.map(r => `• ${r.document_type} (${r.status})`).join('\n')}\n\nYou'll get an update once they are ready for pickup!`;
+        }
+    },
+    gordon_heights: {
+        keywords: ['gordon heights', 'barangay info', 'location', 'hall'],
+        response: () => `Barangay Gordon Heights is one of the largest barangays in Olongapo City. Our Barangay Hall is located at the heart of the community and is open Monday-Friday, 8AM to 5PM.`,
+    }
 }
 
 const quickReplies = [
-    'Barangay Clearance requirements',
-    'Office hours',
-    'Track my application',
-    'Contact information',
+    'How to get Barangay Clearance?',
+    'Check my request status',
+    'What is QR Verification?',
+    'Office hours and location',
 ]
 
-export default function ChatBot({ onClose }: ChatBotProps) {
+export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotProps) {
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 1,
-            text: 'Hello! I\'m your AI assistant for E-Barangay Gordon Heights. How can I help you today?',
+            text: `Hello ${userProfile?.first_name || 'Resident'}! I'm your AI assistant for E-Barangay Gordon Heights. How can I assist you today?`,
             sender: 'bot',
             timestamp: new Date(),
         }
@@ -55,18 +82,47 @@ export default function ChatBot({ onClose }: ChatBotProps) {
         scrollToBottom()
     }, [messages])
 
-    const getBotResponse = (userMessage: string): string => {
+    const getBotResponse = (userMessage: string): string | React.ReactNode => {
         const lowerMessage = userMessage.toLowerCase()
 
-        // Check for keyword matches
-        for (const [keyword, response] of Object.entries(mockResponses)) {
-            if (lowerMessage.includes(keyword)) {
-                return response
-            }
+        // 1. Check for specific status query
+        if (lowerMessage.includes('status') || lowerMessage.includes('track') || lowerMessage.includes('my request')) {
+            return KNOWLEDGE_BASE.status_check.response(userRequests)
+        }
+
+        // 2. Check for ID related query
+        if (lowerMessage.includes('id') || lowerMessage.includes('identification')) {
+            return KNOWLEDGE_BASE.id_request.response(userProfile?.is_verified || false)
+        }
+
+        // 3. General Keyword Matching
+        if (lowerMessage.includes('clearance')) return KNOWLEDGE_BASE.clearance.response(userProfile?.first_name || '')
+        if (lowerMessage.includes('permit')) return KNOWLEDGE_BASE.permits.response()
+        if (lowerMessage.includes('qr') || lowerMessage.includes('verify')) return KNOWLEDGE_BASE.qr_verification.response()
+        if (lowerMessage.includes('gordon') || lowerMessage.includes('hall')) return KNOWLEDGE_BASE.gordon_heights.response()
+        
+        if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+            return `Hello ${userProfile?.first_name || 'Resident'}! I'm your E-Barangay assistant. I can help you with documents, status updates, or general info. What's on your mind?`
+        }
+
+        if (lowerMessage.includes('help')) {
+            return "I can help you with:\n• Requesting **Clearances & Permits**\n• Checking your **Application Status**\n• Understanding **QR Verification**\n• **Barangay ID** information\n\nJust type what you're looking for!"
         }
 
         // Default response
-        return 'I\'m not sure about that. You can ask me about:\n• Document requirements\n• Office hours\n• Application tracking\n• Contact information\n\nOr type "help" for more options.'
+        return "I'm not quite sure about that specific query. Since I'm still learning, could you try asking about 'Clearance requirements', 'My request status', or 'QR verification'?"
+    }
+
+    // Simple formatter for bot messages
+    const formatText = (text: string | React.ReactNode) => {
+        if (typeof text !== 'string') return text;
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        return parts.map((part, index) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong key={index}>{part.slice(2, -2)}</strong>;
+            }
+            return part;
+        });
     }
 
     const handleSend = (message?: string) => {
@@ -136,7 +192,7 @@ export default function ChatBot({ onClose }: ChatBotProps) {
                                 <div className={styles.messageAvatar}>🤖</div>
                             )}
                             <div className={styles.messageContent}>
-                                <div className={styles.messageText}>{message.text}</div>
+                                <div className={styles.messageText}>{formatText(message.text)}</div>
                                 <div className={styles.messageTime}>
                                     {message.timestamp.toLocaleTimeString([], {
                                         hour: '2-digit',

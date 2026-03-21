@@ -342,6 +342,13 @@
     justify-content: center;
     font-size: 2rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.idCardImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .idCardDetails {
@@ -506,7 +513,64 @@
     animation: fadeIn 0.3s ease;
 }
 
-.infoGroup p {
+.profileCard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 2rem;
+    position: relative;
+}
+
+.profileImageContainer {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    border: 4px solid white;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profileImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.placeholderImage {
+    font-size: 5rem;
+    opacity: 0.5;
+}
+
+.infoGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.infoGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.infoLabel {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    margin-bottom: 0.25rem;
+}
+
+.infoValue {
+    font-size: 1.1rem;
+    font-weight: 600;
     color: var(--text-primary);
     margin: 0;
 }
