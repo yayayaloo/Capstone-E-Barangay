@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react'
@@ -29,8 +29,20 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const [passwordError, setPasswordError] = useState('')
-    const { signUp } = useAuth()
+    const { signUp, verifyOtp, resendOtp } = useAuth()
     const router = useRouter()
+
+    const [step, setStep] = useState<1 | 2>(1)
+    const [otp, setOtp] = useState('')
+    const [resendCooldown, setResendCooldown] = useState(0)
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout
+        if (resendCooldown > 0) {
+            timer = setTimeout(() => setResendCooldown(c => c - 1), 1000)
+        }
+        return () => clearTimeout(timer)
+    }, [resendCooldown])
 
     // Real-time validation logic
     const hasMinLength = password.length >= 6
@@ -100,7 +112,7 @@ export default function RegisterPage() {
             address: address || undefined,
             phone: phone || undefined,
             birthdate: birthdate || undefined
-        })
+        }, `${window.location.origin}/register`)
 
         if (signUpError) {
             setError(signUpError)
@@ -108,13 +120,51 @@ export default function RegisterPage() {
             return
         }
 
+        setStep(2)
+        setLoading(false)
+    }
+
+    const handleResendOtp = async () => {
+        if (resendCooldown > 0) return
+        setLoading(true)
+        setError('')
+        const { error: resendError } = await resendOtp(email)
+        if (resendError) {
+            setError(resendError)
+            setLoading(false)
+            return
+        }
+        setResendCooldown(60)
+        setLoading(false)
+    }
+
+    const handleVerifyOtp = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+        setLoading(true)
+
+        if (!otp || otp.length !== 6) {
+            setError('Please enter a valid 6-digit OTP')
+            setLoading(false)
+            return
+        }
+
+        const { error: otpError } = await verifyOtp(email, otp)
+
+        if (otpError) {
+            setError(otpError)
+            setLoading(false)
+            return
+        }
+
         try {
-            const { data: { user: newUser }, error: userError } = await supabase.auth.getUser()
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
             
-            if (userError || !newUser) {
-                throw new Error('Failed to retrieve user ID for profile creation')
+            if (sessionError || !session?.user) {
+                throw new Error('Verification succeeded but session failed to establish.')
             }
 
+            const newUser = session.user
             let filePath = null;
 
             if (idDocument) {
@@ -130,6 +180,8 @@ export default function RegisterPage() {
                     throw new Error(`Failed to upload ID document: ${uploadError.message}`)
                 }
             }
+
+            const fullName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}${suffix ? ' ' + suffix : ''}`.trim()
 
             // Create profile record
             const { error: insertError } = await supabase
@@ -157,10 +209,11 @@ export default function RegisterPage() {
             }
 
             setSuccess(true)
+            await supabase.auth.signOut()
             setTimeout(() => router.push('/login'), 3000)
         } catch (err: any) {
-            console.error('Post-signup error:', err)
-            setError(`Account created, but document upload failed: ${err.message}. Please contact support.`)
+            console.error('Post-verification error:', err)
+            setError(`Account verified, but profile setup failed: ${err.message}. Please contact support.`)
             setLoading(false)
         }
     }
@@ -179,6 +232,64 @@ export default function RegisterPage() {
                         <p>Your account has been created and is now under review. Please check your email to verify your account. You will be redirected to the login page shortly.</p>
                         <Link href="/login" className={styles.link}>Go to Login →</Link>
                     </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (step === 2) {
+        return (
+            <div className={styles.registerContainer}>
+                <div className={styles.loginBackground}>
+                    <div className={styles.gradientOrb1} />
+                    <div className={styles.gradientOrb2} />
+                </div>
+                <div className={styles.registerCard}>
+                    <div className={styles.logoSection}>
+                        <div className={styles.logoIcon}>🔐</div>
+                        <h1>Verify Your Email</h1>
+                        <p>We sent a 6-digit code to {email}</p>
+                    </div>
+
+                    <form onSubmit={handleVerifyOtp} className={styles.form}>
+                        {error && (
+                            <div className={styles.errorMessage}>
+                                ⚠️ {error}
+                            </div>
+                        )}
+                        <div className={styles.inputGroup}>
+                            <label htmlFor="otp">Enter OTP</label>
+                            <input
+                                id="otp"
+                                type="text"
+                                maxLength={6}
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                                placeholder="123456"
+                                required
+                                style={{ textAlign: 'center', letterSpacing: '0.25em', fontSize: '1.25rem' }}
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            className={styles.submitButton}
+                            disabled={loading || otp.length !== 6}
+                        >
+                            {loading ? 'Verifying...' : 'Verify Email'}
+                        </button>
+                        
+                        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                            <button
+                                type="button"
+                                onClick={handleResendOtp}
+                                disabled={resendCooldown > 0 || loading}
+                                className={styles.link}
+                                style={{ background: 'none', border: 'none', cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer' }}
+                            >
+                                {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         )

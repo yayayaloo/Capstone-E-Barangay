@@ -12,6 +12,8 @@ interface AuthContextType {
     session: Session | null
     loading: boolean
     signIn: (email: string, password?: string) => Promise<{ error: string | null }>
+    verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>
+    resendOtp: (email: string) => Promise<{ error: string | null }>
     signUp: (
         email: string,
         password: string,
@@ -26,7 +28,8 @@ interface AuthContextType {
             address?: string
             phone?: string
             birthdate?: string
-        }
+        },
+        emailRedirectTo?: string
     ) => Promise<{ error: string | null }>
     signOut: () => Promise<void>
     refreshProfile: () => Promise<void>
@@ -252,6 +255,26 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         }
     }
 
+    const verifyOtp = async (email: string, token: string) => {
+        try {
+            const { error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' })
+            return { error: error?.message || null }
+        } catch (error: any) {
+            return { error: error.message || 'An error occurred during verification' }
+        }
+    }
+
+    const resendOtp = async (email: string) => {
+        try {
+            const { error } = await supabase.auth.resend({ type: 'signup', email, options: {
+                emailRedirectTo: window.location.origin + '/register'
+            } })
+            return { error: error?.message || null }
+        } catch (error: any) {
+            return { error: error.message || 'An error occurred while resending the OTP' }
+        }
+    }
+
     const signUp = async (
         email: string,
         password: string,
@@ -266,13 +289,15 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
             address?: string
             phone?: string
             birthdate?: string
-        }
+        },
+        emailRedirectTo?: string
     ) => {
         try {
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
+                    emailRedirectTo,
                     data: {
                         full_name: metadata.fullName,
                         first_name: metadata.firstName,
@@ -305,7 +330,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, profile, session, loading, signIn, signUp, signOut, refreshProfile }}>
+        <AuthContext.Provider value={{ user, profile, session, loading, signIn, signUp, verifyOtp, resendOtp, signOut, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     )
