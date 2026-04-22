@@ -61,6 +61,25 @@ CREATE TABLE IF NOT EXISTS qr_verifications (
     verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 5. Audit Logs table
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action TEXT NOT NULL,
+    description TEXT NOT NULL,
+    performed_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 6. Feedback table
+CREATE TABLE IF NOT EXISTS feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resident_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- =============================================
 -- Indexes for performance
 -- =============================================
@@ -76,6 +95,8 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qr_verifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 
 -- =============================================
 -- RLS Policies
@@ -153,6 +174,24 @@ CREATE POLICY "Admins can view verifications"
 CREATE POLICY "Admins can create verifications"
     ON qr_verifications FOR INSERT
     WITH CHECK (is_admin());
+
+-- AUDIT_LOGS policies
+CREATE POLICY "Admins can view audit logs"
+    ON audit_logs FOR SELECT
+    USING (is_admin());
+
+CREATE POLICY "Admins can create audit logs"
+    ON audit_logs FOR INSERT
+    WITH CHECK (is_admin());
+
+-- FEEDBACK policies
+CREATE POLICY "Admins can view feedback"
+    ON feedback FOR SELECT
+    USING (is_admin());
+
+CREATE POLICY "Residents can create feedback"
+    ON feedback FOR INSERT
+    WITH CHECK (auth.uid() = resident_id);
 
 -- =============================================
 -- Auto-update updated_at trigger
@@ -239,3 +278,64 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- =============================================
+-- Public Statistics Function
+-- =============================================
+CREATE OR REPLACE FUNCTION get_public_stats()
+RETURNS json AS $$
+DECLARE
+    res_count INT;
+    req_count INT;
+BEGIN
+    SELECT count(*) INTO res_count FROM profiles WHERE role = 'resident';
+    SELECT count(*) INTO req_count FROM service_requests;
+    
+    RETURN json_build_object(
+        'residents', res_count,
+        'requests', req_count
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- =============================================
+-- Auth Hook for Automatic Profile Creation
+-- =============================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, email, role)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'full_name', 'Resident'),
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'role', 'resident')
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger the function every time a user is created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- =============================================
+-- Storage Buckets & Policies
+-- =============================================
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('resident-requirements', 'resident-requirements', false)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Residents can upload their own requirements" 
+  ON storage.objects FOR INSERT 
+  WITH CHECK (bucket_id = 'resident-requirements' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
+
+CREATE POLICY "Residents can view their own requirements" 
+  ON storage.objects FOR SELECT 
+  USING (bucket_id = 'resident-requirements' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
+
+CREATE POLICY "Admins can view all requirements" 
+  ON storage.objects FOR SELECT 
+  USING (bucket_id = 'resident-requirements' AND is_admin());

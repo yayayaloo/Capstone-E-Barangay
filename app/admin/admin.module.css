@@ -536,8 +536,15 @@
 }
 
 @keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-10px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 /* ─── Avatar ──────────────────────────────────────────────── */
@@ -781,12 +788,15 @@
 @media (max-width: 968px) {
     .dashboardLayout {
         grid-template-columns: 1fr;
-        min-height: calc(100vh - 145px); /* Header + BottomNav */
-        margin-bottom: 65px; /* BottomNav height */
+        min-height: calc(100vh - 145px);
+        /* Header + BottomNav */
+        margin-bottom: 65px;
+        /* BottomNav height */
     }
 
     .sidebar {
-        display: none; /* Hide sidebar in favor of BottomNav */
+        display: none;
+        /* Hide sidebar in favor of BottomNav */
     }
 
     .mainContent {

@@ -6,18 +6,20 @@ import styles from './RequestModal.module.css'
 interface RequestModalProps {
     onClose: () => void
     onSubmit: (documentType: string, purpose: string, attachment: File | null) => Promise<void>
+    initialType?: string
 }
 
 const documentTypes = [
-    { value: 'Barangay Clearance', label: '📄 Barangay Clearance', desc: 'For employment, business, or government transactions', reqs: 'Valid ID, Proof of residency' },
-    { value: 'Business Permit', label: '🏠 Business Permit', desc: 'Register or renew a business permit', reqs: 'DTI/SEC registration, Occupancy permit' },
-    { value: 'Barangay ID', label: '🆔 Barangay ID', desc: 'Official barangay identification card', reqs: 'Birth Certificate, 2x2 Photo' },
-    { value: 'Certificate', label: '📝 Certificate', desc: 'Indigency, residency, or other certificates', reqs: 'Valid ID, Purpose statement' },
-
+    { value: 'Barangay Clearance', label: '📄 Barangay Clearance', desc: 'Verification of residency, good moral character, no derogatory record.', reqs: 'Valid ID (Php 50.00)' },
+    { value: 'Barangay Certification', label: '📝 Barangay Certification', desc: 'For Residency, Loan, Good Moral Character.', reqs: 'Valid ID (Php 50.00)' },
+    { value: 'Business Clearance', label: '🏢 Business Clearance', desc: 'Compliance for business permit within Gordon Heights.', reqs: 'DTI Certificate (Free)' },
+    { value: 'Lot Certification', label: '🏡 Lot / Building Certification', desc: 'Issued to actual lot occupants for compliance to government agencies.', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment, etc. (Php 1.00/sqm)' },
+    { value: 'First Time Job Seeker', label: '💼 First Time Job Seeker', desc: 'Waives fees for pre-employment requirements (Ages 18-30).', reqs: 'Valid ID (Free)' },
+    { value: 'Indigency', label: '🤝 Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
 ]
 
-export default function RequestModal({ onClose, onSubmit }: RequestModalProps) {
-    const [selectedType, setSelectedType] = useState('')
+export default function RequestModal({ onClose, onSubmit, initialType }: RequestModalProps) {
+    const [selectedType, setSelectedType] = useState(initialType || '')
     const [purpose, setPurpose] = useState('')
     const [attachment, setAttachment] = useState<File | null>(null)
     const [submitting, setSubmitting] = useState(false)

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import Image from 'next/image'
 import styles from './page.module.css'
 
 export default function Home() {
@@ -11,13 +12,13 @@ export default function Home() {
     useEffect(() => {
         async function fetchStats() {
             try {
-                const [resRes, reqRes] = await Promise.all([
-                    supabase.from('profiles').select('*', { count: 'exact', head: true }),
-                    supabase.from('service_requests').select('*', { count: 'exact', head: true })
-                ])
+                const { data, error } = await supabase.rpc('get_public_stats')
+                
+                if (error) throw error
+
                 setStats({
-                    residents: resRes.count?.toLocaleString() || '0',
-                    requests: reqRes.count?.toLocaleString() || '0'
+                    residents: data?.residents?.toLocaleString() || '0',
+                    requests: data?.requests?.toLocaleString() || '0'
                 })
             } catch (e) {
                 console.error(e)
@@ -32,7 +33,7 @@ export default function Home() {
             <nav className={styles.nav}>
                 <div className="container flex-between">
                     <div className={styles.logo}>
-                        <span className={styles.logoIcon}>🏛️</span>
+                        <Image src="/logo.png" alt="Barangay Gordon Heights Logo" width={40} height={40} className={styles.logoImage} />
                         <span>E-Barangay</span>
                     </div>
                     <div className={styles.navLinks}>

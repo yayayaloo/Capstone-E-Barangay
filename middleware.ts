@@ -66,19 +66,34 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Redirect authenticated users away from landing, login, and register pages
-    if (session && (pathname === '/' || pathname === '/login' || pathname === '/register')) {
-        // Fallback to checking DB for role if not in user_metadata
+    if (session) {
         let role = session.user.user_metadata?.role;
         
+        // Fallback to checking DB for role if not in user_metadata
         if (!role) {
             const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
             role = data?.role || 'resident';
         }
-        
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = role === 'admin' ? '/admin' : '/resident'
-        return NextResponse.redirect(redirectUrl)
+
+        // Enforce Role-Based Access Control (RBAC)
+        if (pathname.startsWith('/admin') && role !== 'admin') {
+            const redirectUrl = request.nextUrl.clone()
+            redirectUrl.pathname = '/resident'
+            return NextResponse.redirect(redirectUrl)
+        }
+
+        if (pathname.startsWith('/resident') && role === 'admin') {
+            const redirectUrl = request.nextUrl.clone()
+            redirectUrl.pathname = '/admin'
+            return NextResponse.redirect(redirectUrl)
+        }
+
+        // Redirect authenticated users away from landing, login, and register pages
+        if (pathname === '/' || pathname === '/login' || pathname === '/register') {
+            const redirectUrl = request.nextUrl.clone()
+            redirectUrl.pathname = role === 'admin' ? '/admin' : '/resident'
+            return NextResponse.redirect(redirectUrl)
+        }
     }
 
     return supabaseResponse

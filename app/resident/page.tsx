@@ -27,6 +27,7 @@ function ResidentPortalContent() {
     const [activeTab, setActiveTab] = useState('overview')
     const [showChatBot, setShowChatBot] = useState(false)
     const [showRequestModal, setShowRequestModal] = useState(false)
+    const [selectedServiceType, setSelectedServiceType] = useState('')
     const [showProfileModal, setShowProfileModal] = useState(false)
     const [showScanner, setShowScanner] = useState(false)
     const [scanning, setScanning] = useState(false)
@@ -350,6 +351,20 @@ function ResidentPortalContent() {
                                     <span>222-0402</span>
                                 </div>
                             </a>
+                            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle} style={{ background: '#1877f220', color: '#1877f2' }}>📘</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>Official Facebook</strong>
+                                    <span style={{ fontSize: '0.65rem' }}>Bago at progresibong Gordon Heights</span>
+                                </div>
+                            </a>
+                            <a href="mailto:barangaygordonheights2018@gmail.com" className={styles.hotlineItem}>
+                                <div className={styles.hotlineCircle} style={{ background: '#ea433520', color: '#ea4335' }}>✉️</div>
+                                <div className={styles.hotlineContent}>
+                                    <strong>Email Address</strong>
+                                    <span style={{ fontSize: '0.65rem' }}>barangaygordonheights...</span>
+                                </div>
+                            </a>
                         </div>
                     </div>
 
@@ -567,17 +582,27 @@ function ResidentPortalContent() {
 
             <section className={styles.availableServices} style={{ marginTop: '4rem' }}>
                 <h2 style={{ marginBottom: '1.5rem' }}>Available Services</h2>
-                <div className="grid grid-4" style={{ gap: '1rem' }}>
+                <div className="grid grid-3" style={{ gap: '1rem' }}>
                     {[
-                        { type: 'Barangay Clearance', desc: 'Employment / Business' },
-                        { type: 'Business Permit', desc: 'New / Renewal' },
-                        { type: 'Barangay ID', desc: 'Citizen Identification' },
-                        { type: 'Certificate', desc: 'Indigency / Residency' },
+                        { type: 'Barangay Clearance', desc: 'Verification of residency & good moral character', fee: 'Php 50.00' },
+                        { type: 'Barangay Certification', desc: 'Residency, Loan, Good Moral Character', fee: 'Php 50.00' },
+                        { type: 'Business Clearance', desc: 'Compliance for business permit within Gordon Heights', fee: 'Free' },
+                        { type: 'Lot Certification', desc: 'Issued to lot occupants for government agencies', fee: 'Php 1.00/sqm' },
+                        { type: 'First Time Job Seeker', desc: 'Waives pre-employment fees (Ages 18–30)', fee: 'Free' },
+                        { type: 'Indigency', desc: 'Certification of financial status for assistance', fee: 'Free' },
                     ].map(s => (
-                        <div className="glass-card" key={s.type} style={{ padding: '1.25rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => setShowRequestModal(true)}>
-                            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{getDocIcon(s.type)}</div>
-                            <h4 style={{ fontSize: '0.95rem' }}>{s.type}</h4>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.desc}</p>
+                        <div
+                            className="glass-card"
+                            key={s.type}
+                            style={{ padding: '1.25rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.15s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}
+                            onClick={() => { setSelectedServiceType(s.type); setShowRequestModal(true); }}
+                        >
+                            <div style={{ fontSize: '2rem' }}>{getDocIcon(s.type)}</div>
+                            <h4 style={{ fontSize: '0.9rem', margin: 0 }}>{s.type}</h4>
+                            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>{s.desc}</p>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: s.fee === 'Free' ? '#10b981' : 'var(--primary-400)', background: s.fee === 'Free' ? '#10b98115' : 'var(--primary-50, #eff6ff)', padding: '0.15rem 0.6rem', borderRadius: '999px', marginTop: '0.25rem' }}>
+                                {s.fee}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -610,9 +635,11 @@ function ResidentPortalContent() {
     const getDocIcon = (type: string) => {
         const iconMap: Record<string, string> = {
             'Barangay Clearance': '📄',
-            'Business Permit': '🏠',
-            'Barangay ID': '🆔',
-            'Certificate': '📝',
+            'Barangay Certification': '📝',
+            'Business Clearance': '🏢',
+            'Lot Certification': '🏡',
+            'First Time Job Seeker': '💼',
+            'Indigency': '🤝',
         }
         return iconMap[type] || '📄'
     }
@@ -716,7 +743,8 @@ function ResidentPortalContent() {
             {/* Request Document Modal */}
             {showRequestModal && (
                 <RequestModal
-                    onClose={() => setShowRequestModal(false)}
+                    initialType={selectedServiceType}
+                    onClose={() => { setShowRequestModal(false); setSelectedServiceType(''); }}
                     onSubmit={handleRequestSubmit}
                 />
             )}

@@ -66,3 +66,13 @@ export interface QRVerification {
     verified_by: string | null
     verified_at: string
 }
+
+export interface AuditLog {
+    id: string
+    action: string
+    description: string
+    performed_by: string
+    created_at: string
+    // Joined fields
+    admin_name?: string
+}

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
@@ -59,83 +60,135 @@ export default function LoginPage() {
 
     return (
         <div className={styles.loginContainer}>
-            <div className={styles.loginBackground}>
-                <div className={styles.gradientOrb1} />
-                <div className={styles.gradientOrb2} />
-            </div>
-
-            <div className={styles.loginCard}>
-                <div className={styles.logoSection}>
-                    <Link href="/" className={styles.backLink} title="Back to Home">←</Link>
-                    <div className={styles.logoIcon}>🏛️</div>
-                    <h1>Welcome Back</h1>
-                    <p>Sign in to your E-Barangay account</p>
-                </div>
-
-                <form onSubmit={handleSubmit} className={styles.form}>
-                    {error && (
-                        <div className={styles.errorMessage}>
-                            ⚠️ {error}
+            
+            {/* Left Panel - Branding */}
+            <div className={styles.brandingPanel}>
+                <div className={styles.brandingBackground} />
+                <div className={styles.brandingContent}>
+                    <div className={styles.brandHeader}>
+                        <Image src="/logo.png" alt="Logo" width={64} height={64} />
+                        <div>
+                            <h2 className={styles.brandTitle}>Barangay Gordon Heights</h2>
+                            <div className={styles.brandSubtitle}>Olongapo City</div>
                         </div>
-                    )}
-
-                    <div className={styles.inputGroup}>
-                        <label htmlFor="email">Email Address</label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            required
-                        />
                     </div>
 
-                    <div className={styles.inputGroup}>
-                        <label htmlFor="password">Password</label>
-                        <div className={styles.passwordInputWrapper}>
+                    <div className={styles.brandSection}>
+                        <div className={styles.sectionTitle}>Mandate</div>
+                        <div className={styles.sectionText}>
+                            Barangay Gordon Heights is responsible for delivering essential services, maintaining peace and order, implementing local governance and facilitating citizen's participation.
+                        </div>
+                    </div>
+
+                    <div className={styles.brandSection}>
+                        <div className={styles.sectionTitle}>Vision</div>
+                        <div className={styles.sectionText}>
+                            Peaceful barangay, God fearing, productive with self-reliance and with law abiding citizens.
+                        </div>
+                    </div>
+
+                    <div className={styles.brandSection}>
+                        <div className={styles.sectionTitle}>Mission</div>
+                        <div className={styles.sectionText}>
+                            To translate the convention on the rights of every Filipino into local policies, sustainable programs and services, and support the survival, protection, development and participation of the people in community building through the provision of good education, health and other institution with special protection, information, communication by legislating ordinances, formulating strategies, enforcing and implementing the same.
+                        </div>
+                    </div>
+
+                    <div className={styles.brandSection}>
+                        <div className={styles.sectionTitle}>Service Pledge</div>
+                        <p style={{marginBottom: '0.5rem', fontSize: '0.85rem'}}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
+                        <ul className={styles.coreValues}>
+                            <li>• Serve with honesty and integrity</li>
+                            <li>• Be polite and courteous at all times</li>
+                            <li>• Demonstrate appropriate behavior and professionalism</li>
+                            <li>• Be prompt and timely</li>
+                            <li>• Provide adequate and reliable information</li>
+                            <li>• Be available during office hours</li>
+                            <li>• Provide feedback mechanism and respond to complaints</li>
+                            <li>• Equal treatment to all</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Panel - Form */}
+            <div className={styles.formPanel}>
+                <Link href="/" className={styles.backButton}>
+                    ← Back to Home
+                </Link>
+                <div className={styles.loginCard}>
+                    <div className={styles.logoSection}>
+                        <div className={styles.logoIcon}>
+                            <Image src="/logo.png" alt="Logo" width={90} height={90} />
+                        </div>
+                        <h1 style={{ color: '#111827', fontSize: '1.4rem' }}>Barangay Gordon Heights</h1>
+                        <p style={{ textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '1px', marginTop: '0.25rem', fontWeight: 600 }}>E-Barangay System</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className={styles.form}>
+                        {error && (
+                            <div className={styles.errorMessage}>
+                                ⚠️ {error}
+                            </div>
+                        )}
+
+                        <div className={styles.inputGroup}>
+                            <label htmlFor="email">Email Address</label>
                             <input
-                                id="password"
-                                type={showPassword ? 'text' : 'password'}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="you@example.com"
                                 required
                             />
-                                <button
-                                    type="button"
-                                    className={styles.passwordToggle}
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    tabIndex={-1}
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
                         </div>
+
+                        <div className={styles.inputGroup}>
+                            <label htmlFor="password">Password</label>
+                            <div className={styles.passwordInputWrapper}>
+                                <input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    required
+                                />
+                                    <button
+                                        type="button"
+                                        className={styles.passwordToggle}
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                            </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right', marginTop: '-0.5rem' }}>
+                            <Link href="/forgot-password" className={styles.link} style={{ fontSize: '0.85rem' }}>
+                                Forgot Password?
+                            </Link>
+                        </div>
+
+                        <button
+                            type="submit"
+                            className={styles.submitButton}
+                            disabled={loading}
+                        >
+                            {loading ? 'Signing In...' : 'Sign In'}
+                        </button>
+                    </form>
+
+                    <div className={styles.footer}>
+                        <p>Don&apos;t have an account?{' '}
+                            <Link href="/register" className={styles.link}>Sign up here</Link>
+                        </p>
                     </div>
-
-                    <div style={{ textAlign: 'right', marginTop: '-0.5rem' }}>
-                        <Link href="/forgot-password" className={styles.link} style={{ fontSize: '0.85rem' }}>
-                            Forgot Password?
-                        </Link>
-                    </div>
-
-                    <button
-                        type="submit"
-                        className={styles.submitButton}
-                        disabled={loading}
-                    >
-                        {loading ? 'Signing In...' : 'Sign In'}
-                    </button>
-
-
-                </form>
-
-                <div className={styles.footer}>
-                    <p>Don&apos;t have an account?{' '}
-                        <Link href="/register" className={styles.link}>Create one</Link>
-                    </p>
                 </div>
             </div>
+            
         </div>
     )
 }

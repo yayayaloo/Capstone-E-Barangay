@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Header from '@/components/Header'
@@ -8,7 +9,11 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
-import { ServiceRequest, Announcement, Profile } from '@/lib/types'
+import { ServiceRequest, Announcement, Profile, AuditLog } from '@/lib/types'
+import { logAdminAction } from '@/lib/audit'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
+import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
 import styles from './admin.module.css'
 
 const Scanner = dynamic(
@@ -102,6 +107,7 @@ function AdminDashboardContent() {
     const [requests, setRequests] = useState<ServiceRequest[]>([])
     const [residents, setResidents] = useState<Profile[]>([])
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
     const [residentSearch, setResidentSearch] = useState('')
     const [requestSearch, setRequestSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
@@ -121,6 +127,11 @@ function AdminDashboardContent() {
     const [noteModal, setNoteModal] = useState<{ id: string, status: string } | null>(null)
     const [adminNote, setAdminNote] = useState('')
 
+    // PDF Generation
+    const certRef = useRef<HTMLDivElement>(null)
+    const [certData, setCertData] = useState<CertificateData | null>(null)
+    const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null)
+
     useEffect(() => {
         fetchAdminData()
     }, [])
@@ -130,18 +141,20 @@ function AdminDashboardContent() {
         try {
             // Fetch requests with joined resident data (if schema allows, otherwise fetch separately and merge)
             // Note: Since Supabase doesn't support complex joins without a view in plain select, we'll fetch separately
-            const [reqRes, profilesRes, annRes] = await Promise.all([
+            const [reqRes, profilesRes, annRes, auditRes] = await Promise.all([
                 supabase.from('service_requests').select('*').order('created_at', { ascending: false }),
                 supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-                supabase.from('announcements').select('*').order('published_at', { ascending: false })
+                supabase.from('announcements').select('*').order('published_at', { ascending: false }),
+                supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100)
             ])
 
             if (reqRes.error) throw reqRes.error
             if (profilesRes.error) throw profilesRes.error
             if (annRes.error) throw annRes.error
+            if (auditRes.error) console.error("Audit query error", auditRes.error)
 
             const fetchedProfiles = profilesRes.data as Profile[]
-            
+
             // Map resident names manually
             const mappedRequests = (reqRes.data as ServiceRequest[]).map(req => {
                 const residentData = fetchedProfiles.find(p => p.id === req.resident_id)
@@ -162,6 +175,14 @@ function AdminDashboardContent() {
             setResidents(fetchedProfiles)
             setAnnouncements(annRes.data as Announcement[])
             
+            if (auditRes.data) {
+                const mappedAudit = (auditRes.data as AuditLog[]).map(log => {
+                    const adminData = fetchedProfiles.find(p => p.id === log.performed_by)
+                    return { ...log, admin_name: adminData?.full_name || 'Admin User' }
+                })
+                setAuditLogs(mappedAudit)
+            }
+
             if (qrligs) {
                 setRecentVerifications(qrligs.map(v => ({
                     name: v.holder_name,
@@ -194,16 +215,20 @@ function AdminDashboardContent() {
             // 1. Update the request status
             const { error: reqError } = await supabase
                 .from('service_requests')
-                .update({ 
-                    status: newStatus, 
-                    notes: note || null, 
-                    updated_at: new Date().toISOString() 
+                .update({
+                    status: newStatus,
+                    notes: note || null,
+                    updated_at: new Date().toISOString()
                 })
                 .eq('id', requestId)
 
             if (reqError) throw reqError
 
             showToast(`Request marked as ${newStatus}`, 'success')
+            
+            if (profile?.id) {
+                await logAdminAction('UPDATE_REQUEST', `Updated request ${requestId.slice(0, 8)} to ${newStatus}`, profile.id);
+            }
 
             fetchAdminData()
             setNoteModal(null)
@@ -217,7 +242,7 @@ function AdminDashboardContent() {
     const publishAnnouncement = async () => {
         if (!annTitle.trim() || !annContent.trim()) return
         setPublishing(true)
-        
+
         try {
             const { data, error } = await supabase
                 .from('announcements')
@@ -237,6 +262,10 @@ function AdminDashboardContent() {
             setAnnContent('')
             setAnnCategory('community_event')
             showToast('Announcement published!', 'success')
+            
+            if (profile?.id) {
+                await logAdminAction('CREATE_ANNOUNCEMENT', `Published announcement: ${annTitle}`, profile.id);
+            }
         } catch (error: any) {
             console.error('Error publishing announcement:', error)
             showToast('Failed to publish announcement', 'error')
@@ -245,11 +274,66 @@ function AdminDashboardContent() {
         }
     }
 
+    const handleGeneratePdf = async (req: ServiceRequest) => {
+        try {
+            setGeneratingPdfId(req.id)
+            
+            // Set data for template rendering
+            setCertData({
+                residentName: req.resident_name || 'Unknown Resident',
+                documentType: req.document_type,
+                purpose: req.purpose || 'General Requirement',
+                dateIssued: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            })
+
+            // Wait brief moment for React to render the hidden component with new data
+            await new Promise(resolve => setTimeout(resolve, 200))
+
+            if (!certRef.current) {
+                throw new Error("Certificate template not found")
+            }
+
+            // Capture the template
+            const canvas = await html2canvas(certRef.current, {
+                scale: 2, // High resolution
+                useCORS: true,
+                logging: false
+            })
+
+            // Setup PDF
+            const imgData = canvas.toDataURL('image/png')
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4' // 210 x 297 mm
+            })
+
+            // Add image to PDF exactly fitting the A4 bounds
+            pdf.addImage(imgData, 'PNG', 0, 0, 210, 297)
+            
+            // Trigger download
+            const fileName = `${req.document_type.replace(/\s+/g, '_')}_${req.resident_name?.replace(/\s+/g, '_')}.pdf`
+            pdf.save(fileName)
+
+            showToast('PDF Generated successfully!', 'success')
+            
+            if (profile?.id) {
+                 await logAdminAction('GENERATE_PDF', `Generated PDF for request ${req.id.slice(0, 8)}`, profile.id);
+            }
+        } catch (error: any) {
+            console.error("PDF Generation error:", error)
+            showToast("Failed to generate PDF. Check console.", "error")
+        } finally {
+            setGeneratingPdfId(null)
+            setCertData(null) // clear template memory
+        }
+    }
+
     const deleteAnnouncement = async (id: string) => {
         try {
             // Optimistic deletion
             setAnnouncements(prev => prev.filter(a => a.id !== id))
-            
+
             const { error } = await supabase
                 .from('announcements')
                 .delete()
@@ -260,6 +344,9 @@ function AdminDashboardContent() {
                 throw error
             }
             showToast('Announcement deleted', 'success')
+            if (profile?.id) {
+                await logAdminAction('DELETE_ANNOUNCEMENT', `Deleted announcement ID ${id.slice(0, 8)}`, profile.id);
+            }
         } catch (error) {
             console.error('Error deleting announcement:', error)
             showToast('Failed to delete announcement', 'error')
@@ -271,15 +358,15 @@ function AdminDashboardContent() {
     const verifyResident = async (residentId: string) => {
         try {
             const idNumber = `GH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`
-            
+
             // Optimistic update
             setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, resident_id_number: idNumber } : r))
-            
+
             const { error } = await supabase
                 .from('profiles')
-                .update({ 
-                    is_verified: true, 
-                    resident_id_number: idNumber 
+                .update({
+                    is_verified: true,
+                    resident_id_number: idNumber
                 })
                 .eq('id', residentId)
 
@@ -289,6 +376,9 @@ function AdminDashboardContent() {
             }
 
             showToast('Resident verified successfully!', 'success')
+            if (profile?.id) {
+                await logAdminAction('VERIFY_RESIDENT', `Verified resident ID ${residentId.slice(0, 8)}`, profile.id);
+            }
         } catch (error: any) {
             console.error('Error verifying resident:', error)
             showToast('Failed to verify resident', 'error')
@@ -320,8 +410,8 @@ function AdminDashboardContent() {
     const exportToCSV = (data: any[], filename: string) => {
         if (data.length === 0) return
         const headers = Object.keys(data[0]).join(',')
-        const rows = data.map(obj => 
-            Object.values(obj).map(val => 
+        const rows = data.map(obj =>
+            Object.values(obj).map(val =>
                 typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
             ).join(',')
         )
@@ -341,7 +431,7 @@ function AdminDashboardContent() {
         if (!results || results.length === 0) return;
         const scannedValue = results[0].rawValue?.trim();
         if (!scannedValue || verifying) return;
-        
+
         setVerifying(true)
         setScanResult(null)
 
@@ -356,23 +446,23 @@ function AdminDashboardContent() {
             if (docData) {
                 const isValid = docData.status === 'ready' || docData.status === 'completed'
                 const holderName = (docData.profiles as any)?.full_name || 'Unknown'
-                
+
                 if (!isValid) {
-                    setScanResult({ 
-                        valid: false, 
-                        message: `Document is still in ${docData.status} status.`, 
-                        holder: holderName, 
-                        docType: docData.document_type 
+                    setScanResult({
+                        valid: false,
+                        message: `Document is still in ${docData.status} status.`,
+                        holder: holderName,
+                        docType: docData.document_type
                     })
                 } else {
-                    setScanResult({ 
-                        valid: true, 
+                    setScanResult({
+                        valid: true,
                         isResident: false,
-                        docType: docData.document_type, 
-                        holder: holderName, 
-                        date: docData.updated_at 
+                        docType: docData.document_type,
+                        holder: holderName,
+                        date: docData.updated_at
                     })
-                    
+
                     const log = { name: holderName, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: '✅ Valid Doc' }
                     setRecentVerifications(prev => [log, ...prev].slice(0, 5))
                 }
@@ -385,7 +475,7 @@ function AdminDashboardContent() {
                     is_valid: isValid,
                     verified_by: profile?.id
                 })
-                
+
                 return
             }
 
@@ -406,7 +496,7 @@ function AdminDashboardContent() {
                     phone: resData.phone,
                     date: resData.created_at
                 })
-                
+
                 const log = { name: resData.full_name, doc: 'Resident ID', time: new Date().toLocaleTimeString(), result: '✅ Verified Resident' }
                 setRecentVerifications(prev => [log, ...prev].slice(0, 5))
 
@@ -425,12 +515,12 @@ function AdminDashboardContent() {
 
 
             // 3. Fallback: If no match found
-            setScanResult({ 
-                valid: false, 
-                message: 'No record found. Please ensure this is an official E-Barangay QR Code.' 
+            setScanResult({
+                valid: false,
+                message: 'No record found. Please ensure this is an official E-Barangay QR Code.'
             })
 
-        } catch(e: any) {
+        } catch (e: any) {
             console.error('Scan error:', e)
             setScanResult({ valid: false, message: 'Process error: Could not verify QR code.' })
         } finally {
@@ -463,10 +553,12 @@ function AdminDashboardContent() {
         { id: 'announcements', icon: '📢', label: 'Announcements' },
         { id: 'verify', icon: '🔐', label: 'QR Verification' },
         { id: 'analytics', icon: '📈', label: 'Analytics' },
+        { id: 'audit', icon: '🧾', label: 'Audit Trail' },
     ]
 
     return (
         <div className={styles.adminContainer}>
+            <CertificateTemplate ref={certRef} data={certData} />
             <Header
                 title="E-Barangay Admin"
                 userName={profile?.full_name || 'Admin'}
@@ -478,7 +570,9 @@ function AdminDashboardContent() {
                 {/* Sidebar */}
                 <aside className={styles.sidebar}>
                     <div className={styles.sidebarBrand}>
-                        <div className={styles.brandIcon}>🏛️</div>
+                        <div className={styles.brandIcon}>
+                            <Image src="/logo.png" alt="Barangay Logo" width={32} height={32} />
+                        </div>
                         <div>
                             <div className={styles.brandName}>Admin Panel</div>
                             <div className={styles.brandSub}>Gordon Heights</div>
@@ -502,10 +596,10 @@ function AdminDashboardContent() {
                     </div>
                 </aside>
 
-                <BottomNav 
-                    items={navItems} 
-                    activeTab={activeTab} 
-                    setActiveTab={setActiveTab} 
+                <BottomNav
+                    items={navItems}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
                 />
 
                 {/* Main Content */}
@@ -697,8 +791,8 @@ function AdminDashboardContent() {
                                                         <td>{req.document_type}</td>
                                                         <td>
                                                             {req.attachment_url ? (
-                                                                <button 
-                                                                    className="btn btn-outline" 
+                                                                <button
+                                                                    className="btn btn-outline"
                                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
                                                                     onClick={() => viewAttachment(req.attachment_url!)}
                                                                 >
@@ -722,10 +816,20 @@ function AdminDashboardContent() {
                                                                 {req.status === 'ready' && (
                                                                     <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
                                                                 )}
+                                                                {(req.status === 'ready' || req.status === 'completed') && (
+                                                                    <button 
+                                                                        className="btn btn-primary" 
+                                                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#10b981', borderColor: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }} 
+                                                                        onClick={() => handleGeneratePdf(req)}
+                                                                        disabled={generatingPdfId === req.id}
+                                                                    >
+                                                                        {generatingPdfId === req.id ? 'Generating...' : '🖨️ PDF'}
+                                                                    </button>
+                                                                )}
                                                                 {(req.status === 'pending' || req.status === 'processing') && (
                                                                     <button className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setNoteModal({ id: req.id, status: 'rejected' })}>Reject</button>
                                                                 )}
-                                                                {(req.status === 'completed' || req.status === 'rejected') && (
+                                                                {req.status === 'rejected' && (
                                                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
                                                                 )}
                                                             </div>
@@ -801,7 +905,7 @@ function AdminDashboardContent() {
                                                                                     🛡️ VERIFIED
                                                                                 </div>
                                                                             ) : (
-                                                                                <button 
+                                                                                <button
                                                                                     className={styles.verifyBtn}
                                                                                     onClick={() => verifyResident(res.id)}
                                                                                 >
@@ -926,8 +1030,8 @@ function AdminDashboardContent() {
                                                 <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>
                                                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
                                                     <p>Scan Complete</p>
-                                                    <button 
-                                                        className="btn btn-outline" 
+                                                    <button
+                                                        className="btn btn-outline"
                                                         style={{ marginTop: '1rem', color: 'white', borderColor: 'white' }}
                                                         onClick={() => setScanResult(null)}
                                                     >
@@ -960,7 +1064,7 @@ function AdminDashboardContent() {
                                         <h3>Recent Verifications</h3>
                                         <div className={styles.verificationList}>
                                             {recentVerifications.length === 0 ? (
-                                                  <p className={styles.emptyMessage} style={{ padding: '2rem 0' }}>No scans performed yet in this session.</p>
+                                                <p className={styles.emptyMessage} style={{ padding: '2rem 0' }}>No scans performed yet in this session.</p>
                                             ) : recentVerifications.map((v, i) => (
                                                 <div key={i} className={styles.activityItem} style={{ padding: '1rem' }}>
                                                     <div className={styles.activityIcon} style={{ fontSize: '1.25rem' }}>🔍</div>
@@ -1075,6 +1179,53 @@ function AdminDashboardContent() {
                                 )}
                             </div>
                         )}
+
+                        {/* ── AUDIT TRAIL ── */}
+                        {activeTab === 'audit' && (
+                            <div className="animate-fadeIn">
+                                <div className={styles.pageHeader}>
+                                    <div>
+                                        <h1>System Audit Trail</h1>
+                                        <p className={styles.pageSubtitle}>Log of all administrative actions in the E-Barangay system.</p>
+                                    </div>
+                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToCSV(auditLogs, 'Audit_Logs')}>
+                                        📥 Export Logs CSV
+                                    </button>
+                                </div>
+
+                                <div className={`${styles.tableContainer} ${styles.glassTable}`}>
+                                    {loading ? <LoadingSpinner text="Loading logs..." /> : (
+                                        <table className={styles.table}>
+                                            <thead>
+                                                <tr>
+                                                    <th>Date &amp; Time</th>
+                                                    <th>Admin</th>
+                                                    <th>Action</th>
+                                                    <th>Description</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {auditLogs.map(log => (
+                                                    <tr key={log.id}>
+                                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                            {new Date(log.created_at).toLocaleString()}
+                                                        </td>
+                                                        <td><strong>{log.admin_name}</strong></td>
+                                                        <td><span className="badge badge-info" style={{ fontSize: '0.7rem' }}>{log.action}</span></td>
+                                                        <td style={{ color: 'var(--text-muted)' }}>{log.description}</td>
+                                                    </tr>
+                                                ))}
+                                                {auditLogs.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={4} className={styles.emptyMessage}>No audit logs found.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>
@@ -1084,7 +1235,7 @@ function AdminDashboardContent() {
                     <div className="glass-card" style={{ maxWidth: '400px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)' }} onClick={e => e.stopPropagation()}>
                         <h3 style={{ marginBottom: '1rem' }}>Reason for {noteModal.status === 'rejected' ? 'Rejection' : 'Update'}</h3>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Please provide a reason or note for the resident.</p>
-                        
+
                         <textarea
                             value={adminNote}
                             onChange={(e) => setAdminNote(e.target.value)}
@@ -1092,7 +1243,7 @@ function AdminDashboardContent() {
                             rows={4}
                             style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: 'white', marginBottom: '1.5rem' }}
                         />
-                        
+
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setNoteModal(null)}>Cancel</button>
                             <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateStatus(noteModal.id, noteModal.status, adminNote)}>Confirm Rejection</button>

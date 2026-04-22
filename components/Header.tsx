@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import styles from './Header.module.css'
 
 interface HeaderProps {
@@ -15,7 +16,7 @@ export default function Header({ title, userName, onSignOut, variant = 'resident
         <header className={`${styles.header} ${variant === 'admin' ? styles.adminHeader : ''}`}>
             <div className="container flex-between">
                 <Link href={variant === 'admin' ? '/admin' : '/resident'} className={styles.logo}>
-                    <span className={styles.logoIcon}>🏛️</span>
+                    <Image src="/logo.png" alt="Barangay Logo" width={28} height={28} className={styles.logoImage} />
                     <span>{title}</span>
                 </Link>
                 <div className={styles.userMenu}>
