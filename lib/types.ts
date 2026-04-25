@@ -26,6 +26,7 @@ export interface Profile {
     birthdate: string | null
     profile_picture_url: string | null
 
+    sectors: string[]
     created_at: string
     updated_at: string
 }

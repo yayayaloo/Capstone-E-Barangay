@@ -8,7 +8,7 @@
 
 @media (min-width: 900px) {
     .loginContainer {
-        grid-template-columns: 1.15fr 1fr;
+        grid-template-columns: 1fr 1.15fr;
     }
 }
 
@@ -16,7 +16,7 @@
 .brandingPanel {
     background: linear-gradient(135deg, #0a0a1a, #131326); /* System Dark Theme */
     color: white;
-    padding: 3rem 6%;
+    padding: 2.5rem 7%;
     display: none;
     flex-direction: column;
     justify-content: center;
@@ -55,19 +55,21 @@
 .brandingContent {
     position: relative;
     z-index: 1;
-    max-width: 100%;
+    max-width: 480px;
 }
 
 .brandHeader {
     display: flex;
     align-items: center;
     gap: 1rem;
-    margin-bottom: 4rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .brandTitle {
     font-family: var(--font-poppins, sans-serif);
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 700;
     margin: 0;
     letter-spacing: 0.5px;
@@ -75,31 +77,31 @@
 }
 
 .brandSubtitle {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     opacity: 0.8;
     text-transform: uppercase;
     letter-spacing: 2px;
 }
 
 .brandSection {
-    margin-bottom: 2.5rem;
+    margin-bottom: 1.5rem;
 }
 
 .sectionTitle {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2.5px;
     color: #818cf8; /* System Indigo */
     margin-bottom: 0.5rem;
     border-bottom: 1px solid rgba(255,255,255,0.1);
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
     display: inline-block;
 }
 
 .sectionText {
-    font-size: 0.85rem;
-    line-height: 1.5;
+    font-size: 0.8rem;
+    line-height: 1.6;
     opacity: 0.85;
     font-weight: 300;
 }
@@ -108,13 +110,13 @@
     list-style: none;
     padding: 0;
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 300;
 }
 
 .coreValues li {
-    margin-bottom: 0.5rem;
-    line-height: 1.4;
+    margin-bottom: 0.35rem;
+    line-height: 1.5;
 }
 
 .coreValues strong {
@@ -130,6 +132,7 @@
     align-items: center;
     border-radius: 20px;
     position: relative;
+    padding: 3rem 2.5rem;
     background: #f9fafb; /* Light gray to visually separate slightly */
 }
 
@@ -153,19 +156,20 @@
 
 @media (min-width: 900px) {
     .formPanel {
+        padding: 3rem 3rem;
         background: #ffffff; /* Clean white when split */
     }
 }
 
 .loginCard {
     width: 100%;
-    max-width: 420px;
-    padding: 2rem;
+    max-width: 520px;
+    padding: 3rem;
 }
 
 .logoSection {
     text-align: center;
-    margin-bottom: 2.5rem;
+    margin-bottom: 3rem;
 }
 
 .logoIcon {
@@ -186,34 +190,35 @@
 
 .logoSection p {
     color: #6b7280;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
 }
 
 .form {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1.75rem;
 }
 
 .inputGroup {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .inputGroup label {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     color: #6b7280;
 }
 
 .inputGroup input {
-    padding: 0.875rem 1rem;
+    padding: 1rem 1.25rem;
     background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 10px;
     color: #111827;
     font-size: 1rem;
     font-family: var(--font-inter, sans-serif);
@@ -255,17 +260,17 @@
 }
 
 .submitButton {
-    padding: 0.875rem;
+    padding: 1.125rem;
     background: linear-gradient(135deg, #6366f1, #4f46e5);
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     color: #fff;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 600;
     font-family: var(--font-inter, sans-serif);
     cursor: pointer;
     transition: all 0.2s;
-    margin-top: 1rem;
+    margin-top: 1.5rem;
 }
 
 .submitButton:hover:not(:disabled) {
@@ -298,12 +303,12 @@
 
 .footer {
     text-align: center;
-    margin-top: 2rem;
-    padding-top: 1.5rem;
+    margin-top: 2.75rem;
+    padding-top: 2rem;
     border-top: 1px solid #f3f4f6;
 }
 
 .footer p {
     color: #6b7280;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
 }

@@ -10,6 +10,23 @@ import { supabase } from '@/lib/supabase'
 import styles from './register.module.css'
 import loginStyles from '../login/login.module.css'
 
+const SECTOR_OPTIONS = [
+    { value: 'Solo Parent', icon: '🧑‍🍼' },
+    { value: 'OFW', icon: '🌍' },
+    { value: 'PWD', icon: '♿' },
+    { value: 'Senior Citizen', icon: '👴' },
+    { value: 'LGBTQ+', icon: '🏳️‍🌈' },
+    { value: 'Employed', icon: '💼' },
+    { value: 'Unemployed', icon: '📭' },
+    { value: '4Ps Beneficiary', icon: '👩‍👧' },
+    { value: 'Pregnant/Lactating', icon: '🤰' },
+    { value: 'Youth (15-30)', icon: '🧑' },
+    { value: 'Indigenous People', icon: '🌾' },
+    { value: 'OSC', icon: '📕' },
+    { value: 'OSY', icon: '📗' },
+    { value: 'OSA', icon: '📘' },
+]
+
 export default function RegisterPage() {
     const [firstName, setFirstName] = useState('')
     const [middleName, setMiddleName] = useState('')
@@ -26,6 +43,8 @@ export default function RegisterPage() {
     const [gender, setGender] = useState<'Male' | 'Female' | ''>('')
     const [relationshipStatus, setRelationshipStatus] = useState('')
     const [idDocument, setIdDocument] = useState<File | null>(null)
+    const [sectors, setSectors] = useState<string[]>([])
+    const [showSectors, setShowSectors] = useState(false)
     const [agreedToTerms, setAgreedToTerms] = useState(false)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
@@ -92,7 +111,7 @@ export default function RegisterPage() {
 
         const fullName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}${suffix ? ' ' + suffix : ''}`.trim()
 
-        const { error: signUpError } = await signUp(email, password, {
+        const { error: signUpError, userId: newUserId } = await signUp(email, password, {
             fullName,
             firstName,
             middleName: middleName || undefined,
@@ -112,16 +131,15 @@ export default function RegisterPage() {
         }
 
         try {
-            // Attempt to fetch session incase email confirmation is disabled
-            const { data: { session } } = await supabase.auth.getSession()
+            // Use the userId from signUp response (works even without an active session)
+            const userId = newUserId || (await supabase.auth.getSession()).data.session?.user?.id
 
-            if (session?.user) {
-                const newUser = session.user
+            if (userId) {
                 let filePath = null;
 
                 if (idDocument) {
                     const fileName = `id_verification_${Date.now()}_${idDocument.name.replace(/\s+/g, '_')}`
-                    filePath = `${newUser.id}/${fileName}`
+                    filePath = `${userId}/${fileName}`
 
                     const { error: uploadError } = await supabase.storage
                         .from('resident-requirements')
@@ -145,14 +163,21 @@ export default function RegisterPage() {
                         relationship_status: relationshipStatus,
                         address: address || null,
                         phone: phone || null,
-                        id_document_url: filePath
+                        birthdate: birthdate || null,
+                        id_document_url: filePath,
+                        sectors: sectors
                     })
-                    .eq('id', newUser.id)
+                    .eq('id', userId)
 
                 if (updateError) {
                     console.error('Failed to update profile record:', updateError.message)
                 }
-                await supabase.auth.signOut()
+
+                // Sign out if we had a session (email confirmation disabled case)
+                const { data: { session: currentSession } } = await supabase.auth.getSession()
+                if (currentSession) {
+                    await supabase.auth.signOut()
+                }
             }
         } catch (err) {
             console.error('Post-signup error:', err)
@@ -237,7 +262,7 @@ export default function RegisterPage() {
         <div className={loginStyles.loginContainer}>
 
             {/* Left Panel - Branding */}
-            <div className={loginStyles.brandingPanel}>
+            <div className={loginStyles.brandingPanel} style={{ justifyContent: 'flex-start', paddingTop: '3rem' }}>
                 <div className={loginStyles.brandingBackground} />
                 <div className={loginStyles.brandingContent}>
                     <div className={loginStyles.brandHeader}>
@@ -271,7 +296,7 @@ export default function RegisterPage() {
 
                     <div className={loginStyles.brandSection}>
                         <div className={loginStyles.sectionTitle}>Service Pledge</div>
-                        <p style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
+                        <p style={{ marginBottom: '0.5rem', fontSize: '0.8rem' }}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
                         <ul className={loginStyles.coreValues}>
                             <li>• Serve with honesty and integrity</li>
                             <li>• Be polite and courteous at all times</li>
@@ -288,7 +313,7 @@ export default function RegisterPage() {
 
             {/* Right Panel - Form Container */}
             <div className={loginStyles.formPanel} style={{ overflowY: 'auto' }}>
-                <Link href="/" className={loginStyles.backButton} style={{ position: 'sticky', background: '#fff', zIndex: 10, width: '100%', padding: '1.5rem', top: 0, left: 0, borderBottom: '1px solid #f1f5f9' }}>
+                <Link href="/" className={loginStyles.backButton} style={{ position: 'sticky', background: '#fff', zIndex: 10, width: '100%', padding: '1.75rem 2rem', top: 0, left: 0, borderBottom: '1px solid #f1f5f9' }}>
                     ← Back to Home
                 </Link>
                 <div className={styles.registerCard}>
@@ -525,6 +550,106 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
+                        {/* Sectoral Classification */}
+                        <div style={{
+                            margin: '0.5rem 0',
+                            background: '#f8faff',
+                            borderRadius: '16px',
+                            border: '1px solid #e2e8f0',
+                            overflow: 'hidden',
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowSectors(!showSectors)}
+                                style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '1rem 1.25rem',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 700,
+                                    color: '#1e293b',
+                                }}
+                            >
+                                <span>
+                                    📋 Sectoral Classification
+                                    <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+                                        (Optional{sectors.length > 0 ? ` • ${sectors.length} selected` : ''})
+                                    </span>
+                                </span>
+                                <span style={{
+                                    transform: showSectors ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.2s ease',
+                                    fontSize: '0.75rem',
+                                    color: '#94a3b8',
+                                }}>▼</span>
+                            </button>
+
+                            {showSectors && (
+                                <div style={{ padding: '0 1.25rem 1.25rem' }}>
+                                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '0.75rem', lineHeight: 1.4 }}>
+                                        Select all sectors that apply. You can update this later in your profile.
+                                    </p>
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(2, 1fr)',
+                                        gap: '0.4rem',
+                                    }}>
+                                        {SECTOR_OPTIONS.map(opt => {
+                                            const isSelected = sectors.includes(opt.value)
+                                            return (
+                                                <div
+                                                    key={opt.value}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.45rem',
+                                                        padding: '0.5rem 0.65rem',
+                                                        borderRadius: '8px',
+                                                        border: `1.5px solid ${isSelected ? '#6366f1' : '#e2e8f0'}`,
+                                                        background: isSelected ? 'rgba(99, 102, 241, 0.06)' : '#fff',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.15s ease',
+                                                        fontSize: '0.78rem',
+                                                        color: isSelected ? '#4338ca' : '#475569',
+                                                        fontWeight: isSelected ? 600 : 400,
+                                                        userSelect: 'none',
+                                                    }}
+                                                    onClick={() => setSectors(prev =>
+                                                        prev.includes(opt.value)
+                                                            ? prev.filter(s => s !== opt.value)
+                                                            : [...prev, opt.value]
+                                                    )}
+                                                >
+                                                    <span style={{
+                                                        width: '14px',
+                                                        height: '14px',
+                                                        borderRadius: '3px',
+                                                        border: `2px solid ${isSelected ? '#6366f1' : '#cbd5e1'}`,
+                                                        background: isSelected ? '#6366f1' : '#fff',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        flexShrink: 0,
+                                                        fontSize: '0.6rem',
+                                                        color: '#fff',
+                                                    }}>
+                                                        {isSelected && '✓'}
+                                                    </span>
+                                                    <span>{opt.icon}</span>
+                                                    {opt.value}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className={styles.idUploadSection}>
                             <label>Identity Verification *</label>
                             <p className={styles.uploadInfo}>Upload a valid ID (e.g., PhilID, Passport, Driver&apos;s License) to prove residency in Gordon Heights, Olongapo City.</p>
@@ -552,7 +677,7 @@ export default function RegisterPage() {
                                 required
                             />
                             <label htmlFor="terms">
-                                I have read and agree to the <Link href="/terms" className={styles.inlineLink}>Terms and Conditions</Link> and <Link href="/privacy" className={styles.inlineLink}>Privacy Policy</Link>
+                                I have read and agree to the <Link href="/terms" className={styles.inlineLink} target="_blank" rel="noopener noreferrer">Terms and Conditions</Link> and <Link href="/privacy" className={styles.inlineLink} target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
                             </label>
                         </div>
 

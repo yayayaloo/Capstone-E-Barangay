@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     is_verified BOOLEAN NOT NULL DEFAULT false,
     resident_id_number TEXT UNIQUE,
     resident_qr_id TEXT UNIQUE DEFAULT gen_random_uuid(),
+    sectors TEXT[] NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -231,11 +232,12 @@ DECLARE
     found_request RECORD;
     found_profile RECORD;
 BEGIN
-    -- Check if it's a resident profile QR
+    -- Check if it's a resident profile QR (by id or resident_qr_id)
     SELECT p.id, p.full_name, p.resident_id_number, p.is_verified 
     INTO found_profile
     FROM profiles p
-    WHERE p.id::text = qr_code_string;
+    WHERE p.id::text = qr_code_string
+       OR p.resident_qr_id = qr_code_string;
 
     IF FOUND THEN
         RETURN jsonb_build_object(
@@ -280,6 +282,25 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- =============================================
+-- QR Verification Logging Function
+-- Allows any authenticated user to log scan results (bypasses RLS)
+-- =============================================
+CREATE OR REPLACE FUNCTION log_qr_verification(
+    p_document_ref TEXT,
+    p_document_type TEXT,
+    p_holder_name TEXT,
+    p_is_valid BOOLEAN,
+    p_verified_by UUID DEFAULT NULL
+)
+RETURNS void AS $$
+BEGIN
+    INSERT INTO qr_verifications (document_ref, document_type, holder_name, is_valid, verified_by)
+    VALUES (p_document_ref, p_document_type, p_holder_name, p_is_valid, COALESCE(p_verified_by, auth.uid()));
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+
+-- =============================================
 -- Public Statistics Function
 -- =============================================
 CREATE OR REPLACE FUNCTION get_public_stats()
@@ -304,12 +325,28 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, email, role)
+  INSERT INTO public.profiles (
+    id, full_name, email, role,
+    first_name, middle_name, last_name, suffix,
+    gender, relationship_status, address, phone, birthdate
+  )
   VALUES (
     new.id,
     COALESCE(new.raw_user_meta_data->>'full_name', 'Resident'),
     new.email,
-    COALESCE(new.raw_user_meta_data->>'role', 'resident')
+    COALESCE(new.raw_user_meta_data->>'role', 'resident'),
+    new.raw_user_meta_data->>'first_name',
+    new.raw_user_meta_data->>'middle_name',
+    new.raw_user_meta_data->>'last_name',
+    new.raw_user_meta_data->>'suffix',
+    new.raw_user_meta_data->>'gender',
+    new.raw_user_meta_data->>'relationship_status',
+    new.raw_user_meta_data->>'address',
+    new.raw_user_meta_data->>'phone',
+    CASE WHEN new.raw_user_meta_data->>'birthdate' IS NOT NULL AND new.raw_user_meta_data->>'birthdate' != ''
+      THEN (new.raw_user_meta_data->>'birthdate')::date
+      ELSE NULL
+    END
   );
   RETURN new;
 END;

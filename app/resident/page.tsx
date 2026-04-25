@@ -45,10 +45,13 @@ function ResidentPortalContent() {
 
     useEffect(() => {
         if (profile?.id) {
-            fetchRequests()
-            fetchAnnouncements()
+            if (activeTab === 'overview') {
+                fetchAnnouncements()
+            } else if (activeTab === 'requests') {
+                fetchRequests()
+            }
         }
-    }, [profile?.id])
+    }, [profile?.id, activeTab])
 
     const fetchRequests = async () => {
         if (!profile?.id) return
@@ -177,6 +180,20 @@ function ResidentPortalContent() {
                     details: verificationResult.details,
                     message: verificationResult.message
                 });
+
+                // Log scan to qr_verifications for audit trail
+                try {
+                    await supabase.rpc('log_qr_verification', {
+                        p_document_ref: qrData,
+                        p_document_type: verificationResult.type || 'Unknown',
+                        p_holder_name: verificationResult.details?.['Holder Name'] || 'Unknown',
+                        p_is_valid: verificationResult.isValid,
+                        p_verified_by: profile?.id || null
+                    });
+                } catch (logError) {
+                    // Non-critical: don't block the UI if logging fails
+                    console.warn('Could not log verification:', logError);
+                }
             } else {
                 setScanResult({
                     isValid: false,
@@ -503,6 +520,14 @@ function ResidentPortalContent() {
                             <p className={styles.infoValue}>{profile?.relationship_status || 'Not specified'}</p>
                         </div>
                         <div className={styles.infoGroup}>
+                            <label className={styles.infoLabel}>Birthdate</label>
+                            <p className={styles.infoValue}>
+                                {profile?.birthdate 
+                                    ? `${new Date(profile.birthdate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${Math.floor((Date.now() - new Date(profile.birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))} yrs old)`
+                                    : 'Not specified'}
+                            </p>
+                        </div>
+                        <div className={styles.infoGroup}>
                             <label className={styles.infoLabel}>Email Address</label>
                             <p className={styles.infoValue}>{profile?.email}</p>
                         </div>
@@ -513,6 +538,28 @@ function ResidentPortalContent() {
                         <div className={styles.infoGroup}>
                             <label className={styles.infoLabel}>Phone Number</label>
                             <p className={styles.infoValue}>{profile?.phone || 'Not specified'}</p>
+                        </div>
+                        <div className={styles.infoGroup} style={{ gridColumn: '1 / -1' }}>
+                            <label className={styles.infoLabel}>Sectoral Classification</label>
+                            {profile?.sectors && profile.sectors.length > 0 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
+                                    {profile.sectors.map(s => (
+                                        <span key={s} style={{
+                                            padding: '0.3rem 0.7rem',
+                                            borderRadius: '99px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 600,
+                                            background: 'rgba(99, 102, 241, 0.12)',
+                                            color: '#a5b4fc',
+                                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                                        }}>
+                                            {s}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className={styles.infoValue} style={{ opacity: 0.5 }}>Not specified — update your profile to add</p>
+                            )}
                         </div>
                     </div>
                     <button className="btn btn-primary" style={{ marginTop: '2.5rem', width: '100%' }} onClick={() => setShowProfileModal(true)}>

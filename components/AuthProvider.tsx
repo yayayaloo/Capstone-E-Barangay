@@ -30,7 +30,7 @@ interface AuthContextType {
             birthdate?: string
         },
         emailRedirectTo?: string
-    ) => Promise<{ error: string | null }>
+    ) => Promise<{ error: string | null; userId: string | null }>
     signOut: () => Promise<void>
     refreshProfile: () => Promise<void>
 }
@@ -186,11 +186,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 .eq('id', userId)
                 .single()
 
-            const { data: { user: currentUser } } = await supabase.auth.getUser()
-
             if (dbError) {
                 console.warn('DB Profile error, attempting metadata fallback:', dbError.message)
                 
+                const { data: { user: currentUser } } = await supabase.auth.getUser()
+
                 // FALLBACK: Use session user metadata if profile table row or columns are missing
                 if (currentUser && mountedRef.current) {
                     const fallbackProfile: Profile = {
@@ -212,6 +212,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                         is_verified: false,
                         resident_id_number: null,
                         resident_qr_id: null,
+                        sectors: currentUser.user_metadata?.sectors || [],
                         created_at: currentUser.created_at,
                         updated_at: currentUser.created_at
                     }
@@ -219,6 +220,15 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 }
             } else {
                 if (mountedRef.current && dbData) {
+                    // Check if we need fallback data
+                    const needsFallback = !dbData.gender || !dbData.relationship_status || !dbData.address || !dbData.phone || !dbData.full_name || !dbData.email;
+                    
+                    let currentUser = null;
+                    if (needsFallback) {
+                        const { data } = await supabase.auth.getUser();
+                        currentUser = data.user;
+                    }
+
                     // Merge DB data with user_metadata in case the DB row is missing registration fields
                     const mergedProfile: Profile = {
                         ...(dbData as Profile),
@@ -314,9 +324,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 }
             })
 
-            return { error: error?.message || null }
+            return { error: error?.message || null, userId: data?.user?.id || null }
         } catch (error: any) {
-            return { error: error.message || 'An error occurred during sign up' }
+            return { error: error.message || 'An error occurred during sign up', userId: null }
         }
     }
 

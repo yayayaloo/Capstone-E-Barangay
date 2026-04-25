@@ -47,10 +47,12 @@ export default function LoginPage() {
             }
             setLoading(false)
         } else {
-            // Once sign-in succeeds, fetch their profile or use user metadata 
-            // to dynamically route them. Middleware will also handle fallback routing.
-            const { data } = await supabase.from('profiles').select('role').eq('email', email).single()
-            if (data?.role === 'admin') {
+            // Once sign-in succeeds, use session metadata to dynamically route them. 
+            // This is instantly available from the JWT without an extra DB query.
+            const { data: { session } } = await supabase.auth.getSession()
+            const role = session?.user?.user_metadata?.role || 'resident'
+            
+            if (role === 'admin') {
                 router.push('/admin')
             } else {
                 router.push('/resident')

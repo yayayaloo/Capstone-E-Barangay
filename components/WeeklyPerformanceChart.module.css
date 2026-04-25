@@ -1,0 +1,423 @@
+.chartContainer {
+    background: rgba(15, 15, 35, 0.6);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 16px;
+    padding: 1.75rem;
+    position: relative;
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+
+.chartContainer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.4), transparent);
+}
+
+/* ─── Header ──────────────────────────────────────────────── */
+.chartHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.chartTitle {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chartTitleIcon {
+    font-size: 1.3rem;
+}
+
+.chartSubtitle {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.headerRight {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.trendBadge {
+    padding: 0.35rem 0.85rem;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.trendBadge[data-trend="upward"] {
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.trendBadge[data-trend="downward"] {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.trendBadge[data-trend="stable"] {
+    background: rgba(99, 102, 241, 0.12);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.changeBadge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.changeUp {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+}
+
+.changeDown {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+}
+
+/* ─── Metric Toggles ─────────────────────────────────────── */
+.metricToggles {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.metricBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.9rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.metricBtn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.metricActive {
+    background: rgba(99, 102, 241, 0.15) !important;
+    border-color: rgba(99, 102, 241, 0.4) !important;
+    color: #fff !important;
+}
+
+.metricActive[data-metric="completed"] {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+.metricActive[data-metric="pending"] {
+    background: rgba(245, 158, 11, 0.15) !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+.metricActive[data-metric="rejected"] {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+.metricDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ─── Chart ───────────────────────────────────────────────── */
+.chartWrapper {
+    width: 100%;
+    aspect-ratio: 700 / 280;
+    position: relative;
+}
+
+.chart {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.bar {
+    transition: opacity 0.2s ease, height 0.4s cubic-bezier(0.4, 0, 0.2, 1), y 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.trendLine {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: drawLine 1.5s ease-out forwards;
+}
+
+.areaPath {
+    opacity: 0;
+    animation: fadeInArea 1s ease-out 0.5s forwards;
+}
+
+.dataPoint {
+    transition: r 0.2s ease;
+}
+
+.regressionLine {
+    opacity: 0;
+    animation: fadeInArea 0.8s ease-out 1s forwards;
+}
+
+@keyframes drawLine {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes fadeInArea {
+    to {
+        opacity: 1;
+    }
+}
+
+/* ─── Tooltip ─────────────────────────────────────────────── */
+.tooltip {
+    background: rgba(15, 15, 35, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-top: 1rem;
+    animation: tooltipIn 0.2s ease-out;
+}
+
+.tooltipHeader {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tooltipGrid {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    gap: 0.35rem 0.6rem;
+    align-items: center;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.tooltipGrid strong {
+    color: #fff;
+    text-align: right;
+}
+
+.tooltipDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+@keyframes tooltipIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─── Insights ────────────────────────────────────────────── */
+.insightsSection {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.insightsTitle {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.insightsList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+
+.insightCard {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.2s ease;
+}
+
+.insightCard:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+}
+
+.insight_increase {
+    border-left: 3px solid #10b981;
+}
+
+.insight_decrease {
+    border-left: 3px solid #ef4444;
+}
+
+.insight_peak {
+    border-left: 3px solid #f59e0b;
+}
+
+.insight_low {
+    border-left: 3px solid #6366f1;
+}
+
+.insight_stable {
+    border-left: 3px solid #3b82f6;
+}
+
+.insightIcon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.insightContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.insightWeek {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.insightMessage {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.2rem 0 0;
+    line-height: 1.45;
+}
+
+/* ─── Loading ─────────────────────────────────────────────── */
+.loadingState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    gap: 1rem;
+}
+
+.loadingState p {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.85rem;
+}
+
+.loadingPulse {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .chartContainer {
+        padding: 1.25rem;
+    }
+
+    .chartHeader {
+        flex-direction: column;
+    }
+
+    .headerRight {
+        width: 100%;
+    }
+
+    .metricToggles {
+        gap: 0.35rem;
+    }
+
+    .metricBtn {
+        padding: 0.35rem 0.65rem;
+        font-size: 0.72rem;
+    }
+
+    .insightsList {
+        grid-template-columns: 1fr;
+    }
+
+    .tooltipGrid {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .chartContainer {
+        padding: 1rem;
+        border-radius: 12px;
+    }
+
+    .chartTitle {
+        font-size: 1rem;
+    }
+
+    .metricBtn {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.68rem;
+    }
+}

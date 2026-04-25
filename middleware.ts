@@ -67,13 +67,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (session) {
-        let role = session.user.user_metadata?.role;
-        
-        // Fallback to checking DB for role if not in user_metadata
-        if (!role) {
-            const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-            role = data?.role || 'resident';
-        }
+        let role = session.user.user_metadata?.role || 'resident';
 
         // Enforce Role-Based Access Control (RBAC)
         if (pathname.startsWith('/admin') && role !== 'admin') {

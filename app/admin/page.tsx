@@ -13,7 +13,11 @@ import { ServiceRequest, Announcement, Profile, AuditLog } from '@/lib/types'
 import { logAdminAction } from '@/lib/audit'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
+import WeeklyPerformanceChart from '@/components/WeeklyPerformanceChart'
+import SectoralChart from '@/components/SectoralChart'
+import AgeDemographicChart from '@/components/AgeDemographicChart'
 import styles from './admin.module.css'
 
 const Scanner = dynamic(
@@ -102,6 +106,7 @@ function AdminDashboardContent() {
     const { profile, signOut } = useAuth()
     const { showToast } = useToast()
     const [activeTab, setActiveTab] = useState('overview')
+    const [analyticsView, setAnalyticsView] = useState<'overview' | 'trends' | 'demographics'>('overview')
     const [loading, setLoading] = useState(true)
 
     const [requests, setRequests] = useState<ServiceRequest[]>([])
@@ -132,79 +137,126 @@ function AdminDashboardContent() {
     const [certData, setCertData] = useState<CertificateData | null>(null)
     const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null)
 
-    useEffect(() => {
-        fetchAdminData()
-    }, [])
+    const [stats, setStats] = useState({ pending: 0, processing: 0, completed: 0, rejected: 0, totalRequests: 0, totalResidents: 0 })
+    const [demographicsData, setDemographicsData] = useState<any[] | null>(null)
+    const [loadingDemographics, setLoadingDemographics] = useState(false)
 
-    const fetchAdminData = async () => {
-        setLoading(true)
+    // Resident detail modal
+    const [selectedResident, setSelectedResident] = useState<Profile | null>(null)
+
+    useEffect(() => {
+        fetchDataForTab(activeTab)
+    }, [activeTab])
+
+    const fetchOverviewStats = async () => {
         try {
-            // Fetch requests with joined resident data (if schema allows, otherwise fetch separately and merge)
-            // Note: Since Supabase doesn't support complex joins without a view in plain select, we'll fetch separately
-            const [reqRes, profilesRes, annRes, auditRes] = await Promise.all([
-                supabase.from('service_requests').select('*').order('created_at', { ascending: false }),
-                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-                supabase.from('announcements').select('*').order('published_at', { ascending: false }),
-                supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100)
+            const [
+                { data: allStatuses },
+                { count: totalResidents }
+            ] = await Promise.all([
+                supabase.from('service_requests').select('status'),
+                supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'resident')
             ])
 
-            if (reqRes.error) throw reqRes.error
-            if (profilesRes.error) throw profilesRes.error
-            if (annRes.error) throw annRes.error
-            if (auditRes.error) console.error("Audit query error", auditRes.error)
+            const pending = allStatuses?.filter(r => r.status === 'pending').length || 0;
+            const processing = allStatuses?.filter(r => r.status === 'processing').length || 0;
+            const completed = allStatuses?.filter(r => r.status === 'completed').length || 0;
+            const rejected = allStatuses?.filter(r => r.status === 'rejected').length || 0;
+            const totalRequests = allStatuses?.length || 0;
 
-            const fetchedProfiles = profilesRes.data as Profile[]
-
-            // Map resident names manually
-            const mappedRequests = (reqRes.data as ServiceRequest[]).map(req => {
-                const residentData = fetchedProfiles.find(p => p.id === req.resident_id)
-                return {
-                    ...req,
-                    resident_name: residentData?.full_name || 'Unknown Resident'
-                }
+            setStats({
+                pending,
+                processing,
+                completed,
+                rejected,
+                totalRequests,
+                totalResidents: totalResidents || 0
             })
+        } catch (error) {
+            console.error('Error fetching stats:', error)
+        }
+    }
 
-            // Fetch recent verifications from DB
-            const { data: qrligs } = await supabase
-                .from('qr_verifications')
-                .select('*')
-                .order('verified_at', { ascending: false })
-                .limit(5)
+    const fetchDataForTab = async (tab: string) => {
+        setLoading(true)
+        try {
+            if (tab === 'overview') {
+                await fetchOverviewStats()
+                // Fetch recent top 5 requests & announcements
+                const [reqRes, annRes, qrRes] = await Promise.all([
+                    supabase.from('service_requests').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(5),
+                    supabase.from('announcements').select('*').order('published_at', { ascending: false }).limit(5),
+                    supabase.from('qr_verifications').select('*').order('verified_at', { ascending: false }).limit(5)
+                ])
 
-            setRequests(mappedRequests)
-            setResidents(fetchedProfiles)
-            setAnnouncements(annRes.data as Announcement[])
-            
-            if (auditRes.data) {
-                const mappedAudit = (auditRes.data as AuditLog[]).map(log => {
-                    const adminData = fetchedProfiles.find(p => p.id === log.performed_by)
-                    return { ...log, admin_name: adminData?.full_name || 'Admin User' }
-                })
-                setAuditLogs(mappedAudit)
-            }
-
-            if (qrligs) {
-                setRecentVerifications(qrligs.map(v => ({
-                    name: v.holder_name,
-                    doc: v.document_type,
-                    time: new Date(v.verified_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    result: v.is_valid ? '✅ Valid' : '❌ Invalid'
-                })))
+                const mappedRequests = (reqRes.data || []).map((req: any) => ({
+                    ...req, resident_name: req.profiles?.full_name || 'Unknown Resident'
+                }))
+                setRequests(mappedRequests as ServiceRequest[])
+                setAnnouncements(annRes.data as Announcement[])
+                if (qrRes.data) {
+                    setRecentVerifications(qrRes.data.map((v: any) => ({
+                        name: v.holder_name, doc: v.document_type,
+                        time: new Date(v.verified_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        result: v.is_valid ? '✅ Valid' : '❌ Invalid'
+                    })))
+                }
+            } else if (tab === 'requests') {
+                const { data } = await supabase.from('service_requests').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(100)
+                const mappedRequests = (data || []).map((req: any) => ({
+                    ...req, resident_name: req.profiles?.full_name || 'Unknown Resident'
+                }))
+                setRequests(mappedRequests as ServiceRequest[])
+            } else if (tab === 'residents') {
+                const { data } = await supabase.from('profiles').select('*').eq('role', 'resident').order('created_at', { ascending: false }).limit(100)
+                setResidents(data as Profile[])
+            } else if (tab === 'announcements') {
+                const { data } = await supabase.from('announcements').select('*').order('published_at', { ascending: false }).limit(50)
+                setAnnouncements(data as Announcement[])
+            } else if (tab === 'audit') {
+                const { data } = await supabase.from('audit_logs').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(100)
+                const mappedAudit = (data || []).map((log: any) => ({
+                    ...log, admin_name: log.profiles?.full_name || 'Admin User'
+                }))
+                setAuditLogs(mappedAudit as AuditLog[])
             }
         } catch (error: any) {
-            console.error('Error fetching admin data:', error)
+            console.error('Error fetching tab data:', error)
             showToast('Failed to load dashboard data', 'error')
         } finally {
             setLoading(false)
         }
     }
 
-    const pendingCount = requests.filter(r => r.status === 'pending').length
-    const processingCount = requests.filter(r => r.status === 'processing').length
-    const completedCount = requests.filter(r => r.status === 'completed').length
-    const rejectedCount = requests.filter(r => r.status === 'rejected').length
-    const completionRate = requests.length > 0
-        ? Math.round((completedCount / requests.length) * 100)
+    useEffect(() => {
+        if (activeTab === 'overview' && analyticsView === 'demographics' && !demographicsData) {
+            fetchDemographics();
+        }
+    }, [activeTab, analyticsView, demographicsData]);
+
+    const fetchDemographics = async () => {
+        setLoadingDemographics(true);
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('gender, birthdate, sectors')
+                .eq('role', 'resident');
+            if (!error) {
+                setDemographicsData(data || []);
+            } else {
+                console.error("Error fetching demographics", error);
+            }
+        } finally {
+            setLoadingDemographics(false);
+        }
+    }
+
+    const pendingCount = stats.pending
+    const processingCount = stats.processing
+    const completedCount = stats.completed
+    const rejectedCount = stats.rejected
+    const completionRate = stats.totalRequests > 0
+        ? Math.round((stats.completed / stats.totalRequests) * 100)
         : 0
 
     const updateStatus = async (requestId: string, newStatus: string, note?: string) => {
@@ -212,25 +264,38 @@ function AdminDashboardContent() {
             const request = requests.find(r => r.id === requestId)
             if (!request) return
 
-            // 1. Update the request status
+            // Build update payload
+            const updatePayload: Record<string, any> = {
+                status: newStatus,
+                notes: note || null,
+                updated_at: new Date().toISOString()
+            }
+
+            // Auto-generate QR code ref when marking as 'ready'
+            // This enables the document QR verification flow
+            if (newStatus === 'ready' && !request.qr_code_ref) {
+                updatePayload.qr_code_ref = crypto.randomUUID()
+            }
+
             const { error: reqError } = await supabase
                 .from('service_requests')
-                .update({
-                    status: newStatus,
-                    notes: note || null,
-                    updated_at: new Date().toISOString()
-                })
+                .update(updatePayload)
                 .eq('id', requestId)
 
             if (reqError) throw reqError
 
-            showToast(`Request marked as ${newStatus}`, 'success')
+            showToast(
+                newStatus === 'ready'
+                    ? `Request marked as ready — QR code generated for document verification`
+                    : `Request marked as ${newStatus}`,
+                'success'
+            )
             
             if (profile?.id) {
-                await logAdminAction('UPDATE_REQUEST', `Updated request ${requestId.slice(0, 8)} to ${newStatus}`, profile.id);
+                await logAdminAction('UPDATE_REQUEST', `Updated request ${requestId.slice(0, 8)} to ${newStatus}${newStatus === 'ready' ? ' (QR code generated)' : ''}`, profile.id);
             }
 
-            fetchAdminData()
+            fetchDataForTab(activeTab)
             setNoteModal(null)
             setAdminNote('')
         } catch (error: any) {
@@ -340,7 +405,7 @@ function AdminDashboardContent() {
                 .eq('id', id)
 
             if (error) {
-                fetchAdminData()
+                fetchDataForTab(activeTab)
                 throw error
             }
             showToast('Announcement deleted', 'success')
@@ -371,7 +436,7 @@ function AdminDashboardContent() {
                 .eq('id', residentId)
 
             if (error) {
-                fetchAdminData() // Revert
+                fetchDataForTab(activeTab) // Revert
                 throw error
             }
 
@@ -407,24 +472,100 @@ function AdminDashboardContent() {
         }
     }
 
-    const exportToCSV = (data: any[], filename: string) => {
+    const exportToPDF = (data: Profile[], filename: string) => {
         if (data.length === 0) return
-        const headers = Object.keys(data[0]).join(',')
-        const rows = data.map(obj =>
-            Object.values(obj).map(val =>
-                typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
-            ).join(',')
-        )
-        const csvContent = [headers, ...rows].join('\n')
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-        const link = document.createElement('a')
-        const url = URL.createObjectURL(blob)
-        link.setAttribute('href', url)
-        link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`)
-        link.style.visibility = 'hidden'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+
+        const doc = new jsPDF()
+
+        // Header Title
+        doc.setFontSize(18)
+        doc.setTextColor(40, 40, 40)
+        doc.text('Barangay Gordon Heights', 14, 22)
+        
+        doc.setFontSize(12)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Resident Directory Report', 14, 30)
+        doc.setFontSize(10)
+        doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 36)
+
+        // Map data to tidy rows
+        const tableColumn = ["Name", "Gender", "Email", "Phone", "Status", "Registered"]
+        const tableRows: any[] = []
+
+        data.forEach(res => {
+            const resData = [
+                res.full_name || 'N/A',
+                res.gender || 'N/A',
+                res.email || 'N/A',
+                res.phone || 'N/A',
+                res.is_verified ? 'Verified' : 'Pending',
+                new Date(res.created_at).toLocaleDateString()
+            ]
+            tableRows.push(resData)
+        })
+
+        // Draw Table
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 45,
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [63, 81, 181], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { top: 40 }
+        })
+
+        doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`)
+        showToast('PDF Export generated successfully', 'success')
+    }
+
+    const exportRequestsToPDF = (data: ServiceRequest[], filename: string) => {
+        if (data.length === 0) return
+
+        const doc = new jsPDF()
+
+        // Header Title
+        doc.setFontSize(18)
+        doc.setTextColor(40, 40, 40)
+        doc.text('Barangay Gordon Heights', 14, 22)
+        
+        doc.setFontSize(12)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Document Requests Report', 14, 30)
+        doc.setFontSize(10)
+        doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 36)
+
+        // Map data to tidy rows
+        const tableColumn = ["Ref ID", "Applicant Name", "Document Type", "Purpose", "Status", "Date Applied"]
+        const tableRows: any[] = []
+
+        data.forEach(req => {
+            const reqData = [
+                req.id?.split('-')[0].toUpperCase() || 'N/A',
+                req.resident_name || 'N/A',
+                req.document_type || 'N/A',
+                req.purpose || 'N/A',
+                req.status.charAt(0).toUpperCase() + req.status.slice(1),
+                new Date(req.created_at).toLocaleDateString()
+            ]
+            tableRows.push(reqData)
+        })
+
+        // Draw Table
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 45,
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [63, 81, 181], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { top: 40 }
+        })
+
+        doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`)
+        showToast('PDF Export generated successfully', 'success')
     }
 
     const handleScan = async (results: any[]) => {
@@ -467,7 +608,7 @@ function AdminDashboardContent() {
                     setRecentVerifications(prev => [log, ...prev].slice(0, 5))
                 }
 
-                // SAVE TO DB LOGS
+                // Save to verification logs
                 await supabase.from('qr_verifications').insert({
                     document_ref: scannedValue,
                     document_type: docData.document_type,
@@ -479,16 +620,29 @@ function AdminDashboardContent() {
                 return
             }
 
-            // 2. Try to find if it's a Resident ID (using ID or old Resident QR ID)
-            const { data: resData } = await supabase
+            // 2. Try to find if it's a Resident ID
+            // Use separate safe queries instead of string interpolation to avoid injection
+            let resData = null
+            const { data: byId } = await supabase
                 .from('profiles')
                 .select('*')
-                .or(`id.eq."${scannedValue}",resident_qr_id.eq."${scannedValue}"`)
+                .eq('id', scannedValue)
                 .maybeSingle()
+            resData = byId
+
+            if (!resData) {
+                const { data: byQrId } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('resident_qr_id', scannedValue)
+                    .maybeSingle()
+                resData = byQrId
+            }
 
             if (resData) {
+                const isVerified = resData.is_verified === true
                 setScanResult({
-                    valid: true,
+                    valid: isVerified,
                     isResident: true,
                     holder: resData.full_name,
                     docType: 'Resident ID Card',
@@ -497,22 +651,25 @@ function AdminDashboardContent() {
                     date: resData.created_at
                 })
 
-                const log = { name: resData.full_name, doc: 'Resident ID', time: new Date().toLocaleTimeString(), result: '✅ Verified Resident' }
+                const log = {
+                    name: resData.full_name,
+                    doc: 'Resident ID',
+                    time: new Date().toLocaleTimeString(),
+                    result: isVerified ? '✅ Verified Resident' : '⚠️ Unverified Account'
+                }
                 setRecentVerifications(prev => [log, ...prev].slice(0, 5))
 
-                // SAVE TO DB LOGS
+                // Save to verification logs
                 await supabase.from('qr_verifications').insert({
                     document_ref: scannedValue,
                     document_type: 'Resident ID Card',
                     holder_name: resData.full_name,
-                    is_valid: true,
+                    is_valid: isVerified,
                     verified_by: profile?.id
                 })
 
                 return
             }
-
-
 
             // 3. Fallback: If no match found
             setScanResult({
@@ -738,8 +895,8 @@ function AdminDashboardContent() {
                                         <h1>Document Requests</h1>
                                         <p className={styles.pageSubtitle}>{requests.length} total requests — {pendingCount} pending action</p>
                                     </div>
-                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToCSV(requests, 'Document_Requests')}>
-                                        📥 Export Requests CSV
+                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportRequestsToPDF(requests, 'Document_Requests')}>
+                                        📄 Export Requests PDF
                                     </button>
                                 </div>
 
@@ -856,8 +1013,8 @@ function AdminDashboardContent() {
                                         <h1>Registered Residents</h1>
                                         <p className={styles.pageSubtitle}>{residents.length} registered accounts in the system</p>
                                     </div>
-                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToCSV(residents, 'Resident_List')}>
-                                        📥 Export Residents CSV
+                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToPDF(residents, 'Resident_List')}>
+                                        📄 Export Residents PDF
                                     </button>
                                 </div>
 
@@ -890,7 +1047,7 @@ function AdminDashboardContent() {
                                                 {filteredResidents.map((res, i) => {
                                                     const reqCount = requests.filter(r => r.resident_id === res.id).length
                                                     return (
-                                                        <tr key={res.id}>
+                                                        <tr key={res.id} onClick={() => setSelectedResident(res)} style={{ cursor: 'pointer' }} title="Click to view full profile">
                                                             <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{String(i + 1).padStart(3, '0')}</td>
                                                             <td>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -941,6 +1098,200 @@ function AdminDashboardContent() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Resident Detail Modal */}
+                        {selectedResident && (() => {
+                            const res = selectedResident;
+                            const resRequests = requests.filter(r => r.resident_id === res.id);
+                            const age = res.birthdate ? Math.floor((Date.now() - new Date(res.birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+                            const idDocBucket = 'resident-requirements';
+
+                            const viewIdDocument = async () => {
+                                if (!res.id_document_url) return;
+                                try {
+                                    const { data, error } = await supabase.storage
+                                        .from(idDocBucket)
+                                        .createSignedUrl(res.id_document_url, 3600);
+                                    if (error) throw error;
+                                    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                                } catch (err: any) {
+                                    showToast(`Could not open ID document: ${err.message || 'Unknown error'}`, 'error');
+                                }
+                            };
+
+                            return (
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setSelectedResident(null)}>
+                                    <div className="glass-card" style={{ maxWidth: '720px', width: '100%', padding: '2.5rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                                        {/* Header */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+                                            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>👤 Resident Profile</h2>
+                                            <button style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', cursor: 'pointer' }} onClick={() => setSelectedResident(null)}>✕</button>
+                                        </div>
+
+                                        {/* Profile Header Card */}
+                                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '1.5rem', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.15)', marginBottom: '1.5rem' }}>
+                                            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '3px solid rgba(99, 102, 241, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                                                {res.profile_picture_url ? (
+                                                    <img src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <span style={{ fontSize: '2rem' }}>👤</span>
+                                                )}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.25rem' }}>{res.full_name}</h3>
+                                                <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                                                    ID: {res.resident_id_number || res.id?.slice(0, 12).toUpperCase()}
+                                                </p>
+                                                <span className={res.is_verified ? 'badge badge-success' : 'badge badge-warning'} style={{ fontSize: '0.75rem' }}>
+                                                    {res.is_verified ? '🛡️ Verified Resident' : '⏳ Pending Verification'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Info Grid */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>First Name</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.first_name || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Middle Name</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.middle_name || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Last Name</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.last_name || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Suffix</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.suffix || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Gender</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.gender || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Birthdate</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>
+                                                    {res.birthdate
+                                                        ? `${new Date(res.birthdate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${age} yrs old)`
+                                                        : '—'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Relationship Status</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.relationship_status || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Phone</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.phone || '—'}</p>
+                                            </div>
+                                            <div style={{ gridColumn: '1 / -1' }}>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Email Address</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.email}</p>
+                                            </div>
+                                            <div style={{ gridColumn: '1 / -1' }}>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Home Address</label>
+                                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 500 }}>{res.address || '—'}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Sectoral Classification */}
+                                        <div style={{ marginBottom: '1.5rem' }}>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>Sectoral Classification</label>
+                                            {res.sectors && res.sectors.length > 0 ? (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                                    {res.sectors.map(s => (
+                                                        <span key={s} style={{
+                                                            padding: '0.3rem 0.7rem',
+                                                            borderRadius: '99px',
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 600,
+                                                            background: 'rgba(99, 102, 241, 0.12)',
+                                                            color: '#a5b4fc',
+                                                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                        }}>{s}</span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.5 }}>No sectors specified</p>
+                                            )}
+                                        </div>
+
+                                        {/* ID Document Section */}
+                                        <div style={{ padding: '1.25rem', background: 'rgba(37, 99, 235, 0.06)', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.15)', marginBottom: '1.5rem' }}>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                                🪪 Identity Verification Document
+                                            </label>
+                                            {res.id_document_url ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <span style={{ fontSize: '0.9rem', color: 'var(--success-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>✅ Document uploaded</span>
+                                                    <button 
+                                                        className="btn btn-primary" 
+                                                        style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }} 
+                                                        onClick={viewIdDocument}
+                                                    >
+                                                        👁️ View ID Document
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--warning-500)' }}>⚠️ No ID document uploaded</p>
+                                            )}
+                                        </div>
+
+                                        {/* Meta Info */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{resRequests.length}</div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Requests</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmtDate(res.created_at)}</div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Registered</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: res.is_verified ? 'var(--success-500)' : 'var(--warning-500)' }}>
+                                                    {res.is_verified ? '✅' : '⏳'}
+                                                </div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Status</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Request History */}
+                                        {resRequests.length > 0 && (
+                                            <div>
+                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'block', marginBottom: '0.75rem' }}>Request History</label>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
+                                                    {resRequests.map(req => (
+                                                        <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                                            <div>
+                                                                <strong style={{ fontSize: '0.85rem' }}>{req.document_type}</strong>
+                                                                <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{fmtDate(req.created_at)}</p>
+                                                            </div>
+                                                            <span className={statusBadge(req.status)} style={{ fontSize: '0.7rem' }}>
+                                                                {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Actions */}
+                                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                                            {!res.is_verified && (
+                                                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { verifyResident(res.id); setSelectedResident(null); }}>
+                                                    ✅ Verify Resident
+                                                </button>
+                                            )}
+                                            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSelectedResident(null)}>
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* ── ANNOUNCEMENTS ── */}
                         {activeTab === 'announcements' && (
@@ -1092,89 +1443,142 @@ function AdminDashboardContent() {
                                     </div>
                                 </div>
 
+                                {/* Analytics Sub-Navigation */}
+                                <select
+                                    value={analyticsView}
+                                    onChange={(e) => setAnalyticsView(e.target.value as any)}
+                                    style={{
+                                        marginBottom: '1.75rem',
+                                        padding: '0.65rem 2.5rem 0.65rem 1rem',
+                                        borderRadius: '10px',
+                                        border: '1px solid rgba(99, 102, 241, 0.25)',
+                                        background: 'rgba(15, 15, 35, 0.6)',
+                                        color: '#fff',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                        appearance: 'none',
+                                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(255,255,255,0.5)' viewBox='0 0 16 16'%3E%3Cpath d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E")`,
+                                        backgroundRepeat: 'no-repeat',
+                                        backgroundPosition: 'right 0.85rem center',
+                                        backdropFilter: 'blur(10px)',
+                                    }}
+                                >
+                                    <option value="overview" style={{ background: '#1a1a2e' }}>📊 Overview — Stats & Breakdowns</option>
+                                    <option value="trends" style={{ background: '#1a1a2e' }}>📈 Trends — Weekly Performance</option>
+                                    <option value="demographics" style={{ background: '#1a1a2e' }}>👥 Demographics — Sectoral & Age</option>
+                                </select>
+
                                 {loading ? <LoadingSpinner text="Loading analytics..." /> : (
                                     <>
-                                        {/* Summary Cards */}
-                                        <div className={styles.statsGrid}>
-                                            <div className={`glass-card ${styles.statCard}`}>
-                                                <div className={styles.statIcon}>📄</div>
-                                                <div className={styles.statValue}>{requests.length}</div>
-                                                <div className={styles.statLabel}>Total Requests</div>
-                                                <div className={styles.statTrend}>All time</div>
-                                            </div>
-                                            <div className={`glass-card ${styles.statCard}`}>
-                                                <div className={styles.statIcon}>⚡</div>
-                                                <div className={styles.statValue}>{completionRate}%</div>
-                                                <div className={styles.statLabel}>Completion Rate</div>
-                                                <div className={styles.statTrend}>↑ Good performance</div>
-                                            </div>
-                                            <div className={`glass-card ${styles.statCard}`}>
-                                                <div className={styles.statIcon}>📢</div>
-                                                <div className={styles.statValue}>{announcements.length}</div>
-                                                <div className={styles.statLabel}>Announcements</div>
-                                                <div className={styles.statTrend}>This month</div>
-                                            </div>
-                                            <div className={`glass-card ${styles.statCard}`}>
-                                                <div className={styles.statIcon}>❌</div>
-                                                <div className={styles.statValue}>{rejectedCount}</div>
-                                                <div className={styles.statLabel}>Rejected</div>
-                                                <div className={styles.statTrend}>{requests.length > 0 ? Math.round(rejectedCount / requests.length * 100) : 0}% rejection rate</div>
-                                            </div>
-                                        </div>
-
-                                        {/* Document Type Breakdown */}
-                                        <div className="grid grid-2">
-                                            <div className="glass-card">
-                                                <h3>📊 Document Type Breakdown</h3>
-                                                {(['Barangay Clearance', 'Business Permit', 'Barangay ID', 'Certificate of Indigency', 'Certificate of Residency'] as const).map(type => {
-                                                    const count = requests.filter(r => r.document_type === type).length
-                                                    const pct = requests.length > 0 ? Math.round(count / requests.length * 100) : 0
-                                                    return (
-                                                        <div key={type} className={styles.analyticsRow}>
-                                                            <span className={styles.analyticsLabel}>{type}</span>
-                                                            <div className={styles.progressBar}>
-                                                                <div className={styles.progressFill} style={{ width: `${pct}%` }} />
-                                                            </div>
-                                                            <span className={styles.analyticsCount}>{count}</span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-
-                                            <div className="glass-card">
-                                                <h3>🔢 Status Breakdown</h3>
-                                                {(['pending', 'processing', 'ready', 'completed', 'rejected'] as const).map(status => {
-                                                    const count = requests.filter(r => r.status === status).length
-                                                    const pct = requests.length > 0 ? Math.round(count / requests.length * 100) : 0
-                                                    return (
-                                                        <div key={status} className={styles.analyticsRow}>
-                                                            <span className={statusBadge(status)} style={{ minWidth: '90px', textAlign: 'center' }}>
-                                                                {status.charAt(0).toUpperCase() + status.slice(1)}
-                                                            </span>
-                                                            <div className={styles.progressBar}>
-                                                                <div className={styles.progressFill} style={{ width: `${pct}%` }} />
-                                                            </div>
-                                                            <span className={styles.analyticsCount}>{count}</span>
-                                                        </div>
-                                                    )
-                                                })}
-
-                                                <div className={styles.analyticsSummary}>
-                                                    <div>
-                                                        <div className={styles.summaryValue}>{requests.length}</div>
-                                                        <div className={styles.summaryLabel}>Total</div>
+                                        {/* ── OVERVIEW SUB-VIEW ── */}
+                                        {analyticsView === 'overview' && (
+                                            <div className="animate-fadeIn">
+                                                {/* Summary Cards */}
+                                                <div className={styles.statsGrid}>
+                                                    <div className={`glass-card ${styles.statCard}`}>
+                                                        <div className={styles.statIcon}>📄</div>
+                                                        <div className={styles.statValue}>{requests.length}</div>
+                                                        <div className={styles.statLabel}>Total Requests</div>
+                                                        <div className={styles.statTrend}>All time</div>
                                                     </div>
-                                                    <div>
-                                                        <div className={styles.summaryValue}>{residents.length}</div>
-                                                        <div className={styles.summaryLabel}>Residents</div>
+                                                    <div className={`glass-card ${styles.statCard}`}>
+                                                        <div className={styles.statIcon}>⚡</div>
+                                                        <div className={styles.statValue}>{completionRate}%</div>
+                                                        <div className={styles.statLabel}>Completion Rate</div>
+                                                        <div className={styles.statTrend}>↑ Good performance</div>
                                                     </div>
-                                                    <div>
-                                                        <div className={styles.summaryValue}>{completionRate}%</div>
-                                                        <div className={styles.summaryLabel}>Rate</div>
+                                                    <div className={`glass-card ${styles.statCard}`}>
+                                                        <div className={styles.statIcon}>📢</div>
+                                                        <div className={styles.statValue}>{announcements.length}</div>
+                                                        <div className={styles.statLabel}>Announcements</div>
+                                                        <div className={styles.statTrend}>This month</div>
+                                                    </div>
+                                                    <div className={`glass-card ${styles.statCard}`}>
+                                                        <div className={styles.statIcon}>❌</div>
+                                                        <div className={styles.statValue}>{rejectedCount}</div>
+                                                        <div className={styles.statLabel}>Rejected</div>
+                                                        <div className={styles.statTrend}>{requests.length > 0 ? Math.round(rejectedCount / requests.length * 100) : 0}% rejection rate</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Document Type & Status Breakdown */}
+                                                <div className="grid grid-2" style={{ marginTop: '1.5rem' }}>
+                                                    <div className="glass-card">
+                                                        <h3>📊 Document Type Breakdown</h3>
+                                                        {(['Barangay Clearance', 'Business Permit', 'Barangay ID', 'Certificate of Indigency', 'Certificate of Residency'] as const).map(type => {
+                                                            const count = requests.filter(r => r.document_type === type).length
+                                                            const pct = requests.length > 0 ? Math.round(count / requests.length * 100) : 0
+                                                            return (
+                                                                <div key={type} className={styles.analyticsRow}>
+                                                                    <span className={styles.analyticsLabel}>{type}</span>
+                                                                    <div className={styles.progressBar}>
+                                                                        <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+                                                                    </div>
+                                                                    <span className={styles.analyticsCount}>{count}</span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+
+                                                    <div className="glass-card">
+                                                        <h3>🔢 Status Breakdown</h3>
+                                                        {(['pending', 'processing', 'ready', 'completed', 'rejected'] as const).map(status => {
+                                                            const count = requests.filter(r => r.status === status).length
+                                                            const pct = requests.length > 0 ? Math.round(count / requests.length * 100) : 0
+                                                            return (
+                                                                <div key={status} className={styles.analyticsRow}>
+                                                                    <span className={statusBadge(status)} style={{ minWidth: '90px', textAlign: 'center' }}>
+                                                                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                                                                    </span>
+                                                                    <div className={styles.progressBar}>
+                                                                        <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+                                                                    </div>
+                                                                    <span className={styles.analyticsCount}>{count}</span>
+                                                                </div>
+                                                            )
+                                                        })}
+
+                                                        <div className={styles.analyticsSummary}>
+                                                            <div>
+                                                                <div className={styles.summaryValue}>{requests.length}</div>
+                                                                <div className={styles.summaryLabel}>Total</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className={styles.summaryValue}>{residents.length}</div>
+                                                                <div className={styles.summaryLabel}>Residents</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className={styles.summaryValue}>{completionRate}%</div>
+                                                                <div className={styles.summaryLabel}>Rate</div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
+
+                                        {/* ── TRENDS SUB-VIEW ── */}
+                                        {analyticsView === 'trends' && (
+                                            <div className="animate-fadeIn">
+                                                <WeeklyPerformanceChart />
+                                            </div>
+                                        )}
+
+                                        {/* ── DEMOGRAPHICS SUB-VIEW ── */}
+                                        {analyticsView === 'demographics' && (
+                                            <div className="animate-fadeIn">
+                                                {loadingDemographics ? (
+                                                    <LoadingSpinner text="Loading demographic data..." />
+                                                ) : (
+                                                    <>
+                                                        <SectoralChart profiles={demographicsData || []} />
+                                                        <AgeDemographicChart profiles={demographicsData || []} />
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </div>
