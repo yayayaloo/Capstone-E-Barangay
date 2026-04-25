@@ -568,6 +568,34 @@ function AdminDashboardContent() {
         showToast('PDF Export generated successfully', 'success')
     }
 
+    const exportToCSV = (data: AuditLog[], filename: string) => {
+        if (data.length === 0) return;
+        
+        const headers = ['Date & Time', 'Admin', 'Action', 'Description'];
+        const csvRows = [headers.join(',')];
+        
+        data.forEach(log => {
+            const row = [
+                `"${new Date(log.created_at).toLocaleString().replace(/"/g, '""')}"`,
+                `"${(log.admin_name || 'Admin User').replace(/"/g, '""')}"`,
+                `"${log.action.replace(/"/g, '""')}"`,
+                `"${log.description.replace(/"/g, '""')}"`
+            ];
+            csvRows.push(row.join(','));
+        });
+        
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast('CSV Export generated successfully', 'success');
+    }
+
     const handleScan = async (results: any[]) => {
         if (!results || results.length === 0) return;
         const scannedValue = results[0].rawValue?.trim();
