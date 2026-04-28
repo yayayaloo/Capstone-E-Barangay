@@ -503,11 +503,7 @@
 }
 
 /* Profile Section */
-@media (max-width: 768px) {
-    .hotlineItem {
-        padding: 0.5rem 0.75rem;
-    }
-}
+
 
 .profileSection {
     animation: fadeIn 0.3s ease;
@@ -637,6 +633,12 @@
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+    .portalContainer {
+        padding-bottom: 5rem;
+    }
+}
+
 @media (max-width: 768px) {
     .tabNav {
         overflow-x: auto;
@@ -673,5 +675,58 @@
         width: 55px;
         height: 55px;
         font-size: 1.75rem;
+    }
+
+    .hotlineItem {
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .welcome {
+        padding: 1.5rem;
+    }
+
+    .idCardMain {
+        flex-direction: column;
+        text-align: center;
+        align-items: center;
+        padding: 1.25rem;
+    }
+
+    .idCardIcon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.5rem;
+    }
+
+    .verifiedBadge {
+        display: block;
+        margin: 0.5rem auto 0;
+        width: fit-content;
+    }
+}
+
+@media (max-width: 480px) {
+    .profileImageContainer {
+        width: 150px;
+        height: 150px;
+    }
+
+    .applicationItem {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .appInfo {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .chatButton {
+        bottom: 1rem;
+        right: 1rem;
+        width: 50px;
+        height: 50px;
     }
 }

@@ -37,6 +37,12 @@
     font-weight: 500;
 }
 
+@media (max-width: 768px) {
+    .header {
+        padding: 0.75rem 0;
+    }
+}
+
 @media (max-width: 640px) {
     .userName {
         display: none;
@@ -44,5 +50,11 @@
 
     .logo span:not(.logoIcon) {
         display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        padding: 0.5rem 0;
     }
 }

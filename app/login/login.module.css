@@ -6,7 +6,7 @@
     background: #ffffff;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
     .loginContainer {
         grid-template-columns: 1fr 1.15fr;
     }
@@ -37,7 +37,7 @@
     border-radius: 4px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
     .brandingPanel {
         display: flex;
     }
@@ -154,7 +154,7 @@
     color: var(--primary-600);
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
     .formPanel {
         padding: 3rem 3rem;
         background: #ffffff; /* Clean white when split */

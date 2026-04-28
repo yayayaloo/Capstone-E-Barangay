@@ -249,6 +249,12 @@
 }
 
 /* ─── Responsive ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .container {
+        padding: 1.5rem;
+    }
+}
+
 @media (max-width: 640px) {
     .container {
         padding: 1.25rem;
@@ -278,5 +284,19 @@
 
     .footerValue {
         font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .label {
+        min-width: 65px;
+    }
+    
+    .labelName {
+        font-size: 0.65rem;
     }
 }

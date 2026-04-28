@@ -212,14 +212,23 @@
     }
 }
 
+@media (max-width: 768px) {
+    .modal {
+        max-width: 90%;
+    }
+}
+
+@media (max-width: 640px) {
+    .typeGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 480px) {
     .modal {
         max-height: 100vh;
         border-radius: var(--radius-lg);
-    }
-
-    .typeGrid {
-        grid-template-columns: 1fr;
+        max-width: 100%;
     }
 
     .form {

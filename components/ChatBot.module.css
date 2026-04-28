@@ -341,7 +341,17 @@
 }
 
 /* Responsive */
+@media (max-width: 768px) {
+    .chatContainer {
+        height: 95vh;
+    }
+}
+
 @media (max-width: 640px) {
+    .backdrop {
+        padding: 0;
+    }
+
     .chatContainer {
         height: 100vh;
         max-height: 100vh;
@@ -350,5 +360,19 @@
 
     .messageContent {
         max-width: 85%;
+    }
+}
+
+@media (max-width: 480px) {
+    .chatHeader {
+        padding: 1rem;
+    }
+
+    .messagesContainer {
+        padding: 1rem;
+    }
+
+    .inputContainer {
+        padding: 1rem;
     }
 }

@@ -46,7 +46,7 @@
     transform: translateY(-2px);
 }
 
-@media (max-width: 968px) {
+@media (max-width: 768px) {
     .bottomNav {
         display: flex;
     }

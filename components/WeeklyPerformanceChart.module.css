@@ -406,6 +406,12 @@
     }
 }
 
+@media (max-width: 640px) {
+    .chartTitle {
+        font-size: 1.05rem;
+    }
+}
+
 @media (max-width: 480px) {
     .chartContainer {
         padding: 1rem;

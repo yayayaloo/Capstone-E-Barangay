@@ -76,10 +76,18 @@
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
     .toastContainer {
         left: 1rem;
         right: 1rem;
         max-width: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .toastContainer {
+        left: 0.5rem;
+        right: 0.5rem;
+        top: 1rem;
     }
 }

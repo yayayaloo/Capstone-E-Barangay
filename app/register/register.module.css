@@ -388,16 +388,24 @@
     color: #4f46e5;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
     .registerCard {
-        padding: 2rem 1.5rem;
+        padding: 2.5rem 2rem;
     }
+}
 
+@media (max-width: 640px) {
     .inputRow {
         grid-template-columns: 1fr;
     }
 
     .nameGrid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .registerCard {
+        padding: 2rem 1.5rem;
     }
 }
