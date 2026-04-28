@@ -122,7 +122,7 @@ export default function RegisterPage() {
             address: address || undefined,
             phone: phone || undefined,
             birthdate: birthdate || undefined
-        }, `${window.location.origin}/register`)
+        }, `${window.location.origin}/auth/confirm`)
 
         if (signUpError) {
             setError(signUpError)
@@ -173,7 +173,7 @@ export default function RegisterPage() {
 
         setSuccess(true)
         setLoading(false)
-        setTimeout(() => router.push('/login'), 3000)
+        // Removed auto-redirect so user has time to read the instructions
     }
 
     if (success) {
@@ -235,7 +235,8 @@ export default function RegisterPage() {
                         <div className={styles.successMessage}>
                             <div style={{ fontSize: '3rem', margin: '0 auto 1.5rem' }}>✅</div>
                             <h2 style={{ color: '#111827', fontSize: '1.75rem', marginBottom: '1rem', fontWeight: 'bold' }}>Registration Successful!</h2>
-                            <p>Your account has been created and is now under review. You will be redirected to the login page shortly.</p>
+                            <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
+                            <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
                             <Link href="/login" className={styles.link}>Go to Login →</Link>
                         </div>
                     </div>

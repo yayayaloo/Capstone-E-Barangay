@@ -277,7 +277,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const resendOtp = async (email: string) => {
         try {
             const { error } = await supabase.auth.resend({ type: 'signup', email, options: {
-                emailRedirectTo: window.location.origin + '/register'
+                emailRedirectTo: window.location.origin + '/auth/confirm'
             } })
             return { error: error?.message || null }
         } catch (error: any) {

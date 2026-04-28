@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
@@ -9,18 +9,33 @@ import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import styles from './login.module.css'
 
-export default function LoginPage() {
+function LoginContent() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState('')
+    const [successMessage, setSuccessMessage] = useState('')
     const [loading, setLoading] = useState(false)
     const { signIn } = useAuth()
     const router = useRouter()
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+        // Handle email confirmation success
+        if (searchParams.get('confirmed') === 'true') {
+            setSuccessMessage('Your email has been verified successfully! You can now sign in.')
+        }
+        // Handle email confirmation errors
+        const errorDesc = searchParams.get('error_description')
+        if (errorDesc) {
+            setError(errorDesc)
+        }
+    }, [searchParams])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
+        setSuccessMessage('')
         
         if (!email.trim() || !password.trim()) {
             setError('Please enter both email and password.')
@@ -41,7 +56,7 @@ export default function LoginPage() {
             if (error.includes('Invalid login credentials')) {
                 setError('Incorrect email or password. Please try again.')
             } else if (error.includes('Email not confirmed')) {
-                setError('Please verify your email address before logging in.')
+                setError('Please verify your email address before logging in. Check your inbox for the confirmation link.')
             } else {
                 setError(error)
             }
@@ -128,6 +143,22 @@ export default function LoginPage() {
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
+                        {successMessage && (
+                            <div style={{
+                                padding: '0.875rem 1rem',
+                                borderRadius: '12px',
+                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                color: '#059669',
+                                fontSize: '0.85rem',
+                                fontWeight: 500,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                            }}>
+                                ✅ {successMessage}
+                            </div>
+                        )}
                         {error && (
                             <div className={styles.errorMessage}>
                                 ⚠️ {error}
@@ -192,5 +223,21 @@ export default function LoginPage() {
             </div>
             
         </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className={styles.loginContainer}>
+                <div className={styles.formPanel}>
+                    <div className={styles.loginCard}>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     )
 }
