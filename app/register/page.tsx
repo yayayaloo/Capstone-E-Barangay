@@ -150,24 +150,12 @@ export default function RegisterPage() {
                     }
                 }
 
-                // Update profile record with additional details
-                const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({
-                        full_name: fullName,
-                        first_name: firstName,
-                        middle_name: middleName || null,
-                        last_name: lastName,
-                        suffix: suffix || null,
-                        gender: gender,
-                        relationship_status: relationshipStatus,
-                        address: address || null,
-                        phone: phone || null,
-                        birthdate: birthdate || null,
-                        id_document_url: filePath,
-                        sectors: sectors
-                    })
-                    .eq('id', userId)
+                // Update profile record with additional details (bypassing RLS via RPC)
+                const { error: updateError } = await supabase.rpc('complete_registration', {
+                    p_user_id: userId,
+                    p_id_document_url: filePath,
+                    p_sectors: sectors
+                })
 
                 if (updateError) {
                     console.error('Failed to update profile record:', updateError.message)

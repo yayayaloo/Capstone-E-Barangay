@@ -365,9 +365,56 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('resident-requirements', 'resident-requirements', false)
 ON CONFLICT (id) DO NOTHING;
 
+-- Helper function to safely check if a folder name is a recently created profile ID
+CREATE OR REPLACE FUNCTION is_recent_profile(profile_id_text TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+    valid_uuid UUID;
+BEGIN
+    BEGIN
+        valid_uuid := profile_id_text::UUID;
+    EXCEPTION WHEN invalid_text_representation THEN
+        RETURN false;
+    END;
+
+    RETURN EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE id = valid_uuid 
+        AND created_at > (NOW() - INTERVAL '1 hour')
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- RPC to update profile details immediately after signup without requiring an active session
+CREATE OR REPLACE FUNCTION complete_registration(
+    p_user_id UUID,
+    p_id_document_url TEXT,
+    p_sectors TEXT[]
+)
+RETURNS void AS $$
+BEGIN
+    UPDATE profiles 
+    SET 
+        id_document_url = p_id_document_url,
+        sectors = p_sectors
+    WHERE id = p_user_id 
+    AND created_at > (NOW() - INTERVAL '1 hour');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Drop existing policy if any (for idempotency when running in SQL editor)
+DROP POLICY IF EXISTS "Residents can upload their own requirements" ON storage.objects;
+
 CREATE POLICY "Residents can upload their own requirements" 
   ON storage.objects FOR INSERT 
-  WITH CHECK (bucket_id = 'resident-requirements' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
+  WITH CHECK (
+    bucket_id = 'resident-requirements' 
+    AND (
+      auth.uid()::text = (string_to_array(name, '/'))[1]
+      OR 
+      (auth.role() = 'anon' AND public.is_recent_profile((string_to_array(name, '/'))[1]))
+    )
+  );
 
 CREATE POLICY "Residents can view their own requirements" 
   ON storage.objects FOR SELECT 
