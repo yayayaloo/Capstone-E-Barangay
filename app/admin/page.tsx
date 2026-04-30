@@ -568,7 +568,7 @@ function AdminDashboardContent() {
 
         const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
+        link.setAttribute("href", encodeURI(csvContent));
         link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
