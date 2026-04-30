@@ -285,8 +285,8 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: var(--primary-600);
-    border: none;
+    background: white;
+    border: 1px solid var(--border-color);
     font-size: 2rem;
     cursor: pointer;
     box-shadow: var(--shadow-lg);
@@ -453,7 +453,7 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 1.25rem;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 12px;

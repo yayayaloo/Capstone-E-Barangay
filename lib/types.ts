@@ -77,3 +77,18 @@ export interface AuditLog {
     // Joined fields
     admin_name?: string
 }
+
+export type BlotterStatus = 'Pending' | 'Ongoing' | 'Resolved' | 'Referred'
+
+export interface BlotterReport {
+    id: string
+    complainant: string
+    respondent: string
+    incident_details: string
+    incident_date: string
+    location: string
+    status: BlotterStatus
+    created_at: string
+    updated_at: string
+    created_by: string | null
+}

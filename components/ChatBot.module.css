@@ -74,7 +74,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.75rem;
+    overflow: hidden;
+}
+
+.botAvatar img {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
 }
 
 .headerInfo h3 {
@@ -159,7 +165,13 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 1.25rem;
+    overflow: hidden;
+}
+
+.messageAvatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .userMessage .messageAvatar {
@@ -167,7 +179,8 @@
 }
 
 .botMessage .messageAvatar {
-    background: var(--primary-600);
+    background: white;
+    border: 1px solid var(--border-color);
 }
 
 .messageContent {

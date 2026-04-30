@@ -44,7 +44,7 @@ export default function ForgotPasswordPage() {
                 <div className={styles.logoSection}>
                     <Link href="/login" className={styles.backLink}>← Back to Login</Link>
                     <div className={styles.logoIcon}>
-                        {submitted ? '📬' : '🔐'}
+                        {submitted ? '' : ''}
                     </div>
                     <h1>{submitted ? 'Check Your Inbox!' : 'Forgot Password'}</h1>
                     <p>
@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
                     <form onSubmit={handleSubmit} className={styles.form}>
                         {error && (
                             <div className={styles.errorMessage} style={{ color: '#ef4444', textAlign: 'center', marginBottom: '1rem', background: '#fee2e2', padding: '0.75rem', borderRadius: '12px', fontSize: '0.875rem', border: '1px solid #fecaca' }}>
-                                ⚠️ {error}
+                                {error}
                             </div>
                         )}
                         <div className={styles.inputGroup}>

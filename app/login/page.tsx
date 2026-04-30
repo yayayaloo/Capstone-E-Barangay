@@ -36,7 +36,7 @@ function LoginContent() {
         e.preventDefault()
         setError('')
         setSuccessMessage('')
-        
+
         if (!email.trim() || !password.trim()) {
             setError('Please enter both email and password.')
             return
@@ -66,7 +66,7 @@ function LoginContent() {
             // This is instantly available from the JWT without an extra DB query.
             const { data: { session } } = await supabase.auth.getSession()
             const role = session?.user?.user_metadata?.role || 'resident'
-            
+
             if (role === 'admin') {
                 router.push('/admin')
             } else {
@@ -77,7 +77,7 @@ function LoginContent() {
 
     return (
         <div className={styles.loginContainer}>
-            
+
             {/* Left Panel - Branding */}
             <div className={styles.brandingPanel}>
                 <div className={styles.brandingBackground} />
@@ -113,7 +113,7 @@ function LoginContent() {
 
                     <div className={styles.brandSection}>
                         <div className={styles.sectionTitle}>Service Pledge</div>
-                        <p style={{marginBottom: '0.5rem', fontSize: '0.85rem'}}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
+                        <p style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
                         <ul className={styles.coreValues}>
                             <li>• Serve with honesty and integrity</li>
                             <li>• Be polite and courteous at all times</li>
@@ -156,12 +156,12 @@ function LoginContent() {
                                 alignItems: 'center',
                                 gap: '0.5rem',
                             }}>
-                                ✅ {successMessage}
+                                {successMessage}
                             </div>
                         )}
                         {error && (
                             <div className={styles.errorMessage}>
-                                ⚠️ {error}
+                                {error}
                             </div>
                         )}
 
@@ -188,14 +188,14 @@ function LoginContent() {
                                     placeholder="••••••••"
                                     required
                                 />
-                                    <button
-                                        type="button"
-                                        className={styles.passwordToggle}
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        tabIndex={-1}
-                                    >
-                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                    </button>
+                                <button
+                                    type="button"
+                                    className={styles.passwordToggle}
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
 
@@ -221,7 +221,7 @@ function LoginContent() {
                     </div>
                 </div>
             </div>
-            
+
         </div>
     )
 }

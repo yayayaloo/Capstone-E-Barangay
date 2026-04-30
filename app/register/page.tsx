@@ -11,20 +11,20 @@ import styles from './register.module.css'
 import loginStyles from '../login/login.module.css'
 
 const SECTOR_OPTIONS = [
-    { value: 'Solo Parent', icon: '🧑‍🍼' },
-    { value: 'OFW', icon: '🌍' },
-    { value: 'PWD', icon: '♿' },
-    { value: 'Senior Citizen', icon: '👴' },
-    { value: 'LGBTQ+', icon: '🏳️‍🌈' },
-    { value: 'Employed', icon: '💼' },
-    { value: 'Unemployed', icon: '📭' },
-    { value: '4Ps Beneficiary', icon: '👩‍👧' },
-    { value: 'Pregnant/Lactating', icon: '🤰' },
-    { value: 'Youth (15-30)', icon: '🧑' },
-    { value: 'Indigenous People', icon: '🌾' },
-    { value: 'OSC', icon: '📕' },
-    { value: 'OSY', icon: '📗' },
-    { value: 'OSA', icon: '📘' },
+    { value: 'Solo Parent', icon: '' },
+    { value: 'OFW', icon: '' },
+    { value: 'PWD', icon: '' },
+    { value: 'Senior Citizen', icon: '' },
+    { value: 'LGBTQ+', icon: '' },
+    { value: 'Employed', icon: '' },
+    { value: 'Unemployed', icon: '' },
+    { value: '4Ps Beneficiary', icon: '' },
+    { value: 'Pregnant/Lactating', icon: '' },
+    { value: 'Youth (15-30)', icon: '' },
+    { value: 'Indigenous People', icon: '' },
+    { value: 'OSC', icon: '' },
+    { value: 'OSY', icon: '' },
+    { value: 'OSA', icon: '' },
 ]
 
 export default function RegisterPage() {
@@ -233,7 +233,7 @@ export default function RegisterPage() {
                 <div className={loginStyles.formPanel}>
                     <div className={styles.registerCard}>
                         <div className={styles.successMessage}>
-                            <div style={{ fontSize: '3rem', margin: '0 auto 1.5rem' }}>✅</div>
+                            <div style={{ fontSize: '3rem', margin: '0 auto 1.5rem' }}></div>
                             <h2 style={{ color: '#111827', fontSize: '1.75rem', marginBottom: '1rem', fontWeight: 'bold' }}>Registration Successful!</h2>
                             <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
@@ -317,7 +317,7 @@ export default function RegisterPage() {
                     <form onSubmit={handleSubmit} className={styles.form}>
                         {error && (
                             <div className={styles.errorMessage}>
-                                ⚠️ {error}
+                                {error}
                             </div>
                         )}
 
@@ -652,7 +652,7 @@ export default function RegisterPage() {
                                     required
                                 />
                                 <div className={styles.fileInputPlaceholder}>
-                                    {idDocument ? `📄 ${idDocument.name}` : '📁 Choose File (Image or PDF)'}
+                                    {idDocument ? ` ${idDocument.name}` : ' Choose File (Image or PDF)'}
                                 </div>
                             </div>
                         </div>

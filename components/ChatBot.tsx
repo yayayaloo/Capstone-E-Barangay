@@ -94,7 +94,7 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
 export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotProps) {
     const defaultMessage: Message = {
         id: 1,
-        text: `Hello ${userProfile?.first_name || 'Residente'}! 👋 Ako ang iyong AI Assistant para sa E-Barangay Gordon Heights — powered by Gemini AI. Maaari akong tumulong sa iyong mga dokumento, requirements, at barangay information. Paano kita matutulungan ngayon?`,
+        text: `Hello ${userProfile?.first_name || 'Residente'}! 👋 Ako ang iyong AI Assistant para sa E-Barangay Gordon Heights. Maaari akong tumulong sa iyong mga dokumento, requirements, at barangay information. Paano kita matutulungan ngayon?`,
         sender: 'bot',
         timestamp: new Date(),
     }
@@ -105,10 +105,14 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
             const saved = sessionStorage.getItem(STORAGE_KEY)
             if (saved) {
                 const parsed = JSON.parse(saved)
-                // Revive Date objects from JSON strings
-                return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+                // Revive Date objects and clean up old branding from history
+                return parsed.map((m: any) => ({
+                    ...m,
+                    text: m.id === 1 ? m.text.replace(' — powered by Gemini AI', '') : m.text,
+                    timestamp: new Date(m.timestamp)
+                }))
             }
-        } catch {}
+        } catch { }
         return [defaultMessage]
     })
     const [inputValue, setInputValue] = useState('')
@@ -119,7 +123,7 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
     useEffect(() => {
         try {
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
-        } catch {}
+        } catch { }
     }, [messages])
 
     const scrollToBottom = () => {
@@ -233,12 +237,14 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                 {/* Header */}
                 <div className={styles.chatHeader}>
                     <div className={styles.headerInfo}>
-                        <div className={styles.botAvatar}>🤖</div>
+                        <div className={styles.botAvatar}>
+                            <img src="/logo.png" alt="Barangay Logo" />
+                        </div>
                         <div>
                             <h3>AI Assistant</h3>
                             <span className={styles.status}>
                                 <span className={styles.statusDot}></span>
-                                Powered by Gemini AI
+                                Online
                             </span>
                         </div>
                     </div>
@@ -253,7 +259,9 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                             className={`${styles.message} ${message.sender === 'user' ? styles.userMessage : styles.botMessage}`}
                         >
                             {message.sender === 'bot' && (
-                                <div className={styles.messageAvatar}>🤖</div>
+                                <div className={styles.messageAvatar}>
+                                    <img src="/logo.png" alt="Bot" />
+                                </div>
                             )}
                             <div className={styles.messageContent}>
                                 <div className={styles.messageText}>
@@ -264,14 +272,16 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                                 </div>
                             </div>
                             {message.sender === 'user' && (
-                                <div className={styles.messageAvatar}>👤</div>
+                                <div className={styles.messageAvatar}></div>
                             )}
                         </div>
                     ))}
 
-                    {isTyping && (
+                        {isTyping && (
                         <div className={`${styles.message} ${styles.botMessage}`}>
-                            <div className={styles.messageAvatar}>🤖</div>
+                            <div className={styles.messageAvatar}>
+                                <img src="/logo.png" alt="Bot" />
+                            </div>
                             <div className={styles.typingIndicator}>
                                 <span></span>
                                 <span></span>

@@ -13,7 +13,7 @@ export default function Home() {
         async function fetchStats() {
             try {
                 const { data, error } = await supabase.rpc('get_public_stats')
-                
+
                 if (error) throw error
 
                 setStats({
@@ -51,7 +51,7 @@ export default function Home() {
                 <div className={`container ${styles.heroContainer}`}>
                     <div className={styles.heroContent}>
                         <div className={`${styles.badge} badge badge-info`}>
-                            ✨ Now Live - 24/7 Digital Services
+                            Now Live - 24/7 Digital Services
                         </div>
                         <h1 className="animate-fadeIn">
                             E-Barangay<br />Gordon Heights
@@ -62,11 +62,11 @@ export default function Home() {
                         </p>
                         <div className={styles.heroCTA}>
                             <Link href="/register" className="btn btn-primary">
-                                <span>🚀</span>
+                                <span></span>
                                 Get Started
                             </Link>
                             <Link href="/login" className="btn btn-outline">
-                                <span>🔐</span>
+                                <span></span>
                                 Sign In
                             </Link>
                         </div>
@@ -100,17 +100,17 @@ export default function Home() {
                             </div>
                             <div className={styles.mockupContent}>
                                 <div className={styles.chatBubble}>
-                                    <div className={styles.avatar}>🤖</div>
+                                    <div className={styles.avatar}></div>
                                     <div>
                                         <strong>AI Assistant</strong>
                                         <p>How can I help you today?</p>
                                     </div>
                                 </div>
                                 <div className={styles.serviceGrid}>
-                                    <div className={styles.serviceItem}>📄 Clearance</div>
-                                    <div className={styles.serviceItem}>📝 Permits</div>
-                                    <div className={styles.serviceItem}>🆔 ID Request</div>
-                                    <div className={styles.serviceItem}>📱 QR Verify</div>
+                                    <div className={styles.serviceItem}> Clearance</div>
+                                    <div className={styles.serviceItem}> Permits</div>
+                                    <div className={styles.serviceItem}> ID Request</div>
+                                    <div className={styles.serviceItem}> QR Verify</div>
                                 </div>
                             </div>
                         </div>
@@ -132,7 +132,7 @@ export default function Home() {
 
                     <div className="grid grid-3">
                         <div className="glass-card">
-                            <div className={styles.featureIcon}>🤖</div>
+                            <div className={styles.featureIcon}></div>
                             <h3>AI Chatbot</h3>
                             <p>
                                 Get instant answers to your questions 24/7 through our intelligent
@@ -141,7 +141,7 @@ export default function Home() {
                         </div>
 
                         <div className="glass-card">
-                            <div className={styles.featureIcon}>📱</div>
+                            <div className={styles.featureIcon}></div>
                             <h3>QR Verification</h3>
                             <p>
                                 Secure document authentication with embedded QR codes.
@@ -150,7 +150,7 @@ export default function Home() {
                         </div>
 
                         <div className="glass-card">
-                            <div className={styles.featureIcon}>☁️</div>
+                            <div className={styles.featureIcon}></div>
                             <h3>Cloud-Based</h3>
                             <p>
                                 Access from any device, anywhere. Your data is secure,
@@ -159,7 +159,7 @@ export default function Home() {
                         </div>
 
                         <div className="glass-card">
-                            <div className={styles.featureIcon}>⚡</div>
+                            <div className={styles.featureIcon}></div>
                             <h3>Progressive Web App</h3>
                             <p>
                                 Install on your phone like a native app. Works offline
@@ -168,7 +168,7 @@ export default function Home() {
                         </div>
 
                         <div className="glass-card">
-                            <div className={styles.featureIcon}>🔒</div>
+                            <div className={styles.featureIcon}></div>
                             <h3>Secure & Private</h3>
                             <p>
                                 Your personal information is encrypted and protected.
@@ -177,7 +177,7 @@ export default function Home() {
                         </div>
 
                         <div className="glass-card">
-                            <div className={styles.featureIcon}>⏱️</div>
+                            <div className={styles.featureIcon}></div>
                             <h3>Fast Processing</h3>
                             <p>
                                 Reduced waiting time for document requests.
@@ -198,57 +198,57 @@ export default function Home() {
 
                     <div className="grid grid-2">
                         <div className={`glass-card ${styles.serviceCard}`}>
-                            <div className={styles.serviceCardIcon}>📄</div>
+                            <div className={styles.serviceCardIcon}></div>
                             <div>
                                 <h3>Barangay Clearance</h3>
                                 <p>Apply for barangay clearance online. Get QR-verified certificates.</p>
                                 <ul className={styles.serviceFeatures}>
-                                    <li>✓ Online application</li>
-                                    <li>✓ Real-time tracking</li>
-                                    <li>✓ QR verification</li>
-                                    <li>✓ Digital download</li>
+                                    <li>Online application</li>
+                                    <li>Real-time tracking</li>
+                                    <li>QR verification</li>
+                                    <li>Digital download</li>
                                 </ul>
                             </div>
                         </div>
 
                         <div className={`glass-card ${styles.serviceCard}`}>
-                            <div className={styles.serviceCardIcon}>🏠</div>
+                            <div className={styles.serviceCardIcon}></div>
                             <div>
                                 <h3>Business Permits</h3>
                                 <p>Process business permit applications and renewals digitally.</p>
                                 <ul className={styles.serviceFeatures}>
-                                    <li>✓ Digital forms</li>
-                                    <li>✓ Document upload</li>
-                                    <li>✓ Status updates</li>
-                                    <li>✓ Payment tracking</li>
+                                    <li>Digital forms</li>
+                                    <li>Document upload</li>
+                                    <li>Status updates</li>
+                                    <li>Payment tracking</li>
                                 </ul>
                             </div>
                         </div>
 
                         <div className={`glass-card ${styles.serviceCard}`}>
-                            <div className={styles.serviceCardIcon}>🆔</div>
+                            <div className={styles.serviceCardIcon}></div>
                             <div>
                                 <h3>Barangay ID</h3>
                                 <p>Request your Barangay ID with photo upload and verification.</p>
                                 <ul className={styles.serviceFeatures}>
-                                    <li>✓ Photo upload</li>
-                                    <li>✓ Digital signature</li>
-                                    <li>✓ Quick approval</li>
-                                    <li>✓ Claim scheduling</li>
+                                    <li>Photo upload</li>
+                                    <li>Digital signature</li>
+                                    <li>Quick approval</li>
+                                    <li>Claim scheduling</li>
                                 </ul>
                             </div>
                         </div>
 
                         <div className={`glass-card ${styles.serviceCard}`}>
-                            <div className={styles.serviceCardIcon}>📢</div>
+                            <div className={styles.serviceCardIcon}></div>
                             <div>
                                 <h3>Announcements & News</h3>
                                 <p>Stay updated with barangay events, bulletins, and emergency alerts.</p>
                                 <ul className={styles.serviceFeatures}>
-                                    <li>✓ Push notifications</li>
-                                    <li>✓ Event calendar</li>
-                                    <li>✓ Emergency alerts</li>
-                                    <li>✓ Community updates</li>
+                                    <li>Push notifications</li>
+                                    <li>Event calendar</li>
+                                    <li>Emergency alerts</li>
+                                    <li>Community updates</li>
                                 </ul>
                             </div>
                         </div>
@@ -292,28 +292,28 @@ export default function Home() {
                             <h3>Powered By</h3>
                             <div className={styles.techList}>
                                 <div className={styles.techItem}>
-                                    <span>⚛️</span>
+                                    <span></span>
                                     <div>
                                         <strong>Next.js PWA</strong>
                                         <small>Modern web framework</small>
                                     </div>
                                 </div>
                                 <div className={styles.techItem}>
-                                    <span>🤖</span>
+                                    <span></span>
                                     <div>
                                         <strong>AI & NLP</strong>
                                         <small>Natural language processing</small>
                                     </div>
                                 </div>
                                 <div className={styles.techItem}>
-                                    <span>☁️</span>
+                                    <span></span>
                                     <div>
                                         <strong>Cloud Infrastructure</strong>
                                         <small>Scalable & secure</small>
                                     </div>
                                 </div>
                                 <div className={styles.techItem}>
-                                    <span>🔐</span>
+                                    <span></span>
                                     <div>
                                         <strong>QR Technology</strong>
                                         <small>Document verification</small>
@@ -346,9 +346,9 @@ export default function Home() {
 
                         <div className={styles.footerSection}>
                             <h4>Contact</h4>
-                            <p>📍 Barangay Hall, Gordon Heights</p>
-                            <p>📞 (123) 456-7890</p>
-                            <p>✉️ info@ebarangay-gh.gov.ph</p>
+                            <p> Barangay Hall, Gordon Heights</p>
+                            <p> (123) 456-7890</p>
+                            <p> info@ebarangay-gh.gov.ph</p>
                         </div>
                     </div>
 

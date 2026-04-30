@@ -41,7 +41,7 @@ function ResidentPortalContent() {
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [loadingRequests, setLoadingRequests] = useState(true)
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
-    const [selectedQR, setSelectedQR] = useState<{ref: string, title: string} | null>(null)
+    const [selectedQR, setSelectedQR] = useState<{ ref: string, title: string } | null>(null)
 
     useEffect(() => {
         if (profile?.id) {
@@ -94,14 +94,14 @@ function ResidentPortalContent() {
 
     const handleRequestSubmit = async (documentType: string, purpose: string, attachment: File | null) => {
         if (!profile?.id) return
-        
+
         try {
             let attachmentUrl = null
-            
+
             if (attachment) {
                 const fileName = `${Date.now()}_${attachment.name.replace(/\s+/g, '_')}`
                 const filePath = `${profile.id}/${fileName}`
-                
+
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('resident-requirements')
                     .upload(filePath, attachment)
@@ -110,7 +110,7 @@ function ResidentPortalContent() {
                     console.error('Upload error:', uploadError)
                     throw new Error(`Failed to upload requirement: ${uploadError.message}`)
                 }
-                
+
                 attachmentUrl = filePath
             }
 
@@ -140,7 +140,7 @@ function ResidentPortalContent() {
 
     const handleProfileUpdate = async (updates: Partial<Profile>) => {
         if (!profile?.id) return
-        
+
         try {
             const { error } = await supabase
                 .from('profiles')
@@ -148,7 +148,7 @@ function ResidentPortalContent() {
                 .eq('id', profile.id)
 
             if (error) throw error
-            
+
             await refreshProfile()
             showToast('Profile updated successfully!', 'success')
             setShowProfileModal(false)
@@ -162,7 +162,7 @@ function ResidentPortalContent() {
         if (!result || !result[0] || !result[0].rawValue || scanning) return;
         setScanning(true);
         const qrData = result[0].rawValue;
-        
+
         try {
             // Securely verify QR Code via Postgres Function (bypasses RLS read-restrictions for known QRs)
             const { data: verificationResult, error: verificationError } = await supabase
@@ -215,39 +215,37 @@ function ResidentPortalContent() {
         <>
             <section className={styles.welcome} style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 style={{ fontSize: '1.8rem' }}>Welcome back, {profile?.full_name?.split(' ')[0] || 'Resident'}! 👋</h1>
+                    <h1 style={{ fontSize: '1.8rem' }}>Welcome back, {profile?.full_name?.split(' ')[0] || 'Resident'}!</h1>
                     <p>Access barangay services, track your requests, and stay updated</p>
                 </div>
-                <div 
-                    className={`${styles.idCard} ${profile?.is_verified ? styles.idCardVerified : ''}`} 
+                <div
+                    className={`${styles.idCard} ${profile?.is_verified ? styles.idCardVerified : ''}`}
                     style={{ flex: '1 1 auto', minWidth: '350px', maxWidth: '450px', cursor: 'pointer' }}
                     onClick={() => setActiveTab('profile')}
                 >
                     <div className={styles.idCardMain}>
-                        <div className={styles.idCardIcon}>
-                            {profile?.profile_picture_url ? (
-                                <img 
-                                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`} 
-                                    alt="Profile" 
+                        {profile?.profile_picture_url && (
+                            <div className={styles.idCardIcon}>
+                                <img
+                                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`}
+                                    alt="Profile"
                                     className={styles.idCardImage}
                                 />
-                            ) : (
-                                profile?.is_verified ? '🛡️' : '👤'
-                            )}
-                        </div>
+                            </div>
+                        )}
                         <div className={styles.idCardDetails}>
                             <div className={styles.idCardLabel}>E-Barangay Digital ID</div>
                             <strong className={styles.idCardName}>{profile?.full_name || 'Resident'}</strong>
                             <div className={styles.idCardSub}>
                                 <span>Gordon Heights Resident</span>
                                 {profile?.is_verified ? (
-                                    <span className={styles.verifiedBadge}>✅ Verified Account</span>
+                                    <span className={styles.verifiedBadge}>Verified Account</span>
                                 ) : (
-                                    <span className={styles.pendingBadge}>⏳ Account for Review</span>
+                                    <span className={styles.pendingBadge}>Account for Review</span>
                                 )}
                             </div>
                             <div className={styles.idCardFoot}>
-                                {profile?.is_verified 
+                                {profile?.is_verified
                                     ? `ID NO: ${profile?.resident_id_number || 'Official Issued'}`
                                     : `USER REF: ${profile?.id?.slice(0, 8).toUpperCase() || 'UNVERIFIED'}`
                                 }
@@ -268,7 +266,7 @@ function ResidentPortalContent() {
             {!profile?.is_verified && (
                 <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.05)' }}>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                        <span style={{ fontSize: '1.5rem' }}></span>
                         <div>
                             <strong style={{ display: 'block' }}>Account Under Review</strong>
                             <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -283,11 +281,11 @@ function ResidentPortalContent() {
             <section className={styles.quickActions}>
                 <h2>Quick Actions</h2>
                 <div className="grid grid-3">
-                    <button 
-                        className={`glass-card ${styles.actionCard} ${!profile?.is_verified ? styles.actionDisabled : ''}`} 
+                    <button
+                        className={`glass-card ${styles.actionCard} ${!profile?.is_verified ? styles.actionDisabled : ''}`}
                         onClick={() => profile?.is_verified ? setShowRequestModal(true) : showToast('Verification Required: Please wait for admin approval to request documents.', 'info')}
                     >
-                        <div className={styles.actionIcon}>📄</div>
+                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Request Document</h3>
                             <p>Apply for clearances, permits, and certificates</p>
@@ -295,7 +293,7 @@ function ResidentPortalContent() {
                     </button>
 
                     <button className={`glass-card ${styles.actionCard}`} onClick={() => setActiveTab('requests')}>
-                        <div className={styles.actionIcon}>📊</div>
+                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Track Status</h3>
                             <p>Monitor your pending applications</p>
@@ -306,7 +304,7 @@ function ResidentPortalContent() {
                         className={`glass-card ${styles.actionCard}`}
                         onClick={() => setShowChatBot(true)}
                     >
-                        <div className={styles.actionIcon}>💬</div>
+                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Ask AI Assistant</h3>
                             <p>Get instant answers 24/7</p>
@@ -317,7 +315,7 @@ function ResidentPortalContent() {
                         className={`glass-card ${styles.actionCard}`}
                         onClick={() => { setShowScanner(true); setScanResult(null); }}
                     >
-                        <div className={styles.actionIcon}>📸</div>
+                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Scan QR</h3>
                             <p>Verify documents & IDs</p>
@@ -329,54 +327,54 @@ function ResidentPortalContent() {
             {/* Emergency Hotlines */}
             <section style={{ marginBottom: '3rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <h2 style={{ margin: 0 }}>🚨 Emergency Hotlines</h2>
+                    <h2 style={{ margin: 0 }}>Emergency Hotlines</h2>
                     <span className="badge badge-error animate-pulse" style={{ fontSize: '0.7rem' }}>24/7 SUPPORT</span>
                 </div>
-                
+
                 <div className="grid grid-2" style={{ gap: '1.5rem' }}>
                     {/* Barangay Gordon Heights Group */}
                     <div className="glass-card" style={{ padding: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '1.2rem' }}>🏘️</span> Barangay Gordon Heights
+                            <span style={{ fontSize: '1.2rem' }}></span> Barangay Gordon Heights
                         </h3>
                         <div className={styles.hotlineList}>
                             <a href="tel:2235497" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle}>📞</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>Barangay Hall</strong>
                                     <span>223-5497</span>
                                 </div>
                             </a>
                             <a href="tel:09664632688" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle} style={{ background: '#00539c20', color: '#00539c' }}>🌐</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>Brgy. Mobile (Globe)</strong>
                                     <span>0966-463-2688</span>
                                 </div>
                             </a>
                             <a href="tel:09208278618" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle} style={{ background: '#58b44b20', color: '#58b44b' }}>📶</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>Brgy. Mobile (Smart)</strong>
                                     <span>0920-827-86-18</span>
                                 </div>
                             </a>
                             <a href="tel:2220402" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle}>🚓</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>Police Station 5</strong>
                                     <span>222-0402</span>
                                 </div>
                             </a>
                             <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle} style={{ background: '#1877f220', color: '#1877f2' }}>📘</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>Official Facebook</strong>
                                     <span style={{ fontSize: '0.65rem' }}>Bago at progresibong Gordon Heights</span>
                                 </div>
                             </a>
                             <a href="mailto:barangaygordonheights2018@gmail.com" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle} style={{ background: '#ea433520', color: '#ea4335' }}>✉️</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>Email Address</strong>
                                     <span style={{ fontSize: '0.65rem' }}>barangaygordonheights...</span>
@@ -388,25 +386,25 @@ function ResidentPortalContent() {
                     {/* Olongapo City Group */}
                     <div className="glass-card" style={{ padding: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '1.2rem' }}>🏢</span> Olongapo City Central
+                            <span style={{ fontSize: '1.2rem' }}></span> Olongapo City Central
                         </h3>
                         <div className={styles.hotlineList}>
                             <a href="tel:09985937446" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle} style={{ background: 'var(--error-50, #fee2e2)', color: 'var(--error, #ef4444)' }}>🚑</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>City Rescue (DRRMO)</strong>
                                     <span>0998-593-7446 | 0917-306-5966</span>
                                 </div>
                             </a>
                             <a href="tel:2235731" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle}>👮</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>City Police Office</strong>
                                     <span>223-5731</span>
                                 </div>
                             </a>
                             <a href="tel:2231415" className={styles.hotlineItem}>
-                                <div className={styles.hotlineCircle}>🔥</div>
+
                                 <div className={styles.hotlineContent}>
                                     <strong>BFP Fire Station</strong>
                                     <span>223-1415</span>
@@ -414,14 +412,14 @@ function ResidentPortalContent() {
                             </a>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                                 <a href="tel:6114818" className={styles.hotlineItem} style={{ padding: '0.5rem 0.75rem' }}>
-                                    <div className={styles.hotlineCircle} style={{ width: '30px', height: '30px', fontSize: '1rem' }}>🚧</div>
+
                                     <div className={styles.hotlineContent}>
                                         <strong style={{ fontSize: '0.75rem' }}>Traffic</strong>
                                         <span style={{ fontSize: '0.7rem' }}>611-4818</span>
                                     </div>
                                 </a>
                                 <a href="tel:2222565" className={styles.hotlineItem} style={{ padding: '0.5rem 0.75rem' }}>
-                                    <div className={styles.hotlineCircle} style={{ width: '30px', height: '30px', fontSize: '1rem' }}>👔</div>
+
                                     <div className={styles.hotlineContent}>
                                         <strong style={{ fontSize: '0.75rem' }}>Mayor</strong>
                                         <span style={{ fontSize: '0.7rem' }}>222-2565</span>
@@ -435,7 +433,7 @@ function ResidentPortalContent() {
 
             {/* Announcements */}
             <section className={styles.announcements}>
-                <h2>Latest Announcements 📢</h2>
+                <h2>Latest Announcements</h2>
                 {loadingAnnouncements ? (
                     <LoadingSpinner text="Loading announcements..." size="sm" />
                 ) : (
@@ -472,20 +470,20 @@ function ResidentPortalContent() {
                 <div className={`glass-card ${styles.profileCard}`}>
                     <div className={styles.profileImageContainer}>
                         {profile?.profile_picture_url ? (
-                            <img 
-                                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`} 
-                                alt="Profile" 
+                            <img
+                                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`}
+                                alt="Profile"
                                 className={styles.profileImage}
                             />
                         ) : (
-                            <div className={styles.placeholderImage}>👤</div>
+                            <div className={styles.placeholderImage}></div>
                         )}
                     </div>
                     <h2 style={{ marginBottom: '0.5rem' }}>{profile?.full_name || 'Barangay Resident'}</h2>
                     <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '1.5rem' }}>
                         RESIDENT PASS | {profile?.id?.slice(0, 8).toUpperCase() || 'UNLINKED'}
                     </p>
-                    
+
                     <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Resident Since</span>
@@ -505,7 +503,7 @@ function ResidentPortalContent() {
                 </div>
 
                 <div className="glass-card" style={{ padding: '2rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>👤 Profile Information</h3>
+                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}> Profile Information</h3>
                     <div className={styles.infoGrid}>
                         <div className={styles.infoGroup}>
                             <label className={styles.infoLabel}>Full Name</label>
@@ -522,7 +520,7 @@ function ResidentPortalContent() {
                         <div className={styles.infoGroup}>
                             <label className={styles.infoLabel}>Birthdate</label>
                             <p className={styles.infoValue}>
-                                {profile?.birthdate 
+                                {profile?.birthdate
                                     ? `${new Date(profile.birthdate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${Math.floor((Date.now() - new Date(profile.birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))} yrs old)`
                                     : 'Not specified'}
                             </p>
@@ -582,7 +580,7 @@ function ResidentPortalContent() {
                     <LoadingSpinner text="Loading your requests..." size="sm" />
                 ) : requests.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📂</div>
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}></div>
                         <h3>No requests yet</h3>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Apply for documents using the button above.</p>
                         <button className="btn btn-primary" onClick={() => setShowRequestModal(true)}>Request Now</button>
@@ -591,17 +589,16 @@ function ResidentPortalContent() {
                     requests.map((req) => (
                         <div className={styles.applicationItem} key={req.id}>
                             <div className={styles.appInfo}>
-                                <div className={styles.appIcon}>{getDocIcon(req.document_type)}</div>
                                 <div>
                                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                         {req.document_type}
                                         {req.qr_code_ref && (
-                                            <button 
+                                            <button
                                                 className="btn btn-outline"
                                                 style={{ padding: '0.15rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
                                                 onClick={() => setSelectedQR({ ref: req.qr_code_ref as string, title: req.document_type })}
                                             >
-                                                🔍 View QR
+                                                View QR
                                             </button>
                                         )}
                                     </h4>
@@ -614,7 +611,7 @@ function ResidentPortalContent() {
                                         )}
                                         {req.attachment_url && (
                                             <span style={{ fontSize: '0.75rem', color: 'var(--success-600)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                📎 Requirement Attached
+                                                Requirement Attached
                                             </span>
                                         )}
                                     </div>
@@ -681,14 +678,14 @@ function ResidentPortalContent() {
 
     const getDocIcon = (type: string) => {
         const iconMap: Record<string, string> = {
-            'Barangay Clearance': '📄',
-            'Barangay Certification': '📝',
-            'Business Clearance': '🏢',
-            'Lot Certification': '🏡',
-            'First Time Job Seeker': '💼',
-            'Indigency': '🤝',
+            'Barangay Clearance': '',
+            'Barangay Certification': '',
+            'Business Clearance': '',
+            'Lot Certification': '',
+            'First Time Job Seeker': '',
+            'Indigency': '',
         }
-        return iconMap[type] || '📄'
+        return iconMap[type] || ''
     }
 
     const getCategoryBadge = (category: string) => {
@@ -720,16 +717,16 @@ function ResidentPortalContent() {
         return (
             <div className={styles.adminNote}>
                 <div className={styles.adminNoteHeader}>
-                    <span>💬</span> Official Admin Note
+                    Official Admin Note
                 </div>
                 {isAttachment ? (
-                    <a 
+                    <a
                         href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-requirements/${content}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={styles.adminNoteAttachment}
                     >
-                        <span>📎</span> View Attached File / Response
+                        <span></span> View Attached File / Response
                     </a>
                 ) : (
                     <p className={styles.adminNoteText}>{content}</p>
@@ -750,13 +747,13 @@ function ResidentPortalContent() {
             <nav className={styles.tabNav}>
                 <div className="container" style={{ display: 'flex', gap: '1rem' }}>
                     <button className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`} onClick={() => setActiveTab('overview')}>
-                        🏠 Overview
+                        Overview
                     </button>
                     <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => setActiveTab('requests')}>
-                        📋 My Requests
+                        My Requests
                     </button>
                     <button className={`${styles.tabBtn} ${activeTab === 'profile' ? styles.activeTab : ''}`} onClick={() => setActiveTab('profile')}>
-                        👤 My Profile
+                        My Profile
                     </button>
                 </div>
             </nav>
@@ -775,13 +772,13 @@ function ResidentPortalContent() {
                 onClick={() => setShowChatBot(true)}
                 aria-label="Open AI Assistant"
             >
-                🤖
+                <img src="/logo.png" alt="Chat" style={{ width: '60%', height: '60%', objectFit: 'contain' }} />
             </button>
 
             {/* ChatBot Component */}
             {showChatBot && (
-                <ChatBot 
-                    onClose={() => setShowChatBot(false)} 
+                <ChatBot
+                    onClose={() => setShowChatBot(false)}
                     userProfile={profile}
                     userRequests={requests}
                 />
@@ -811,15 +808,15 @@ function ResidentPortalContent() {
                     <div className="glass-card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center', padding: '2.5rem 1.5rem', background: 'var(--bg-secondary, #1a1a2e)' }} onClick={e => e.stopPropagation()}>
                         <h2 style={{ marginBottom: '0.5rem' }}>E-Barangay Pass</h2>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>{selectedQR.title}</p>
-                        
+
                         <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1.5rem' }}>
                             <QRCodeSVG value={selectedQR.ref} size={220} level="H" includeMargin={false} />
                         </div>
-                        
+
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace', margin: '0 0 1.5rem 0', wordBreak: 'break-all' }}>
                             {selectedQR.ref}
                         </p>
-                        
+
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setSelectedQR(null)}>
                             Close
                         </button>
@@ -832,7 +829,7 @@ function ResidentPortalContent() {
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', padding: '1rem' }} onClick={() => !scanning && setShowScanner(false)}>
                     <div className="glass-card" style={{ maxWidth: '450px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', position: 'relative' }} onClick={e => e.stopPropagation()}>
                         <h2 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Scan QR Code</h2>
-                        
+
                         {!scanResult ? (
                             <>
                                 <div style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem', border: '2px solid var(--primary-500)', position: 'relative' }}>
@@ -852,13 +849,13 @@ function ResidentPortalContent() {
                         ) : (
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>
-                                    {scanResult.isValid ? '✅' : '❌'}
+                                    {scanResult.isValid ? '' : ''}
                                 </div>
                                 <h3 style={{ color: scanResult.isValid ? 'var(--success-500)' : 'var(--error-500)', marginBottom: '0.5rem' }}>
                                     {scanResult.type || 'Unrecognized QR'}
                                 </h3>
                                 <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{scanResult.message}</p>
-                                
+
                                 {scanResult.details && (
                                     <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
                                         {Object.entries(scanResult.details).map(([key, value]) => (
@@ -869,13 +866,13 @@ function ResidentPortalContent() {
                                         ))}
                                     </div>
                                 )}
-                                
+
                                 <button className="btn btn-secondary" style={{ width: '100%', marginBottom: '0.5rem' }} onClick={() => setScanResult(null)}>
                                     Scan Another
                                 </button>
                             </div>
                         )}
-                        
+
                         <button className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={() => setShowScanner(false)}>
                             Close Scanner
                         </button>

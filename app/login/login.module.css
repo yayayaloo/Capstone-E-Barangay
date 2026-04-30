@@ -14,7 +14,8 @@
 
 /* Left Panel - Branding */
 .brandingPanel {
-    background: linear-gradient(135deg, #0a0a1a, #131326); /* System Dark Theme */
+    background: linear-gradient(135deg, #0a0a1a, #131326);
+    /* System Dark Theme */
     color: white;
     padding: 2.5rem 7%;
     display: none;
@@ -29,9 +30,11 @@
 .brandingPanel::-webkit-scrollbar {
     width: 6px;
 }
+
 .brandingPanel::-webkit-scrollbar-track {
     background: transparent;
 }
+
 .brandingPanel::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.2);
     border-radius: 4px;
@@ -48,7 +51,7 @@
     inset: 0;
     opacity: 0.1;
     background-image: radial-gradient(circle at top right, white 10%, transparent 40%),
-                      radial-gradient(circle at bottom left, white 10%, transparent 40%);
+        radial-gradient(circle at bottom left, white 10%, transparent 40%);
     z-index: 0;
 }
 
@@ -92,9 +95,10 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2.5px;
-    color: #818cf8; /* System Indigo */
+    color: #818cf8;
+    /* System Indigo */
     margin-bottom: 0.5rem;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding-bottom: 0.4rem;
     display: inline-block;
 }
@@ -133,7 +137,8 @@
     border-radius: 20px;
     position: relative;
     padding: 3rem 2.5rem;
-    background: #f9fafb; /* Light gray to visually separate slightly */
+    background: #f9fafb;
+    /* Light gray to visually separate slightly */
 }
 
 .backButton {
@@ -157,7 +162,8 @@
 @media (min-width: 1024px) {
     .formPanel {
         padding: 3rem 3rem;
-        background: #ffffff; /* Clean white when split */
+        background: #ffffff;
+        /* Clean white when split */
     }
 }
 

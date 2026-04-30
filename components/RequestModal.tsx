@@ -10,12 +10,12 @@ interface RequestModalProps {
 }
 
 const documentTypes = [
-    { value: 'Barangay Clearance', label: '📄 Barangay Clearance', desc: 'Verification of residency, good moral character, no derogatory record.', reqs: 'Valid ID (Php 50.00)' },
-    { value: 'Barangay Certification', label: '📝 Barangay Certification', desc: 'For Residency, Loan, Good Moral Character.', reqs: 'Valid ID (Php 50.00)' },
-    { value: 'Business Clearance', label: '🏢 Business Clearance', desc: 'Compliance for business permit within Gordon Heights.', reqs: 'DTI Certificate (Free)' },
-    { value: 'Lot Certification', label: '🏡 Lot / Building Certification', desc: 'Issued to actual lot occupants for compliance to government agencies.', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment, etc. (Php 1.00/sqm)' },
-    { value: 'First Time Job Seeker', label: '💼 First Time Job Seeker', desc: 'Waives fees for pre-employment requirements (Ages 18-30).', reqs: 'Valid ID (Free)' },
-    { value: 'Indigency', label: '🤝 Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
+    { value: 'Barangay Clearance', label: ' Barangay Clearance', desc: 'Verification of residency, good moral character, no derogatory record.', reqs: 'Valid ID (Php 50.00)' },
+    { value: 'Barangay Certification', label: ' Barangay Certification', desc: 'For Residency, Loan, Good Moral Character.', reqs: 'Valid ID (Php 50.00)' },
+    { value: 'Business Clearance', label: ' Business Clearance', desc: 'Compliance for business permit within Gordon Heights.', reqs: 'DTI Certificate (Free)' },
+    { value: 'Lot Certification', label: ' Lot / Building Certification', desc: 'Issued to actual lot occupants for compliance to government agencies.', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment, etc. (Php 1.00/sqm)' },
+    { value: 'First Time Job Seeker', label: ' First Time Job Seeker', desc: 'Waives fees for pre-employment requirements (Ages 18-30).', reqs: 'Valid ID (Free)' },
+    { value: 'Indigency', label: ' Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
 ]
 
 export default function RequestModal({ onClose, onSubmit, initialType }: RequestModalProps) {
@@ -72,7 +72,7 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
 
                 <form onSubmit={handleSubmit} className={styles.form}>
                     {error && (
-                        <div className={styles.errorMessage}>⚠️ {error}</div>
+                        <div className={styles.errorMessage}> {error}</div>
                     )}
 
                     <div className={styles.inputGroup}>
@@ -123,15 +123,15 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                                     <span className={styles.fileName}>✔️ {attachment.name}</span>
                                 ) : (
                                     <>
-                                        <span className={styles.uploadIcon}>📁</span>
+                                        <span className={styles.uploadIcon}></span>
                                         <span>Click to upload or drag requirements here</span>
                                         <small>(1x1 Photo, ID, or other supporting documents)</small>
                                     </>
                                 )}
                             </label>
                             {attachment && (
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     className={styles.clearFile}
                                     onClick={() => setAttachment(null)}
                                 >
@@ -150,7 +150,7 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                             className="btn btn-primary"
                             disabled={submitting}
                         >
-                            {submitting ? 'Submitting...' : '📄 Submit Request'}
+                            {submitting ? 'Submitting...' : ' Submit Request'}
                         </button>
                     </div>
                 </form>

@@ -29,16 +29,12 @@
 }
 
 .brandIcon {
-    font-size: 2rem;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    border-radius: 10px;
     width: 44px;
     height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
 }
 
 .brandName {
@@ -66,7 +62,7 @@
     display: flex;
     align-items: center;
     gap: 0.875rem;
-    padding: 0.875rem 1rem;
+    padding: 0.875rem 1.5rem;
     background: transparent;
     border: none;
     border-radius: 10px;
@@ -74,6 +70,7 @@
     font-size: 0.9rem;
     font-weight: 500;
     text-align: left;
+    justify-content: flex-start;
     cursor: pointer;
     transition: all 0.18s ease;
     width: 100%;
@@ -85,9 +82,12 @@
 }
 
 .sidebarNav button.active {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    background: var(--primary-50);
+    color: var(--primary-600);
+    font-weight: 700;
+    border-left: 4px solid var(--primary-600);
+    border-radius: 0 10px 10px 0;
+    padding-left: 1.25rem; /* Adjust for border */
 }
 
 .navIcon {
@@ -343,7 +343,7 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem 1.5rem;
+    padding: 1rem 1.5rem 1rem 0;
     border-bottom: 1px solid var(--border-color);
     transition: background var(--transition-base);
 }

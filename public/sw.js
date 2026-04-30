@@ -36,6 +36,9 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
+  // Skip Supabase API requests to ensure fresh data
+  if (request.url.includes('supabase.co')) return;
+
   // For navigation requests (HTML pages) and Next.js assets, always use network-first
   // This prevents stale HTML from being served with wrong asset hashes
   if (request.mode === 'navigate' || request.url.includes('/_next/')) {

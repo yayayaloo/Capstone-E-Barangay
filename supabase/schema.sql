@@ -423,3 +423,53 @@ CREATE POLICY "Residents can view their own requirements"
 CREATE POLICY "Admins can view all requirements" 
   ON storage.objects FOR SELECT 
   USING (bucket_id = 'resident-requirements' AND is_admin());
+
+-- =============================================
+-- Blotter Reports Module
+-- =============================================
+
+DROP TABLE IF EXISTS blotter_reports CASCADE;
+
+CREATE TABLE IF NOT EXISTS blotter_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    complainant TEXT NOT NULL,
+    respondent TEXT NOT NULL,
+    incident_details TEXT NOT NULL,
+    incident_date TIMESTAMPTZ NOT NULL,
+    location TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Ongoing', 'Resolved', 'Referred')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID REFERENCES profiles(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_blotter_reports_status ON blotter_reports(status);
+CREATE INDEX IF NOT EXISTS idx_blotter_reports_date ON blotter_reports(incident_date DESC);
+
+ALTER TABLE blotter_reports ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can view blotter reports" ON blotter_reports;
+CREATE POLICY "Admins can view blotter reports"
+    ON blotter_reports FOR SELECT
+    USING (is_admin());
+
+DROP POLICY IF EXISTS "Admins can insert blotter reports" ON blotter_reports;
+CREATE POLICY "Admins can insert blotter reports"
+    ON blotter_reports FOR INSERT
+    WITH CHECK (is_admin());
+
+DROP POLICY IF EXISTS "Admins can update blotter reports" ON blotter_reports;
+CREATE POLICY "Admins can update blotter reports"
+    ON blotter_reports FOR UPDATE
+    USING (is_admin());
+
+DROP POLICY IF EXISTS "Admins can delete blotter reports" ON blotter_reports;
+CREATE POLICY "Admins can delete blotter reports"
+    ON blotter_reports FOR DELETE
+    USING (is_admin());
+
+DROP TRIGGER IF EXISTS blotter_reports_updated_at ON blotter_reports;
+CREATE TRIGGER blotter_reports_updated_at
+    BEFORE UPDATE ON blotter_reports
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+

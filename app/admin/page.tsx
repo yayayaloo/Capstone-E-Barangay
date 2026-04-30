@@ -9,7 +9,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
-import { ServiceRequest, Announcement, Profile, AuditLog } from '@/lib/types'
+import { ServiceRequest, Announcement, Profile, AuditLog, BlotterReport, BlotterStatus } from '@/lib/types'
 import { logAdminAction } from '@/lib/audit'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -32,36 +32,6 @@ const Scanner = dynamic(
     }
 )
 import BottomNav from '@/components/BottomNav'
-
-// ─── Rich Mock Data ───────────────────────────────────────────────────────────
-
-const MOCK_REQUESTS: ServiceRequest[] = [
-    { id: 'req-001', resident_id: 'r1', resident_name: 'Juan Dela Cruz', document_type: 'Barangay Clearance', purpose: 'Employment Requirement', status: 'completed', created_at: new Date(Date.now() - 86400000 * 7).toISOString() },
-    { id: 'req-002', resident_id: 'r2', resident_name: 'Maria Santos', document_type: 'Business Permit', purpose: 'New Sari-Sari Store', status: 'pending', created_at: new Date(Date.now() - 86400000 * 1).toISOString() },
-    { id: 'req-003', resident_id: 'r3', resident_name: 'Roberto Reyes', document_type: 'Barangay ID', purpose: 'Official Identification', status: 'processing', created_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-    { id: 'req-004', resident_id: 'r4', resident_name: 'Ana Lim', document_type: 'Certificate of Indigency', purpose: 'Medical Assistance', status: 'ready', created_at: new Date(Date.now() - 86400000 * 3).toISOString() },
-    { id: 'req-005', resident_id: 'r5', resident_name: 'Carlos Mendoza', document_type: 'Barangay Clearance', purpose: 'Bank Loan Requirement', status: 'completed', created_at: new Date(Date.now() - 86400000 * 5).toISOString() },
-    { id: 'req-006', resident_id: 'r6', resident_name: 'Luisa Garcia', document_type: 'Certificate of Residency', purpose: 'School Enrollment', status: 'rejected', created_at: new Date(Date.now() - 86400000 * 4).toISOString() },
-    { id: 'req-007', resident_id: 'r7', resident_name: 'Pedro Aquino', document_type: 'Business Permit', purpose: 'Food Cart Business', status: 'pending', created_at: new Date(Date.now() - 86400000 * 0.5).toISOString() },
-    { id: 'req-008', resident_id: 'r8', resident_name: 'Natividad Villanueva', document_type: 'Barangay Clearance', purpose: 'Overseas Employment', status: 'processing', created_at: new Date(Date.now() - 86400000 * 1.5).toISOString() },
-] as unknown as ServiceRequest[]
-
-const MOCK_RESIDENTS: Profile[] = [
-    { id: 'r1', full_name: 'Juan Dela Cruz', email: 'juan@example.com', role: 'resident', address: 'Block 4 Lot 12, Gordon Heights', phone: '09123456789', resident_qr_id: 'res-qr-001', created_at: new Date(Date.now() - 86400000 * 90).toISOString() },
-    { id: 'r2', full_name: 'Maria Santos', email: 'maria@example.com', role: 'resident', address: 'Block 2 Lot 5, Gordon Heights', phone: '09987654321', resident_qr_id: 'res-qr-002', created_at: new Date(Date.now() - 86400000 * 60).toISOString() },
-    { id: 'r3', full_name: 'Roberto Reyes', email: 'roberto@example.com', role: 'resident', address: 'Block 1 Lot 8, Gordon Heights', phone: '09171234567', resident_qr_id: 'res-qr-003', created_at: new Date(Date.now() - 86400000 * 45).toISOString() },
-    { id: 'r4', full_name: 'Ana Lim', email: 'ana@example.com', role: 'resident', address: 'Block 7 Lot 3, Gordon Heights', phone: '09281234567', resident_qr_id: 'res-qr-004', created_at: new Date(Date.now() - 86400000 * 30).toISOString() },
-    { id: 'r5', full_name: 'Carlos Mendoza', email: 'carlos@example.com', role: 'resident', address: 'Block 5 Lot 20, Gordon Heights', phone: '09391234567', resident_qr_id: 'res-qr-005', created_at: new Date(Date.now() - 86400000 * 20).toISOString() },
-    { id: 'r6', full_name: 'Luisa Garcia', email: 'luisa@example.com', role: 'resident', address: 'Block 3 Lot 14, Gordon Heights', phone: '09501234567', resident_qr_id: 'res-qr-006', created_at: new Date(Date.now() - 86400000 * 15).toISOString() },
-    { id: 'r7', full_name: 'Pedro Aquino', email: 'pedro@example.com', role: 'resident', address: 'Block 6 Lot 9, Gordon Heights', phone: '09611234567', resident_qr_id: 'res-qr-007', created_at: new Date(Date.now() - 86400000 * 10).toISOString() },
-    { id: 'r8', full_name: 'Natividad Villanueva', email: 'nati@example.com', role: 'resident', address: 'Block 8 Lot 1, Gordon Heights', phone: '09721234567', resident_qr_id: 'res-qr-008', created_at: new Date(Date.now() - 86400000 * 5).toISOString() },
-] as Profile[]
-
-const MOCK_ANNOUNCEMENTS: Announcement[] = [
-    { id: 'ann-1', title: 'Upcoming Barangay Assembly', content: 'Please join us for the general assembly this Saturday at 8:00 AM at the Barangay Hall. Attendance is highly encouraged.', category: 'important', author_id: 'mock-admin', published_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-    { id: 'ann-2', title: 'Free Rabies Vaccination Drive', content: 'Bring your pets this Sunday for a free rabies vaccination at the covered court. Sponsored by the City Veterinary Office.', category: 'community_event', author_id: 'mock-admin', published_at: new Date(Date.now() - 86400000 * 5).toISOString() },
-    { id: 'ann-3', title: 'Typhoon Preparedness Alert', content: 'A tropical storm is expected to pass by the end of the week. Please secure your homes and prepare emergency supplies.', category: 'emergency', author_id: 'mock-admin', published_at: new Date(Date.now() - 86400000 * 1).toISOString() },
-] as unknown as Announcement[]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +114,13 @@ function AdminDashboardContent() {
     // Resident detail modal
     const [selectedResident, setSelectedResident] = useState<Profile | null>(null)
 
+    // Blotter Reports state
+    const [blotterReports, setBlotterReports] = useState<BlotterReport[]>([])
+    const [blotterSearch, setBlotterSearch] = useState('')
+    const [blotterStatusFilter, setBlotterStatusFilter] = useState('all')
+    const [blotterModal, setBlotterModal] = useState<{ isOpen: boolean, report: Partial<BlotterReport> | null }>({ isOpen: false, report: null })
+    const [savingBlotter, setSavingBlotter] = useState(false)
+
     useEffect(() => {
         fetchDataForTab(activeTab)
     }, [activeTab])
@@ -198,7 +175,7 @@ function AdminDashboardContent() {
                     setRecentVerifications(qrRes.data.map((v: any) => ({
                         name: v.holder_name, doc: v.document_type,
                         time: new Date(v.verified_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        result: v.is_valid ? '✅ Valid' : '❌ Invalid'
+                        result: v.is_valid ? 'Valid' : 'Invalid'
                     })))
                 }
             } else if (tab === 'requests') {
@@ -219,6 +196,11 @@ function AdminDashboardContent() {
                     ...log, admin_name: log.profiles?.full_name || 'Admin User'
                 }))
                 setAuditLogs(mappedAudit as AuditLog[])
+            } else if (tab === 'blotter') {
+                const { data, error } = await supabase.from('blotter_reports').select('*').order('created_at', { ascending: false }).limit(100)
+                console.log('Blotter fetch data:', data, 'error:', error)
+                if (error) throw error
+                setBlotterReports(data as BlotterReport[])
             }
         } catch (error: any) {
             console.error('Error fetching tab data:', error)
@@ -290,7 +272,7 @@ function AdminDashboardContent() {
                     : `Request marked as ${newStatus}`,
                 'success'
             )
-            
+
             if (profile?.id) {
                 await logAdminAction('UPDATE_REQUEST', `Updated request ${requestId.slice(0, 8)} to ${newStatus}${newStatus === 'ready' ? ' (QR code generated)' : ''}`, profile.id);
             }
@@ -327,7 +309,7 @@ function AdminDashboardContent() {
             setAnnContent('')
             setAnnCategory('community_event')
             showToast('Announcement published!', 'success')
-            
+
             if (profile?.id) {
                 await logAdminAction('CREATE_ANNOUNCEMENT', `Published announcement: ${annTitle}`, profile.id);
             }
@@ -342,7 +324,7 @@ function AdminDashboardContent() {
     const handleGeneratePdf = async (req: ServiceRequest) => {
         try {
             setGeneratingPdfId(req.id)
-            
+
             // Set data for template rendering
             setCertData({
                 residentName: req.resident_name || 'Unknown Resident',
@@ -375,15 +357,15 @@ function AdminDashboardContent() {
 
             // Add image to PDF exactly fitting the A4 bounds
             pdf.addImage(imgData, 'PNG', 0, 0, 210, 297)
-            
+
             // Trigger download
             const fileName = `${req.document_type.replace(/\s+/g, '_')}_${req.resident_name?.replace(/\s+/g, '_')}.pdf`
             pdf.save(fileName)
 
             showToast('PDF Generated successfully!', 'success')
-            
+
             if (profile?.id) {
-                 await logAdminAction('GENERATE_PDF', `Generated PDF for request ${req.id.slice(0, 8)}`, profile.id);
+                await logAdminAction('GENERATE_PDF', `Generated PDF for request ${req.id.slice(0, 8)}`, profile.id);
             }
         } catch (error: any) {
             console.error("PDF Generation error:", error)
@@ -481,7 +463,7 @@ function AdminDashboardContent() {
         doc.setFontSize(18)
         doc.setTextColor(40, 40, 40)
         doc.text('Barangay Gordon Heights', 14, 22)
-        
+
         doc.setFontSize(12)
         doc.setTextColor(100, 100, 100)
         doc.text('Resident Directory Report', 14, 30)
@@ -529,7 +511,7 @@ function AdminDashboardContent() {
         doc.setFontSize(18)
         doc.setTextColor(40, 40, 40)
         doc.text('Barangay Gordon Heights', 14, 22)
-        
+
         doc.setFontSize(12)
         doc.setTextColor(100, 100, 100)
         doc.text('Document Requests Report', 14, 30)
@@ -570,10 +552,10 @@ function AdminDashboardContent() {
 
     const exportToCSV = (data: AuditLog[], filename: string) => {
         if (data.length === 0) return;
-        
+
         const headers = ['Date & Time', 'Admin', 'Action', 'Description'];
         const csvRows = [headers.join(',')];
-        
+
         data.forEach(log => {
             const row = [
                 `"${new Date(log.created_at).toLocaleString().replace(/"/g, '""')}"`,
@@ -583,18 +565,136 @@ function AdminDashboardContent() {
             ];
             csvRows.push(row.join(','));
         });
-        
+
         const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         showToast('CSV Export generated successfully', 'success');
     }
+
+    // Blotter Operations
+    const saveBlotterReport = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!blotterModal.report) return
+        setSavingBlotter(true)
+
+        try {
+            const isEditing = !!blotterModal.report.id
+            const payload = {
+                complainant: blotterModal.report.complainant,
+                respondent: blotterModal.report.respondent,
+                incident_details: blotterModal.report.incident_details,
+                incident_date: blotterModal.report.incident_date,
+                location: blotterModal.report.location,
+                status: blotterModal.report.status || 'Pending'
+            }
+
+            if (isEditing) {
+                const { error } = await supabase
+                    .from('blotter_reports')
+                    .update(payload)
+                    .eq('id', blotterModal.report.id)
+
+                if (error) throw error
+                showToast('Blotter report updated', 'success')
+                if (profile?.id) {
+                    await logAdminAction('UPDATE_BLOTTER', `Updated blotter report ID: ${blotterModal.report.id?.slice(0, 8)}`, profile.id)
+                }
+            } else {
+                const { error } = await supabase
+                    .from('blotter_reports')
+                    .insert({ ...payload, created_by: profile?.id })
+
+                if (error) throw error
+                showToast('Blotter report created', 'success')
+                if (profile?.id) {
+                    await logAdminAction('CREATE_BLOTTER', `Created new blotter report against: ${payload.respondent}`, profile.id)
+                }
+            }
+
+            fetchDataForTab('blotter')
+            setBlotterModal({ isOpen: false, report: null })
+        } catch (error: any) {
+            console.error('Error saving blotter report:', error)
+            showToast(`Failed to save blotter report: ${error.message || 'Unknown error'}`, 'error')
+        } finally {
+            setSavingBlotter(false)
+        }
+    }
+
+    const deleteBlotterReport = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this blotter report?')) return
+        try {
+            const { error } = await supabase
+                .from('blotter_reports')
+                .delete()
+                .eq('id', id)
+
+            if (error) throw error
+            showToast('Blotter report deleted', 'success')
+            if (profile?.id) {
+                await logAdminAction('DELETE_BLOTTER', `Deleted blotter report ID: ${id.slice(0, 8)}`, profile.id)
+            }
+            fetchDataForTab('blotter')
+        } catch (error: any) {
+            console.error('Error deleting blotter report:', error)
+            showToast('Failed to delete blotter report', 'error')
+        }
+    }
+
+    const exportBlotterToPDF = (data: BlotterReport[], filename: string) => {
+        if (data.length === 0) return
+
+        const doc = new jsPDF()
+
+        // Header Title
+        doc.setFontSize(18)
+        doc.setTextColor(40, 40, 40)
+        doc.text('Barangay Gordon Heights', 14, 22)
+
+        doc.setFontSize(12)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Blotter Reports Record', 14, 30)
+        doc.setFontSize(10)
+        doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 36)
+
+        // Map data to tidy rows
+        const tableColumn = ["ID", "Complainant", "Respondent", "Location", "Incident Date", "Status"]
+        const tableRows: any[] = []
+
+        data.forEach(rep => {
+            const repData = [
+                rep.id.slice(0, 6).toUpperCase(),
+                rep.complainant,
+                rep.respondent,
+                rep.location,
+                new Date(rep.incident_date).toLocaleString(),
+                rep.status
+            ]
+            tableRows.push(repData)
+        })
+
+        // Draw Table
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 45,
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [63, 81, 181], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { top: 40 }
+        })
+
+        doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`)
+        showToast('PDF Export generated successfully', 'success')
+    }
+
 
     const handleScan = async (results: any[]) => {
         if (!results || results.length === 0) return;
@@ -632,7 +732,7 @@ function AdminDashboardContent() {
                         date: docData.updated_at
                     })
 
-                    const log = { name: holderName, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: '✅ Valid Doc' }
+                    const log = { name: holderName, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: 'Valid Doc' }
                     setRecentVerifications(prev => [log, ...prev].slice(0, 5))
                 }
 
@@ -683,7 +783,7 @@ function AdminDashboardContent() {
                     name: resData.full_name,
                     doc: 'Resident ID',
                     time: new Date().toLocaleTimeString(),
-                    result: isVerified ? '✅ Verified Resident' : '⚠️ Unverified Account'
+                    result: isVerified ? 'Verified Resident' : 'Unverified Account'
                 }
                 setRecentVerifications(prev => [log, ...prev].slice(0, 5))
 
@@ -732,13 +832,14 @@ function AdminDashboardContent() {
     )
 
     const navItems = [
-        { id: 'overview', icon: '📊', label: 'Overview' },
-        { id: 'requests', icon: '📝', label: 'Document Requests' },
-        { id: 'residents', icon: '👥', label: 'Residents' },
-        { id: 'announcements', icon: '📢', label: 'Announcements' },
-        { id: 'verify', icon: '🔐', label: 'QR Verification' },
-        { id: 'analytics', icon: '📈', label: 'Analytics' },
-        { id: 'audit', icon: '🧾', label: 'Audit Trail' },
+        { id: 'overview', icon: '', label: 'Overview' },
+        { id: 'requests', icon: '', label: 'Document Requests' },
+        { id: 'residents', icon: '', label: 'Residents' },
+        { id: 'announcements', icon: '', label: 'Announcements' },
+        { id: 'verify', icon: '', label: 'QR Verification' },
+        { id: 'analytics', icon: '', label: 'Analytics' },
+        { id: 'blotter', icon: '', label: 'Blotter Reports' },
+        { id: 'audit', icon: '', label: 'Audit Trail' },
     ]
 
     return (
@@ -770,15 +871,11 @@ function AdminDashboardContent() {
                                 className={activeTab === item.id ? styles.active : ''}
                                 onClick={() => setActiveTab(item.id)}
                             >
-                                <span className={styles.navIcon}>{item.icon}</span>
                                 {item.label}
                             </button>
                         ))}
                     </nav>
-                    <div className={styles.sidebarFooter}>
-                        <div className={styles.adminBadge}>🔑 Administrator</div>
-                        <div className={styles.adminName}>{profile?.full_name || 'Admin User'}</div>
-                    </div>
+
                 </aside>
 
                 <BottomNav
@@ -808,25 +905,25 @@ function AdminDashboardContent() {
                                         {/* Stats Row */}
                                         <div className={styles.statsGrid}>
                                             <div className={`glass-card ${styles.statCard} ${styles.statPending}`}>
-                                                <div className={styles.statIcon}>⏳</div>
+                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{pendingCount}</div>
                                                 <div className={styles.statLabel}>Pending</div>
                                                 <div className={styles.statTrend}>requires immediate action</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statProcessing}`}>
-                                                <div className={styles.statIcon}>🔄</div>
+                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{processingCount}</div>
                                                 <div className={styles.statLabel}>Processing</div>
                                                 <div className={styles.statTrend}>in queue</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statCompleted}`}>
-                                                <div className={styles.statIcon}>✅</div>
+                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{completedCount}</div>
                                                 <div className={styles.statLabel}>Completed</div>
                                                 <div className={styles.statTrend}>{completionRate}% efficiency</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statResidents}`}>
-                                                <div className={styles.statIcon}>👥</div>
+                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{residents.length}</div>
                                                 <div className={styles.statLabel}>Residents</div>
                                                 <div className={styles.statTrend}>Total registered</div>
@@ -836,7 +933,7 @@ function AdminDashboardContent() {
                                         {/* Quick Action Cards */}
                                         <div className={styles.quickActions}>
                                             <div className={styles.quickCard} onClick={() => setActiveTab('requests')}>
-                                                <span className={styles.quickIcon}>📋</span>
+                                                <span className={styles.quickIcon}></span>
                                                 <div>
                                                     <strong>Review Requests</strong>
                                                     <span>{pendingCount} awaiting action</span>
@@ -844,7 +941,7 @@ function AdminDashboardContent() {
                                                 <span className={styles.quickArrow}>→</span>
                                             </div>
                                             <div className={styles.quickCard} onClick={() => setActiveTab('announcements')}>
-                                                <span className={styles.quickIcon}>📢</span>
+                                                <span className={styles.quickIcon}></span>
                                                 <div>
                                                     <strong>Post Announcement</strong>
                                                     <span>Notify {residents.length} residents</span>
@@ -852,7 +949,7 @@ function AdminDashboardContent() {
                                                 <span className={styles.quickArrow}>→</span>
                                             </div>
                                             <div className={styles.quickCard} onClick={() => setActiveTab('residents')}>
-                                                <span className={styles.quickIcon}>👥</span>
+                                                <span className={styles.quickIcon}></span>
                                                 <div>
                                                     <strong>Manage Residents</strong>
                                                     <span>View registered accounts</span>
@@ -871,7 +968,7 @@ function AdminDashboardContent() {
                                                 <div className={styles.activityList}>
                                                     {requests.slice(0, 5).map(req => (
                                                         <div className={styles.activityItem} key={req.id}>
-                                                            <div className={styles.activityIcon}>📄</div>
+
                                                             <div className={styles.activityDetails}>
                                                                 <strong>{req.document_type}</strong>
                                                                 <p>{req.resident_name}</p>
@@ -895,7 +992,7 @@ function AdminDashboardContent() {
                                                 <div className={styles.activityList}>
                                                     {announcements.slice(0, 5).map(ann => (
                                                         <div className={styles.activityItem} key={ann.id}>
-                                                            <div className={styles.activityIcon}>📢</div>
+
                                                             <div className={styles.activityDetails}>
                                                                 <strong>{ann.title}</strong>
                                                                 <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: 'var(--text-muted)' }}>
@@ -924,14 +1021,14 @@ function AdminDashboardContent() {
                                         <p className={styles.pageSubtitle}>{requests.length} total requests — {pendingCount} pending action</p>
                                     </div>
                                     <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportRequestsToPDF(requests, 'Document_Requests')}>
-                                        📄 Export Requests PDF
+                                        Export Requests PDF
                                     </button>
                                 </div>
 
                                 <div className={styles.filterBar}>
                                     <input
                                         type="text"
-                                        placeholder="🔍 Search by name or document type..."
+                                        placeholder="Search by name or document type..."
                                         value={requestSearch}
                                         onChange={e => setRequestSearch(e.target.value)}
                                         className={styles.searchInput}
@@ -981,7 +1078,7 @@ function AdminDashboardContent() {
                                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
                                                                     onClick={() => viewAttachment(req.attachment_url!)}
                                                                 >
-                                                                    📎 View File
+                                                                    View File
                                                                 </button>
                                                             ) : (
                                                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No Attachment</span>
@@ -1002,13 +1099,13 @@ function AdminDashboardContent() {
                                                                     <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
                                                                 )}
                                                                 {(req.status === 'ready' || req.status === 'completed') && (
-                                                                    <button 
-                                                                        className="btn btn-primary" 
-                                                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#10b981', borderColor: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }} 
+                                                                    <button
+                                                                        className="btn btn-primary"
+                                                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#10b981', borderColor: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                                                                         onClick={() => handleGeneratePdf(req)}
                                                                         disabled={generatingPdfId === req.id}
                                                                     >
-                                                                        {generatingPdfId === req.id ? 'Generating...' : '🖨️ PDF'}
+                                                                        {generatingPdfId === req.id ? 'Generating...' : 'PDF'}
                                                                     </button>
                                                                 )}
                                                                 {(req.status === 'pending' || req.status === 'processing') && (
@@ -1042,14 +1139,14 @@ function AdminDashboardContent() {
                                         <p className={styles.pageSubtitle}>{residents.length} registered accounts in the system</p>
                                     </div>
                                     <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToPDF(residents, 'Resident_List')}>
-                                        📄 Export Residents PDF
+                                        Export Residents PDF
                                     </button>
                                 </div>
 
                                 <div className={styles.filterBar}>
                                     <input
                                         type="text"
-                                        placeholder="🔍 Search by name, email, or address..."
+                                        placeholder="Search by name, email, or address..."
                                         value={residentSearch}
                                         onChange={e => setResidentSearch(e.target.value)}
                                         className={styles.searchInput}
@@ -1087,7 +1184,7 @@ function AdminDashboardContent() {
                                                                         <div style={{ marginTop: '0.4rem' }}>
                                                                             {res.is_verified ? (
                                                                                 <div className={styles.verifiedBadge}>
-                                                                                    🛡️ VERIFIED
+                                                                                    VERIFIED
                                                                                 </div>
                                                                             ) : (
                                                                                 <button
@@ -1152,7 +1249,7 @@ function AdminDashboardContent() {
                                     <div className="glass-card" style={{ maxWidth: '720px', width: '100%', padding: '2.5rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                                         {/* Header */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-                                            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>👤 Resident Profile</h2>
+                                            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}> Resident Profile</h2>
                                             <button style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', cursor: 'pointer' }} onClick={() => setSelectedResident(null)}>✕</button>
                                         </div>
 
@@ -1162,7 +1259,7 @@ function AdminDashboardContent() {
                                                 {res.profile_picture_url ? (
                                                     <img src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                 ) : (
-                                                    <span style={{ fontSize: '2rem' }}>👤</span>
+                                                    <span style={{ fontSize: '2rem' }}></span>
                                                 )}
                                             </div>
                                             <div style={{ flex: 1 }}>
@@ -1171,7 +1268,7 @@ function AdminDashboardContent() {
                                                     ID: {res.resident_id_number || res.id?.slice(0, 12).toUpperCase()}
                                                 </p>
                                                 <span className={res.is_verified ? 'badge badge-success' : 'badge badge-warning'} style={{ fontSize: '0.75rem' }}>
-                                                    {res.is_verified ? '🛡️ Verified Resident' : '⏳ Pending Verification'}
+                                                    {res.is_verified ? 'Verified Resident' : 'Pending Verification'}
                                                 </span>
                                             </div>
                                         </div>
@@ -1249,21 +1346,21 @@ function AdminDashboardContent() {
                                         {/* ID Document Section */}
                                         <div style={{ padding: '1.25rem', background: 'rgba(37, 99, 235, 0.06)', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.15)', marginBottom: '1.5rem' }}>
                                             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                                                🪪 Identity Verification Document
+                                                Identity Verification Document
                                             </label>
                                             {res.id_document_url ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                     <span style={{ fontSize: '0.9rem', color: 'var(--success-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>✅ Document uploaded</span>
-                                                    <button 
-                                                        className="btn btn-primary" 
-                                                        style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }} 
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
                                                         onClick={viewIdDocument}
                                                     >
-                                                        👁️ View ID Document
+                                                        View ID Document
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--warning-500)' }}>⚠️ No ID document uploaded</p>
+                                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--warning-500)' }}>No ID document uploaded</p>
                                             )}
                                         </div>
 
@@ -1279,7 +1376,7 @@ function AdminDashboardContent() {
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ fontSize: '1.25rem', fontWeight: 700, color: res.is_verified ? 'var(--success-500)' : 'var(--warning-500)' }}>
-                                                    {res.is_verified ? '✅' : '⏳'}
+                                                    {res.is_verified ? 'Verified' : 'Waiting for Approval'}
                                                 </div>
                                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Status</div>
                                             </div>
@@ -1309,7 +1406,7 @@ function AdminDashboardContent() {
                                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
                                             {!res.is_verified && (
                                                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { verifyResident(res.id); setSelectedResident(null); }}>
-                                                    ✅ Verify Resident
+                                                    Verify Resident
                                                 </button>
                                             )}
                                             <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSelectedResident(null)}>
@@ -1332,7 +1429,7 @@ function AdminDashboardContent() {
                                 </div>
 
                                 <div className="glass-card" style={{ marginBottom: '2rem' }}>
-                                    <h3>✏️ Create New Announcement</h3>
+                                    <h3>Create New Announcement</h3>
                                     <div className={styles.announcementForm}>
                                         <input
                                             type="text"
@@ -1348,17 +1445,17 @@ function AdminDashboardContent() {
                                         />
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                             <select value={annCategory} onChange={e => setAnnCategory(e.target.value)}>
-                                                <option value="community_event">🎉 Community Event</option>
-                                                <option value="important">⚠️ Important</option>
-                                                <option value="emergency">🚨 Emergency</option>
-                                                <option value="general">📌 General</option>
+                                                <option value="community_event">Community Event</option>
+                                                <option value="important">Important</option>
+                                                <option value="emergency">Emergency</option>
+                                                <option value="general">General</option>
                                             </select>
                                             <button
                                                 className="btn btn-primary"
                                                 onClick={publishAnnouncement}
                                                 disabled={publishing || !annTitle.trim() || !annContent.trim()}
                                             >
-                                                {publishing ? 'Publishing...' : '📢 Publish'}
+                                                {publishing ? 'Publishing...' : 'Publish'}
                                             </button>
                                         </div>
                                     </div>
@@ -1370,7 +1467,7 @@ function AdminDashboardContent() {
                                         <div className="glass-card" key={ann.id}>
                                             <div className={styles.announcementHeader}>
                                                 <span className={categoryBadge(ann.category)}>{categoryLabel(ann.category)}</span>
-                                                <button className={styles.editButton} onClick={() => deleteAnnouncement(ann.id)}>🗑️ Delete</button>
+                                                <button className={styles.editButton} onClick={() => deleteAnnouncement(ann.id)}>Delete</button>
                                             </div>
                                             <h4 style={{ margin: '0.75rem 0 0.5rem' }}>{ann.title}</h4>
                                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{ann.content}</p>
@@ -1407,7 +1504,7 @@ function AdminDashboardContent() {
                                                 />
                                             ) : (
                                                 <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>
-                                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div>
                                                     <p>Scan Complete</p>
                                                     <button
                                                         className="btn btn-outline"
@@ -1423,14 +1520,14 @@ function AdminDashboardContent() {
                                         {scanResult && !verifying && (
                                             <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: scanResult.valid ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', border: `1px solid ${scanResult.valid ? '#22c55e' : '#ef4444'}` }}>
                                                 <h4 style={{ color: scanResult.valid ? '#22c55e' : '#ef4444', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    {scanResult.valid ? (scanResult.isResident ? '👤 VERIFIED RESIDENT' : '✅ VERIFIED DOCUMENT') : '❌ INVALID / WARNING'}
+                                                    {scanResult.valid ? (scanResult.isResident ? ' VERIFIED RESIDENT' : ' VERIFIED DOCUMENT') : ' INVALID / WARNING'}
                                                 </h4>
                                                 {scanResult.holder && <p><strong>{scanResult.isResident ? 'Name' : 'Holder'}:</strong> {scanResult.holder}</p>}
                                                 {scanResult.docType && <p><strong>Type:</strong> {scanResult.docType}</p>}
                                                 {scanResult.isResident && (
                                                     <div style={{ marginTop: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.35rem' }}>
-                                                        {scanResult.address && <p style={{ fontSize: '0.85rem' }}>📍 {scanResult.address}</p>}
-                                                        {scanResult.phone && <p style={{ fontSize: '0.85rem' }}>📞 {scanResult.phone}</p>}
+                                                        {scanResult.address && <p style={{ fontSize: '0.85rem' }}> {scanResult.address}</p>}
+                                                        {scanResult.phone && <p style={{ fontSize: '0.85rem' }}> {scanResult.phone}</p>}
                                                     </div>
                                                 )}
                                                 <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', opacity: 0.8 }}>
@@ -1446,7 +1543,7 @@ function AdminDashboardContent() {
                                                 <p className={styles.emptyMessage} style={{ padding: '2rem 0' }}>No scans performed yet in this session.</p>
                                             ) : recentVerifications.map((v, i) => (
                                                 <div key={i} className={styles.activityItem} style={{ padding: '1rem' }}>
-                                                    <div className={styles.activityIcon} style={{ fontSize: '1.25rem' }}>🔍</div>
+                                                    <div className={styles.activityIcon} style={{ fontSize: '1.25rem' }}></div>
                                                     <div className={styles.activityDetails}>
                                                         <strong>{v.name}</strong>
                                                         <p>{v.doc}</p>
@@ -1479,23 +1576,23 @@ function AdminDashboardContent() {
                                         marginBottom: '1.75rem',
                                         padding: '0.65rem 2.5rem 0.65rem 1rem',
                                         borderRadius: '10px',
-                                        border: '1px solid rgba(99, 102, 241, 0.25)',
-                                        background: 'rgba(15, 15, 35, 0.6)',
-                                        color: '#fff',
+                                        border: '1px solid var(--border-color)',
+                                        background: '#ffffff',
+                                        color: 'var(--text-primary)',
                                         fontSize: '0.9rem',
                                         fontWeight: 600,
                                         cursor: 'pointer',
                                         outline: 'none',
                                         appearance: 'none',
-                                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(255,255,255,0.5)' viewBox='0 0 16 16'%3E%3Cpath d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E")`,
+                                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(0,0,0,0.5)' viewBox='0 0 16 16'%3E%3Cpath d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E")`,
                                         backgroundRepeat: 'no-repeat',
                                         backgroundPosition: 'right 0.85rem center',
-                                        backdropFilter: 'blur(10px)',
+                                        boxShadow: 'var(--shadow-sm)',
                                     }}
                                 >
-                                    <option value="overview" style={{ background: '#1a1a2e' }}>📊 Overview — Stats & Breakdowns</option>
-                                    <option value="trends" style={{ background: '#1a1a2e' }}>📈 Trends — Weekly Performance</option>
-                                    <option value="demographics" style={{ background: '#1a1a2e' }}>👥 Demographics — Sectoral & Age</option>
+                                    <option value="overview" style={{ background: '#ffffff', color: '#111827' }}>Overview — Stats & Breakdowns</option>
+                                    <option value="trends" style={{ background: '#ffffff', color: '#111827' }}>Trends — Weekly Performance</option>
+                                    <option value="demographics" style={{ background: '#ffffff', color: '#111827' }}>Demographics — Sectoral & Age</option>
                                 </select>
 
                                 {loading ? <LoadingSpinner text="Loading analytics..." /> : (
@@ -1506,25 +1603,25 @@ function AdminDashboardContent() {
                                                 {/* Summary Cards */}
                                                 <div className={styles.statsGrid}>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}>📄</div>
+                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{requests.length}</div>
                                                         <div className={styles.statLabel}>Total Requests</div>
                                                         <div className={styles.statTrend}>All time</div>
                                                     </div>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}>⚡</div>
+                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{completionRate}%</div>
                                                         <div className={styles.statLabel}>Completion Rate</div>
                                                         <div className={styles.statTrend}>↑ Good performance</div>
                                                     </div>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}>📢</div>
+                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{announcements.length}</div>
                                                         <div className={styles.statLabel}>Announcements</div>
                                                         <div className={styles.statTrend}>This month</div>
                                                     </div>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}>❌</div>
+                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{rejectedCount}</div>
                                                         <div className={styles.statLabel}>Rejected</div>
                                                         <div className={styles.statTrend}>{requests.length > 0 ? Math.round(rejectedCount / requests.length * 100) : 0}% rejection rate</div>
@@ -1534,7 +1631,7 @@ function AdminDashboardContent() {
                                                 {/* Document Type & Status Breakdown */}
                                                 <div className="grid grid-2" style={{ marginTop: '1.5rem' }}>
                                                     <div className="glass-card">
-                                                        <h3>📊 Document Type Breakdown</h3>
+                                                        <h3>Document Type Breakdown</h3>
                                                         {(['Barangay Clearance', 'Business Permit', 'Barangay ID', 'Certificate of Indigency', 'Certificate of Residency'] as const).map(type => {
                                                             const count = requests.filter(r => r.document_type === type).length
                                                             const pct = requests.length > 0 ? Math.round(count / requests.length * 100) : 0
@@ -1551,7 +1648,7 @@ function AdminDashboardContent() {
                                                     </div>
 
                                                     <div className="glass-card">
-                                                        <h3>🔢 Status Breakdown</h3>
+                                                        <h3>Status Breakdown</h3>
                                                         {(['pending', 'processing', 'ready', 'completed', 'rejected'] as const).map(status => {
                                                             const count = requests.filter(r => r.status === status).length
                                                             const pct = requests.length > 0 ? Math.round(count / requests.length * 100) : 0
@@ -1612,6 +1709,97 @@ function AdminDashboardContent() {
                             </div>
                         )}
 
+                        {/* ── BLOTTER REPORTS ── */}
+                        {activeTab === 'blotter' && (
+                            <div className="animate-fadeIn">
+                                <div className={styles.pageHeader}>
+                                    <div>
+                                        <h1>Blotter Reports</h1>
+                                        <p className={styles.pageSubtitle}>Manage official blotter and incident reports.</p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button className="btn btn-secondary" onClick={() => setBlotterModal({ isOpen: true, report: { incident_date: new Date().toISOString().slice(0, 16) } })}>
+                                            + New Report
+                                        </button>
+                                        <button className="btn btn-primary" onClick={() => exportBlotterToPDF(blotterReports, 'Blotter_Reports')}>
+                                            Export PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className={styles.filterBar}>
+                                    <input
+                                        type="text"
+                                        placeholder="Search complainant or respondent..."
+                                        value={blotterSearch}
+                                        onChange={e => setBlotterSearch(e.target.value)}
+                                        className={styles.searchInput}
+                                    />
+                                    <select
+                                        value={blotterStatusFilter}
+                                        onChange={e => setBlotterStatusFilter(e.target.value)}
+                                        className={styles.filterSelect}
+                                    >
+                                        <option value="all">All Status</option>
+                                        <option value="Pending">Pending</option>
+                                        <option value="Ongoing">Ongoing</option>
+                                        <option value="Resolved">Resolved</option>
+                                        <option value="Referred">Referred</option>
+                                    </select>
+                                    <span className={styles.searchCount}>{blotterReports.length} report{blotterReports.length !== 1 ? 's' : ''}</span>
+                                </div>
+
+                                <div className={`${styles.tableContainer} ${styles.glassTable}`}>
+                                    {loading ? <LoadingSpinner text="Loading reports..." /> : (
+                                        <table className={styles.table}>
+                                            <thead>
+                                                <tr>
+                                                    <th>Case ID</th>
+                                                    <th>Complainant</th>
+                                                    <th>Respondent</th>
+                                                    <th>Location</th>
+                                                    <th>Incident Date</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {blotterReports.filter(rep => {
+                                                    const matchSearch = rep.complainant.toLowerCase().includes(blotterSearch.toLowerCase()) || rep.respondent.toLowerCase().includes(blotterSearch.toLowerCase());
+                                                    const matchStatus = blotterStatusFilter === 'all' || rep.status === blotterStatusFilter;
+                                                    return matchSearch && matchStatus;
+                                                }).map(rep => (
+                                                    <tr key={rep.id}>
+                                                        <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{rep.id.slice(0, 6).toUpperCase()}</td>
+                                                        <td><strong>{rep.complainant}</strong></td>
+                                                        <td><strong>{rep.respondent}</strong></td>
+                                                        <td style={{ color: 'var(--text-muted)' }}>{rep.location}</td>
+                                                        <td>{new Date(rep.incident_date).toLocaleString()}</td>
+                                                        <td>
+                                                            <span className={rep.status === 'Resolved' ? 'badge badge-success' : rep.status === 'Ongoing' ? 'badge badge-info' : rep.status === 'Referred' ? 'badge badge-warning' : 'badge badge-error'}>
+                                                                {rep.status}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setBlotterModal({ isOpen: true, report: rep })}>Edit</button>
+                                                                <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteBlotterReport(rep.id)}>Delete</button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {blotterReports.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={7} className={styles.emptyMessage}>No blotter reports found.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* ── AUDIT TRAIL ── */}
                         {activeTab === 'audit' && (
                             <div className="animate-fadeIn">
@@ -1621,7 +1809,7 @@ function AdminDashboardContent() {
                                         <p className={styles.pageSubtitle}>Log of all administrative actions in the E-Barangay system.</p>
                                     </div>
                                     <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToCSV(auditLogs, 'Audit_Logs')}>
-                                        📥 Export Logs CSV
+                                        Export Logs CSV
                                     </button>
                                 </div>
 
@@ -1680,6 +1868,102 @@ function AdminDashboardContent() {
                             <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setNoteModal(null)}>Cancel</button>
                             <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateStatus(noteModal.id, noteModal.status, adminNote)}>Confirm Rejection</button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Blotter Form Modal */}
+            {blotterModal.isOpen && blotterModal.report && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setBlotterModal({ isOpen: false, report: null })}>
+                    <div className="glass-card" style={{ maxWidth: '600px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {blotterModal.report.id ? 'Edit Blotter Report' : 'New Blotter Report'}
+                        </h3>
+                        <form onSubmit={saveBlotterReport} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div className="grid grid-2">
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Complainant Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className={styles.searchInput}
+                                        style={{ width: '100%' }}
+                                        value={blotterModal.report.complainant || ''}
+                                        onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, complainant: e.target.value } })}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Respondent Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className={styles.searchInput}
+                                        style={{ width: '100%' }}
+                                        value={blotterModal.report.respondent || ''}
+                                        onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, respondent: e.target.value } })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-2">
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Incident Date & Time *</label>
+                                    <input
+                                        type="datetime-local"
+                                        required
+                                        className={styles.searchInput}
+                                        style={{ width: '100%' }}
+                                        value={blotterModal.report.incident_date ? new Date(blotterModal.report.incident_date).toISOString().slice(0, 16) : ''}
+                                        onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, incident_date: new Date(e.target.value).toISOString() } })}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Location *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className={styles.searchInput}
+                                        style={{ width: '100%' }}
+                                        value={blotterModal.report.location || ''}
+                                        onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, location: e.target.value } })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Incident Details *</label>
+                                <textarea
+                                    required
+                                    rows={4}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                                    value={blotterModal.report.incident_details || ''}
+                                    onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, incident_details: e.target.value } })}
+                                />
+                            </div>
+
+                            {blotterModal.report.id && (
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Status</label>
+                                    <select
+                                        className={styles.filterSelect}
+                                        style={{ width: '100%' }}
+                                        value={blotterModal.report.status || 'Pending'}
+                                        onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, status: e.target.value as BlotterStatus } })}
+                                    >
+                                        <option value="Pending">Pending</option>
+                                        <option value="Ongoing">Ongoing</option>
+                                        <option value="Resolved">Resolved</option>
+                                        <option value="Referred">Referred (e.g. to PNP)</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setBlotterModal({ isOpen: false, report: null })}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={savingBlotter}>
+                                    {savingBlotter ? 'Saving...' : 'Save Report'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

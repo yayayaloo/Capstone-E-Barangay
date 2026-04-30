@@ -109,7 +109,7 @@ export default function WeeklyPerformanceChart() {
                     type: 'increase',
                     message: `+${Math.round(change)}% spike${reasons.length > 0 ? ` — likely due to ${reasons.join(', ')}` : ' — possible event-driven demand'}`,
                     weekLabel: curr.weekLabel,
-                    icon: '📈'
+                    icon: ''
                 })
             } else if (change < -30) {
                 const reasons: string[] = []
@@ -121,7 +121,7 @@ export default function WeeklyPerformanceChart() {
                     type: 'decrease',
                     message: `${Math.round(change)}% drop${reasons.length > 0 ? ` — possibly from ${reasons.join(', ')}` : ' — typical low-activity period'}`,
                     weekLabel: curr.weekLabel,
-                    icon: '📉'
+                    icon: ''
                 })
             }
         }
@@ -133,7 +133,7 @@ export default function WeeklyPerformanceChart() {
                 type: 'peak',
                 message: `Peak activity: ${maxWeek.total} requests — highest volume in 8-week window`,
                 weekLabel: maxWeek.weekLabel,
-                icon: '🔥'
+                icon: ''
             })
         }
 
@@ -227,7 +227,7 @@ export default function WeeklyPerformanceChart() {
             <div className={styles.chartHeader}>
                 <div>
                     <h3 className={styles.chartTitle}>
-                        <span className={styles.chartTitleIcon}>📊</span>
+                        <span className={styles.chartTitleIcon}></span>
                         Weekly Performance
                     </h3>
                     <p className={styles.chartSubtitle}>Service request trends over the last 8 weeks</p>
@@ -295,14 +295,14 @@ export default function WeeklyPerformanceChart() {
                                     y1={y}
                                     x2={chartWidth - padding.right}
                                     y2={y}
-                                    stroke="rgba(255,255,255,0.06)"
+                                    stroke="var(--border-color)"
                                     strokeDasharray={i === 0 ? "none" : "4,4"}
                                 />
                                 <text
                                     x={padding.left - 10}
                                     y={y + 4}
                                     textAnchor="end"
-                                    fill="rgba(255,255,255,0.35)"
+                                    fill="var(--text-muted)"
                                     fontSize="11"
                                     fontFamily="inherit"
                                 >
@@ -350,7 +350,7 @@ export default function WeeklyPerformanceChart() {
                                     y={padding.top}
                                     width={plotWidth / weeklyData.length}
                                     height={plotHeight}
-                                    fill={isHovered ? 'rgba(255,255,255,0.03)' : 'transparent'}
+                                    fill={isHovered ? 'var(--gray-50)' : 'transparent'}
                                     rx="4"
                                 />
 
@@ -377,7 +377,7 @@ export default function WeeklyPerformanceChart() {
                                             width="56"
                                             height="24"
                                             rx="6"
-                                            fill="rgba(15,15,35,0.9)"
+                                            fill="var(--bg-primary)"
                                             stroke={colors.main}
                                             strokeWidth="1"
                                         />
@@ -385,7 +385,7 @@ export default function WeeklyPerformanceChart() {
                                             x={padding.left + (plotWidth / weeklyData.length) * (i + 0.5)}
                                             y={y - 14}
                                             textAnchor="middle"
-                                            fill="#fff"
+                                            fill="var(--text-primary)"
                                             fontSize="12"
                                             fontWeight="700"
                                             fontFamily="inherit"
@@ -400,7 +400,7 @@ export default function WeeklyPerformanceChart() {
                                     x={padding.left + (plotWidth / weeklyData.length) * (i + 0.5)}
                                     y={chartHeight - 10}
                                     textAnchor="middle"
-                                    fill={isHovered ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)'}
+                                    fill={isHovered ? 'var(--text-primary)' : 'var(--text-muted)'}
                                     fontSize="11"
                                     fontFamily="inherit"
                                     fontWeight={isHovered ? '600' : '400'}
@@ -439,7 +439,7 @@ export default function WeeklyPerformanceChart() {
                                 cy={y}
                                 r={hoveredBar === i ? 6 : 4}
                                 fill={colors.main}
-                                stroke="#0f0f23"
+                                stroke="var(--bg-primary)"
                                 strokeWidth="2"
                                 filter="url(#dotGlow)"
                                 className={styles.dataPoint}
@@ -454,7 +454,7 @@ export default function WeeklyPerformanceChart() {
                             y1={padding.top + plotHeight - (Math.max(trendLine.startY, 0) / maxValue) * plotHeight}
                             x2={padding.left + (plotWidth / weeklyData.length) * (weeklyData.length - 0.5)}
                             y2={padding.top + plotHeight - (Math.max(trendLine.endY, 0) / maxValue) * plotHeight}
-                            stroke="rgba(255,255,255,0.15)"
+                            stroke="var(--border-color)"
                             strokeWidth="1.5"
                             strokeDasharray="6,4"
                             className={styles.regressionLine}
@@ -493,7 +493,7 @@ export default function WeeklyPerformanceChart() {
             {insights.length > 0 && (
                 <div className={styles.insightsSection}>
                     <h4 className={styles.insightsTitle}>
-                        <span>💡</span> Trend Insights
+                        Trend Insights
                     </h4>
                     <div className={styles.insightsList}>
                         {insights.map((insight, i) => (

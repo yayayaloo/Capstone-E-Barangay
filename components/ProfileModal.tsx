@@ -6,20 +6,20 @@ import { Profile } from '@/lib/types'
 import { Camera, AlertCircle } from 'lucide-react'
 
 const SECTOR_OPTIONS = [
-    { value: 'Solo Parent', icon: '🧑‍🍼' },
-    { value: 'OFW', icon: '🌍' },
-    { value: 'PWD', icon: '♿' },
-    { value: 'Senior Citizen', icon: '👴' },
-    { value: 'LGBTQ+', icon: '🏳️‍🌈' },
-    { value: 'Employed', icon: '💼' },
-    { value: 'Unemployed', icon: '📭' },
-    { value: '4Ps Beneficiary', icon: '👩‍👧' },
-    { value: 'Pregnant/Lactating', icon: '🤰' },
-    { value: 'Youth (15-30)', icon: '🧑' },
-    { value: 'Indigenous People', icon: '🌾' },
-    { value: 'OSC', icon: '📕' },
-    { value: 'OSY', icon: '📗' },
-    { value: 'OSA', icon: '📘' },
+    { value: 'Solo Parent', icon: '' },
+    { value: 'OFW', icon: '' },
+    { value: 'PWD', icon: '' },
+    { value: 'Senior Citizen', icon: '' },
+    { value: 'LGBTQ+', icon: '' },
+    { value: 'Employed', icon: '' },
+    { value: 'Unemployed', icon: '' },
+    { value: '4Ps Beneficiary', icon: '' },
+    { value: 'Pregnant/Lactating', icon: '' },
+    { value: 'Youth (15-30)', icon: '' },
+    { value: 'Indigenous People', icon: '' },
+    { value: 'OSC', icon: '' },
+    { value: 'OSY', icon: '' },
+    { value: 'OSA', icon: '' },
 ]
 
 interface ProfileModalProps {
@@ -64,7 +64,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
             if (profilePicture) {
                 const fileExt = profilePicture.name.split('.').pop()
                 const fileName = `${profile.id}/${Date.now()}.${fileExt}`
-                
+
                 const { error: uploadError } = await supabase.storage
                     .from('resident-profile-pictures')
                     .upload(fileName, profilePicture, { upsert: true })
@@ -91,7 +91,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
         <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem', zIndex: 9999 }} onClick={onClose}>
             <div className="glass-card" style={{ maxWidth: '550px', width: '100%', padding: '2.5rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                    <h2 style={{ margin: 0 }}>Update Profile 👤</h2>
+                    <h2 style={{ margin: 0 }}>Update Profile</h2>
                     <button style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', cursor: 'pointer' }} onClick={onClose}>✕</button>
                 </div>
 
@@ -112,14 +112,14 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                             onChange={handleFileChange}
                             style={{ display: 'none' }}
                         />
-                        <label 
-                            htmlFor="profile-picture" 
-                            className="btn btn-outline" 
+                        <label
+                            htmlFor="profile-picture"
+                            className="btn btn-outline"
                             style={{ cursor: 'pointer', fontSize: '0.85rem' }}
                         >
                             Change Photo
                         </label>
-                        
+
                         <div style={{ padding: '1rem', background: 'rgba(37, 99, 235, 0.05)', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.1)', width: '100%' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--primary-600)', fontSize: '0.85rem', fontWeight: 700 }}>
                                 <AlertCircle size={16} /> REQUIRED GUIDELINES:
@@ -135,7 +135,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
 
                     {error && (
                         <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '8px', color: '#ef4444' }}>
-                            ⚠️ {error}
+                            {error}
                         </div>
                     )}
 
