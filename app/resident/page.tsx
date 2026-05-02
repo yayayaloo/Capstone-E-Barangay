@@ -266,7 +266,6 @@ function ResidentPortalContent() {
             {!profile?.is_verified && (
                 <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.05)' }}>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '1.5rem' }}></span>
                         <div>
                             <strong style={{ display: 'block' }}>Account Under Review</strong>
                             <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -285,7 +284,6 @@ function ResidentPortalContent() {
                         className={`glass-card ${styles.actionCard} ${!profile?.is_verified ? styles.actionDisabled : ''}`}
                         onClick={() => profile?.is_verified ? setShowRequestModal(true) : showToast('Verification Required: Please wait for admin approval to request documents.', 'info')}
                     >
-                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Request Document</h3>
                             <p>Apply for clearances, permits, and certificates</p>
@@ -293,7 +291,6 @@ function ResidentPortalContent() {
                     </button>
 
                     <button className={`glass-card ${styles.actionCard}`} onClick={() => setActiveTab('requests')}>
-                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Track Status</h3>
                             <p>Monitor your pending applications</p>
@@ -304,7 +301,6 @@ function ResidentPortalContent() {
                         className={`glass-card ${styles.actionCard}`}
                         onClick={() => setShowChatBot(true)}
                     >
-                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Ask AI Assistant</h3>
                             <p>Get instant answers 24/7</p>
@@ -315,7 +311,6 @@ function ResidentPortalContent() {
                         className={`glass-card ${styles.actionCard}`}
                         onClick={() => { setShowScanner(true); setScanResult(null); }}
                     >
-                        <div className={styles.actionIcon}></div>
                         <div>
                             <h3>Scan QR</h3>
                             <p>Verify documents & IDs</p>
@@ -335,7 +330,7 @@ function ResidentPortalContent() {
                     {/* Barangay Gordon Heights Group */}
                     <div className="glass-card" style={{ padding: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '1.2rem' }}></span> Barangay Gordon Heights
+                            Barangay Gordon Heights
                         </h3>
                         <div className={styles.hotlineList}>
                             <a href="tel:2235497" className={styles.hotlineItem}>
@@ -386,7 +381,7 @@ function ResidentPortalContent() {
                     {/* Olongapo City Group */}
                     <div className="glass-card" style={{ padding: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '1.2rem' }}></span> Olongapo City Central
+                            Olongapo City Central
                         </h3>
                         <div className={styles.hotlineList}>
                             <a href="tel:09985937446" className={styles.hotlineItem}>
@@ -580,7 +575,6 @@ function ResidentPortalContent() {
                     <LoadingSpinner text="Loading your requests..." size="sm" />
                 ) : requests.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}></div>
                         <h3>No requests yet</h3>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Apply for documents using the button above.</p>
                         <button className="btn btn-primary" onClick={() => setShowRequestModal(true)}>Request Now</button>

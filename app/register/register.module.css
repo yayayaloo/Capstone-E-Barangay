@@ -41,7 +41,7 @@
     font-family: var(--font-poppins, sans-serif);
     font-size: 1.5rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #6366f1, #14b8a6);
+    background: #2563eb;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -95,7 +95,7 @@
 }
 
 .inputGroup input:focus {
-    border-color: #6366f1;
+    border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
@@ -119,7 +119,7 @@
 }
 
 .select:focus {
-    border-color: #6366f1;
+    border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
@@ -177,7 +177,7 @@
 }
 
 .fileInput:hover + .fileInputPlaceholder {
-    border-color: #6366f1;
+    border-color: #3b82f6;
     background: #f1f5f9;
 }
 
@@ -210,7 +210,7 @@
 }
 
 .passwordToggle:hover {
-    color: #6366f1;
+    color: #3b82f6;
 }
 
 .passwordStrength {
@@ -294,7 +294,7 @@
 .successMessage h2 {
     font-family: var(--font-poppins, sans-serif);
     font-size: 1.5rem;
-    background: linear-gradient(135deg, #6366f1, #14b8a6);
+    background: #3b82f6;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -309,7 +309,7 @@
 
 .submitButton {
     padding: 1.125rem;
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    background: #2563eb;
     border: none;
     border-radius: 12px;
     color: #fff;
@@ -322,7 +322,7 @@
 }
 
 .submitButton:hover:not(:disabled) {
-    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
 }
 
 .submitButton:disabled {
@@ -343,7 +343,7 @@
 }
 
 .link {
-    color: #6366f1;
+    color: #2563eb;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.2s;
@@ -379,13 +379,13 @@
 }
 
 .inlineLink {
-    color: #6366f1;
+    color: #2563eb;
     text-decoration: underline;
     font-weight: 500;
 }
 
 .inlineLink:hover {
-    color: #4f46e5;
+    color: #1d4ed8;
 }
 
 @media (max-width: 768px) {

@@ -120,7 +120,7 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                             />
                             <label htmlFor="attachment" className={styles.fileLabel}>
                                 {attachment ? (
-                                    <span className={styles.fileName}>✔️ {attachment.name}</span>
+                                    <span className={styles.fileName}>{attachment.name}</span>
                                 ) : (
                                     <>
                                         <span className={styles.uploadIcon}></span>

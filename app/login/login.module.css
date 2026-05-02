@@ -95,7 +95,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2.5px;
-    color: #818cf8;
+    color: #3b82f6;
     /* System Indigo */
     margin-bottom: 0.5rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -156,7 +156,7 @@
 }
 
 .backButton:hover {
-    color: var(--primary-600);
+    color: #2563eb;
 }
 
 @media (min-width: 1024px) {
@@ -233,7 +233,7 @@
 }
 
 .inputGroup input:focus {
-    border-color: #6366f1;
+    border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
@@ -262,12 +262,12 @@
 }
 
 .passwordToggle:hover {
-    color: #6366f1;
+    color: #3b82f6;
 }
 
 .submitButton {
     padding: 1.125rem;
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    background: #2563eb;
     border: none;
     border-radius: 12px;
     color: #fff;
@@ -280,7 +280,7 @@
 }
 
 .submitButton:hover:not(:disabled) {
-    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
 }
 
 .submitButton:disabled {
@@ -298,7 +298,7 @@
 }
 
 .link {
-    color: #6366f1;
+    color: #2563eb;
     text-decoration: none;
     font-weight: 600;
 }

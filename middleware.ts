@@ -59,8 +59,11 @@ export async function middleware(request: NextRequest) {
 
     const pathname = request.nextUrl.pathname
 
+    // Public routes accessible without authentication (QR code landing pages)
+    const isPublicRoute = pathname.startsWith('/services') || pathname.startsWith('/request')
+
     // Redirect unauthenticated users trying to access protected routes
-    if (!session && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
+    if (!session && !isPublicRoute && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
         return NextResponse.redirect(redirectUrl)
@@ -94,5 +97,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/', '/admin/:path*', '/resident/:path*', '/login', '/register', '/auth/:path*'],
+    matcher: ['/', '/admin/:path*', '/resident/:path*', '/login', '/register', '/auth/:path*', '/services', '/request/:path*'],
 }

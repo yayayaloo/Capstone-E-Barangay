@@ -14,6 +14,7 @@ import { logAdminAction } from '@/lib/audit'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { QRCodeCanvas } from 'qrcode.react'
 import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
 import WeeklyPerformanceChart from '@/components/WeeklyPerformanceChart'
 import SectoralChart from '@/components/SectoralChart'
@@ -69,6 +70,15 @@ function categoryLabel(cat: string) {
 function fmtDate(iso: string) {
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+
+const DOCUMENTS = [
+    { slug: 'barangay-clearance', name: 'Barangay Clearance', fee: 'Php 50.00', reqs: 'Valid ID' },
+    { slug: 'barangay-certification', name: 'Barangay Certification', fee: 'Php 50.00', reqs: 'Valid ID' },
+    { slug: 'business-clearance', name: 'Business Clearance', fee: 'Free', reqs: 'DTI Certificate' },
+    { slug: 'lot-certification', name: 'Lot / Building Certification', fee: 'Php 1.00/sqm', reqs: 'Purok Cert, Tax Dec' },
+    { slug: 'first-time-job-seeker', name: 'First Time Job Seeker', fee: 'Free', reqs: 'Valid ID' },
+    { slug: 'indigency', name: 'Certificate of Indigency', fee: 'Free', reqs: 'Valid ID' },
+]
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -577,6 +587,70 @@ function AdminDashboardContent() {
         showToast('CSV Export generated successfully', 'success');
     }
 
+    const handlePrintAllQR = () => {
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pageW = 210
+        const colW = pageW / 2
+        const qrSize = 45
+        const startY = 30
+        const origin = typeof window !== 'undefined' ? window.location.origin : ''
+
+        doc.setFontSize(18)
+        doc.setTextColor(30, 58, 138)
+        doc.text('Barangay Gordon Heights', pageW / 2, 15, { align: 'center' })
+        doc.setFontSize(11)
+        doc.setTextColor(100)
+        doc.text('Scan any QR code below to request a document online', pageW / 2, 22, { align: 'center' })
+
+        DOCUMENTS.forEach((d, i) => {
+            const col = i % 2
+            const row = Math.floor(i / 2)
+            const x = col * colW + (colW - qrSize) / 2
+            const y = startY + row * 85
+
+            doc.setDrawColor(200)
+            doc.setFillColor(250, 250, 252)
+            doc.roundedRect(col * colW + 8, y - 5, colW - 16, 78, 4, 4, 'FD')
+
+            const url = `${origin}/request/${d.slug}`
+            const canvas = document.querySelector(`canvas[data-qr-slug="${d.slug}"]`) as HTMLCanvasElement
+            
+            if (canvas) {
+                try {
+                    const imgData = canvas.toDataURL('image/png')
+                    doc.addImage(imgData, 'PNG', x, y, qrSize, qrSize)
+                } catch (e) {
+                    console.error("Failed to add image to PDF", e)
+                }
+            } else {
+                // Fallback placeholder if canvas not found
+                doc.setDrawColor(180)
+                doc.rect(x, y, qrSize, qrSize)
+                doc.setFontSize(7)
+                doc.setTextColor(120)
+                doc.text('[ Scan QR on website ]', x + qrSize / 2, y + qrSize / 2, { align: 'center' })
+            }
+
+            doc.setFontSize(11)
+            doc.setTextColor(30, 30, 30)
+            doc.text(d.name, col * colW + colW / 2, y + qrSize + 8, { align: 'center' })
+
+            doc.setFontSize(8)
+            doc.setTextColor(80)
+            doc.text(`Fee: ${d.fee}  |  Req: ${d.reqs}`, col * colW + colW / 2, y + qrSize + 14, { align: 'center' })
+
+            doc.setFontSize(6)
+            doc.setTextColor(37, 99, 235)
+            doc.text(url, col * colW + colW / 2, y + qrSize + 19, { align: 'center' })
+        })
+
+        doc.setFontSize(8)
+        doc.setTextColor(150)
+        doc.text(`Generated: ${new Date().toLocaleDateString()}  |  E-Barangay Gordon Heights`, pageW / 2, 290, { align: 'center' })
+
+        doc.save('E-Barangay_Document_QR_Codes.pdf')
+    }
+
     // Blotter Operations
     const saveBlotterReport = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -905,25 +979,21 @@ function AdminDashboardContent() {
                                         {/* Stats Row */}
                                         <div className={styles.statsGrid}>
                                             <div className={`glass-card ${styles.statCard} ${styles.statPending}`}>
-                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{pendingCount}</div>
                                                 <div className={styles.statLabel}>Pending</div>
                                                 <div className={styles.statTrend}>requires immediate action</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statProcessing}`}>
-                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{processingCount}</div>
                                                 <div className={styles.statLabel}>Processing</div>
                                                 <div className={styles.statTrend}>in queue</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statCompleted}`}>
-                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{completedCount}</div>
                                                 <div className={styles.statLabel}>Completed</div>
                                                 <div className={styles.statTrend}>{completionRate}% efficiency</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statResidents}`}>
-                                                <div className={styles.statIcon}></div>
                                                 <div className={styles.statValue}>{residents.length}</div>
                                                 <div className={styles.statLabel}>Residents</div>
                                                 <div className={styles.statTrend}>Total registered</div>
@@ -933,7 +1003,6 @@ function AdminDashboardContent() {
                                         {/* Quick Action Cards */}
                                         <div className={styles.quickActions}>
                                             <div className={styles.quickCard} onClick={() => setActiveTab('requests')}>
-                                                <span className={styles.quickIcon}></span>
                                                 <div>
                                                     <strong>Review Requests</strong>
                                                     <span>{pendingCount} awaiting action</span>
@@ -941,7 +1010,6 @@ function AdminDashboardContent() {
                                                 <span className={styles.quickArrow}>→</span>
                                             </div>
                                             <div className={styles.quickCard} onClick={() => setActiveTab('announcements')}>
-                                                <span className={styles.quickIcon}></span>
                                                 <div>
                                                     <strong>Post Announcement</strong>
                                                     <span>Notify {residents.length} residents</span>
@@ -949,13 +1017,31 @@ function AdminDashboardContent() {
                                                 <span className={styles.quickArrow}>→</span>
                                             </div>
                                             <div className={styles.quickCard} onClick={() => setActiveTab('residents')}>
-                                                <span className={styles.quickIcon}></span>
                                                 <div>
                                                     <strong>Manage Residents</strong>
                                                     <span>View registered accounts</span>
                                                 </div>
                                                 <span className={styles.quickArrow}>→</span>
                                             </div>
+                                            <div className={styles.quickCard} onClick={handlePrintAllQR}>
+                                                <div>
+                                                    <strong>Print QR Code Sheet</strong>
+                                                    <span>Generate PDF for Document Services</span>
+                                                </div>
+                                                <span className={styles.quickArrow}>📄</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Hidden QR Codes for PDF generation */}
+                                        <div style={{ display: 'none' }}>
+                                            {DOCUMENTS.map(doc => (
+                                                <QRCodeCanvas 
+                                                    key={doc.slug} 
+                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/request/${doc.slug}`} 
+                                                    size={200}
+                                                    data-qr-slug={doc.slug} 
+                                                />
+                                            ))}
                                         </div>
 
                                         <div className={styles.overviewGrid}>
@@ -1504,7 +1590,6 @@ function AdminDashboardContent() {
                                                 />
                                             ) : (
                                                 <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>
-                                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div>
                                                     <p>Scan Complete</p>
                                                     <button
                                                         className="btn btn-outline"
@@ -1543,7 +1628,6 @@ function AdminDashboardContent() {
                                                 <p className={styles.emptyMessage} style={{ padding: '2rem 0' }}>No scans performed yet in this session.</p>
                                             ) : recentVerifications.map((v, i) => (
                                                 <div key={i} className={styles.activityItem} style={{ padding: '1rem' }}>
-                                                    <div className={styles.activityIcon} style={{ fontSize: '1.25rem' }}></div>
                                                     <div className={styles.activityDetails}>
                                                         <strong>{v.name}</strong>
                                                         <p>{v.doc}</p>
@@ -1603,25 +1687,21 @@ function AdminDashboardContent() {
                                                 {/* Summary Cards */}
                                                 <div className={styles.statsGrid}>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{requests.length}</div>
                                                         <div className={styles.statLabel}>Total Requests</div>
                                                         <div className={styles.statTrend}>All time</div>
                                                     </div>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{completionRate}%</div>
                                                         <div className={styles.statLabel}>Completion Rate</div>
                                                         <div className={styles.statTrend}>↑ Good performance</div>
                                                     </div>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{announcements.length}</div>
                                                         <div className={styles.statLabel}>Announcements</div>
                                                         <div className={styles.statTrend}>This month</div>
                                                     </div>
                                                     <div className={`glass-card ${styles.statCard}`}>
-                                                        <div className={styles.statIcon}></div>
                                                         <div className={styles.statValue}>{rejectedCount}</div>
                                                         <div className={styles.statLabel}>Rejected</div>
                                                         <div className={styles.statTrend}>{requests.length > 0 ? Math.round(rejectedCount / requests.length * 100) : 0}% rejection rate</div>

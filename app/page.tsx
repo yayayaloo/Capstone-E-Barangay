@@ -41,7 +41,7 @@ export default function Home() {
                         <a href="#features">Features</a>
                         <a href="#about">About</a>
                         <Link href="/login" className="btn btn-outline">Login</Link>
-                        <Link href="/register" className="btn btn-primary">Sign Up</Link>
+                        <Link href="/register" className="btn btn-outline">Sign Up</Link>
                     </div>
                 </div>
             </nav>
@@ -65,8 +65,10 @@ export default function Home() {
                                 <span></span>
                                 Get Started
                             </Link>
-                            <Link href="/login" className="btn btn-outline">
-                                <span></span>
+                            <Link href="/services" className="btn btn-outline" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}>
+                                Request Documents
+                            </Link>
+                            <Link href="/login" className="btn btn-outline" style={{ borderColor: 'transparent' }}>
                                 Sign In
                             </Link>
                         </div>

@@ -108,7 +108,7 @@ function ResetPasswordContent() {
                     try {
                         const parsed = JSON.parse(decodeURIComponent(match[1]));
                         if (Array.isArray(parsed) && parsed.length > 0) accessToken = parsed[0];
-                    } catch (err) {}
+                    } catch (err) { }
                 }
             }
 
@@ -123,7 +123,7 @@ function ResetPasswordContent() {
             // 2. Raw fetch to update password (bypasses ALL client locks/bugs)
             const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`;
             const apiKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-            
+
             const response = await fetch(url, {
                 method: 'PUT',
                 headers: {
@@ -148,8 +148,8 @@ function ResetPasswordContent() {
             fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/logout`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': apiKey }
-            }).catch(() => {});
-            
+            }).catch(() => { });
+
             // Clear standard auth cookies to ensure complete sign out
             document.cookie.split(";").forEach((c) => {
                 if (c.trim().startsWith("sb-")) {
@@ -173,7 +173,7 @@ function ResetPasswordContent() {
         return (
             <div className={styles.container}>
                 <div className={styles.card} style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div>
                     <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Password Updated!</h2>
                     <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Your password has been successfully reset. You will be redirected to the login page shortly.</p>
                     <Link href="/login" className={styles.submitButton} style={{ textDecoration: 'none', display: 'inline-block' }}>
@@ -193,7 +193,7 @@ function ResetPasswordContent() {
 
             <div className={styles.card}>
                 <div className={styles.logoSection}>
-                    <div className={styles.logoIcon}>🛡️</div>
+                    <div className={styles.logoIcon}></div>
                     <h1>Reset Password</h1>
                     <p>Enter your new password below</p>
                 </div>
