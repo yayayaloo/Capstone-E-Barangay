@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react'
@@ -27,7 +28,7 @@ const SECTOR_OPTIONS = [
     { value: 'OSA', icon: '' },
 ]
 
-export default function RegisterPage() {
+function RegisterContent() {
     const [firstName, setFirstName] = useState('')
     const [middleName, setMiddleName] = useState('')
     const [lastName, setLastName] = useState('')
@@ -52,6 +53,7 @@ export default function RegisterPage() {
     const [passwordError, setPasswordError] = useState('')
     const { signUp } = useAuth()
     const router = useRouter()
+    const searchParams = useSearchParams()
 
 
     // Real-time validation logic
@@ -237,7 +239,7 @@ export default function RegisterPage() {
                             <h2 style={{ color: '#111827', fontSize: '1.75rem', marginBottom: '1rem', fontWeight: 'bold' }}>Registration Successful!</h2>
                             <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
-                            <Link href="/login" className={styles.link}>Go to Login →</Link>
+                            <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className={styles.link}>Go to Login →</Link>
                         </div>
                     </div>
                 </div>
@@ -681,11 +683,19 @@ export default function RegisterPage() {
 
                     <div className={styles.footer}>
                         <p>Already have an account?{' '}
-                            <Link href="/login" className={styles.link}>Sign in</Link>
+                            <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className={styles.link}>Sign in</Link>
                         </p>
                     </div>
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={<div className={loginStyles.loginContainer}>Loading...</div>}>
+            <RegisterContent />
+        </Suspense>
     )
 }

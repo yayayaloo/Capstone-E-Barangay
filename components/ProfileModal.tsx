@@ -58,19 +58,37 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
         setError('')
         setSubmitting(true)
 
+        let photoUploadFailed = false
+
         try {
             let profile_picture_url = profile.profile_picture_url
 
             if (profilePicture) {
-                const fileExt = profilePicture.name.split('.').pop()
-                const fileName = `${profile.id}/${Date.now()}.${fileExt}`
+                try {
+                    const fileExt = profilePicture.name.split('.').pop()
+                    const fileName = `${profile.id}/${Date.now()}.${fileExt}`
 
-                const { error: uploadError } = await supabase.storage
-                    .from('resident-profile-pictures')
-                    .upload(fileName, profilePicture, { upsert: true })
+                    // Race the upload against a 10-second timeout to prevent infinite loading
+                    const uploadTimeout = new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error('Upload timed out. Please check your connection.')), 10000)
+                    )
 
-                if (uploadError) throw uploadError
-                profile_picture_url = fileName
+                    const uploadRequest = supabase.storage
+                        .from('resident-profile-pictures')
+                        .upload(fileName, profilePicture, { upsert: true })
+
+                    const { error: uploadError } = await Promise.race([uploadRequest, uploadTimeout]) as any
+
+                    if (uploadError) {
+                        photoUploadFailed = true
+                        setError(`Photo could not be uploaded (${uploadError.message}). Your other profile info will still be saved.`)
+                    } else {
+                        profile_picture_url = fileName
+                    }
+                } catch (uploadErr: any) {
+                    photoUploadFailed = true
+                    setError(`Photo upload failed: ${uploadErr.message}. Your other profile info will still be saved.`)
+                }
             }
 
             await onSubmit({
@@ -79,7 +97,10 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                 sectors,
                 profile_picture_url
             })
-            onClose()
+
+            if (!photoUploadFailed) {
+                onClose()
+            }
         } catch (err: any) {
             setError(err?.message || 'Failed to update profile. Please try again.')
         } finally {

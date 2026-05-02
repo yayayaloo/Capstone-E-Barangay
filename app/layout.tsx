@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     description: 'Intelligent Cloud-Based PWA for Automated Resident Inquiries and QR-Enabled Services',
     manifest: '/manifest.json',
     icons: {
-        icon: '/icon-192.png',
-        apple: '/icon-192.png',
+        icon: '/logo.png',
+        apple: '/logo.png',
     },
 }
 

@@ -330,10 +330,10 @@ export default function RequestPage() {
                             You need an E-Barangay account to request a {doc.name}. Login or register to continue — it only takes a minute.
                         </p>
                         <div className={styles.authButtons}>
-                            <Link href="/login" className={styles.authBtnPrimary}>
+                            <Link href={`/login?redirect=/request/${slug}`} className={styles.authBtnPrimary}>
                                 Login to Continue
                             </Link>
-                            <Link href="/register" className={styles.authBtnOutline}>
+                            <Link href={`/register?redirect=/request/${slug}`} className={styles.authBtnOutline}>
                                 Create an Account
                             </Link>
                         </div>

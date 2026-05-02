@@ -51,6 +51,8 @@ function categoryBadge(cat: string) {
     const map: Record<string, string> = {
         community_event: 'badge badge-info',
         important: 'badge badge-warning',
+        emergency_alert: 'badge badge-error',
+        emergency_announcement: 'badge badge-warning',
         emergency: 'badge badge-error',
         general: 'badge badge-info',
     }
@@ -61,6 +63,8 @@ function categoryLabel(cat: string) {
     const map: Record<string, string> = {
         community_event: 'Community Event',
         important: 'Important',
+        emergency_alert: 'Emergency Alert',
+        emergency_announcement: 'Emergency Announcement',
         emergency: 'Emergency',
         general: 'General',
     }
@@ -221,7 +225,7 @@ function AdminDashboardContent() {
     }
 
     useEffect(() => {
-        if (activeTab === 'overview' && analyticsView === 'demographics' && !demographicsData) {
+        if (activeTab === 'analytics' && analyticsView === 'demographics' && !demographicsData) {
             fetchDemographics();
         }
     }, [activeTab, analyticsView, demographicsData]);
@@ -1514,34 +1518,78 @@ function AdminDashboardContent() {
                                     </div>
                                 </div>
 
-                                <div className="glass-card" style={{ marginBottom: '2rem' }}>
-                                    <h3>Create New Announcement</h3>
+                                <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: annCategory === 'emergency_alert' ? '4px solid #ef4444' : annCategory === 'emergency_announcement' ? '4px solid #f59e0b' : undefined }}>
+                                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                        Create New Announcement
+                                        {annCategory === 'emergency_alert' && (
+                                            <span className="badge badge-error animate-pulse" style={{ fontSize: '0.65rem', marginLeft: '0.25rem' }}>LIVE ALERT</span>
+                                        )}
+                                    </h3>
+
+                                    {annCategory === 'emergency_alert' && (
+                                        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', color: '#fca5a5' }}>
+                                            <strong>Emergency Alert</strong> — This will be displayed prominently to all residents. The title is auto-set to "EMERGENCY ALERT".
+                                        </div>
+                                    )}
+                                    {annCategory === 'emergency_announcement' && (
+                                        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', color: '#fcd34d' }}>
+                                            <strong>Emergency Announcement</strong> — Use this for planned or context-based emergency notices that residents should prepare for.
+                                        </div>
+                                    )}
+
                                     <div className={styles.announcementForm}>
-                                        <input
-                                            type="text"
-                                            placeholder="Announcement Title"
-                                            value={annTitle}
-                                            onChange={e => setAnnTitle(e.target.value)}
-                                        />
+                                        {annCategory !== 'emergency_alert' && (
+                                            <input
+                                                type="text"
+                                                placeholder="Announcement Title"
+                                                value={annTitle}
+                                                onChange={e => setAnnTitle(e.target.value)}
+                                            />
+                                        )}
                                         <textarea
                                             rows={4}
-                                            placeholder="Write the announcement content here..."
+                                            placeholder={
+                                                annCategory === 'emergency_alert'
+                                                    ? 'ALERT: What is happening NOW and where?'
+                                                    : annCategory === 'emergency_announcement'
+                                                    ? 'Describe the emergency details and what residents should prepare for.'
+                                                    : 'Write the announcement content here...'
+                                            }
                                             value={annContent}
                                             onChange={e => setAnnContent(e.target.value)}
+                                            style={{
+                                                borderColor: annCategory === 'emergency_alert' ? 'rgba(239,68,68,0.5)' : annCategory === 'emergency_announcement' ? 'rgba(245,158,11,0.5)' : undefined
+                                            }}
                                         />
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                            <select value={annCategory} onChange={e => setAnnCategory(e.target.value)}>
+                                            <select
+                                                value={annCategory}
+                                                onChange={e => {
+                                                    setAnnCategory(e.target.value)
+                                                    if (e.target.value === 'emergency_alert') {
+                                                        setAnnTitle('EMERGENCY ALERT')
+                                                    } else if (annTitle === 'EMERGENCY ALERT') {
+                                                        setAnnTitle('')
+                                                    }
+                                                }}
+                                            >
                                                 <option value="community_event">Community Event</option>
                                                 <option value="important">Important</option>
-                                                <option value="emergency">Emergency</option>
                                                 <option value="general">General</option>
+                                                <option value="emergency_alert">Emergency Alert (Real-time)</option>
+                                                <option value="emergency_announcement">Emergency Announcement (Planned)</option>
                                             </select>
                                             <button
                                                 className="btn btn-primary"
                                                 onClick={publishAnnouncement}
-                                                disabled={publishing || !annTitle.trim() || !annContent.trim()}
+                                                disabled={publishing || !annContent.trim() || (annCategory !== 'emergency_alert' && !annTitle.trim())}
+                                                style={{
+                                                    background: annCategory === 'emergency_alert' ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : undefined,
+                                                    borderColor: annCategory === 'emergency_alert' ? '#dc2626' : annCategory === 'emergency_announcement' ? '#d97706' : undefined,
+                                                    boxShadow: annCategory === 'emergency_alert' ? '0 0 16px rgba(239,68,68,0.4)' : undefined
+                                                }}
                                             >
-                                                {publishing ? 'Publishing...' : 'Publish'}
+                                                {publishing ? 'Publishing...' : annCategory === 'emergency_alert' ? 'Publish Alert' : 'Publish'}
                                             </button>
                                         </div>
                                     </div>

@@ -18,7 +18,7 @@ const CertificateTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) =>
     if (!data) return null;
 
     return (
-        <div 
+        <div
             ref={ref}
             id="certificate-template"
             style={{
@@ -49,15 +49,15 @@ const CertificateTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) =>
             </div>
 
             <div style={{ position: 'relative', zIndex: 1 }}>
-                
+
                 {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                     <div style={{ width: '120px', height: '120px', position: 'relative' }}>
-                         {/* We use standard img for perfect html2canvas capture because next/image sometimes lazy loads */}
+                        {/* We use standard img for perfect html2canvas capture because next/image sometimes lazy loads */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src="/logo.png" alt="Barangay Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
                     </div>
-                    
+
                     <div style={{ textAlign: 'center', flex: 1, paddingTop: '10px' }}>
                         <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', fontFamily: 'Arial, Helvetica, sans-serif' }}>REPUBLIC OF THE PHILIPPINES</p>
                         <p style={{ margin: 0, fontSize: '14px' }}>City of Olongapo</p>
@@ -68,13 +68,13 @@ const CertificateTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) =>
                     </div>
 
                     <div style={{ width: '120px', height: '120px', position: 'relative' }}>
-                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                         <img src="/olongapo-logo.png" alt="Olongapo City Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/olongapo-logo.png" alt="Olongapo City Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
                     </div>
                 </div>
 
                 <hr style={{ border: 'none', borderTop: '4px solid #000', marginBottom: '10px' }} />
-                
+
                 <h2 style={{ textAlign: 'center', fontSize: '24px', fontWeight: 'bold', fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase', margin: '0', letterSpacing: '1px' }}>
                     OFFICE OF THE PUNONG BARANGAY
                 </h2>
@@ -89,7 +89,7 @@ const CertificateTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) =>
                 {/* Body Content */}
                 <div style={{ fontSize: '18px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '60px' }}>
                     <p style={{ fontWeight: 'bold', marginBottom: '20px' }}>TO WHOM IT MAY CONCERN:</p>
-                    
+
                     <p style={{ textIndent: '40px' }}>
                         This is to certify that <strong>{data.residentName.toUpperCase()}</strong>, of legal age, is a bonafide resident of Barangay Gordon Heights, Olongapo City.
                     </p>
@@ -107,17 +107,19 @@ const CertificateTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) =>
                     </p>
                 </div>
 
-                {/* Signature Block */}
-                <div style={{ marginTop: '100px', display: 'flex', justifyContent: 'flex-end' }}>
+                {/* Footer & Signature Block */}
+                <div style={{ marginTop: '100px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    {/* Notes on the left */}
+                    <div style={{ fontSize: '12px', color: '#333' }}>
+                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>Note: This document is valid for six (6) months from the date of issuance.</p>
+                        <p style={{ margin: 0 }}>Not valid without the official dry seal.</p>
+                    </div>
+
+                    {/* Signature on the right */}
                     <div style={{ textAlign: 'center', width: '300px' }}>
                         <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>Hon. PRISCILLA B. PONGE</h3>
                         <p style={{ margin: 0, fontSize: '16px' }}>Punong Barangay</p>
                     </div>
-                </div>
-
-                {/* Footer Notes */}
-                <div style={{ position: 'absolute', bottom: '0', left: '0', width: '100%', fontSize: '12px', color: '#666', paddingTop: '10px' }}>
-                    <p style={{ margin: 0 }}>Not valid without the official dry seal.</p>
                 </div>
 
             </div>

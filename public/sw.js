@@ -1,24 +1,57 @@
+const CACHE_NAME = 'e-barangay-pwa-v1';
+const OFFLINE_URL = '/~offline';
+
+const CACHED_FILES = [
+  OFFLINE_URL,
+  '/logo.png',
+  '/olongapo-logo.png',
+  '/manifest.json',
+  '/icon-192.svg',
+  '/icon-512.svg'
+];
+
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(CACHED_FILES);
+    }).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cacheName) => caches.delete(cacheName))
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
       );
     }).then(() => self.clients.claim())
   );
-
-  // Force unregister the service worker to fix localhost locking issues
-  self.registration.unregister().then(() => {
-    console.log("Service worker forcefully unregistered to fix network hangs.");
-  });
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass through all requests directly to the network without intercepting
-  // This prevents the "Failed to fetch" lock bug in Supabase
-  event.respondWith(fetch(event.request));
+  // Skip cross-origin requests, like Supabase APIs, to prevent CORS and locking issues
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  // Handle HTML Document requests (Navigation)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match(OFFLINE_URL);
+      })
+    );
+    return;
+  }
+
+  // For other requests (images, css, etc.), try Network first, then Cache
+  event.respondWith(
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
+    })
+  );
 });

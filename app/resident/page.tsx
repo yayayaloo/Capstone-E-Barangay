@@ -220,7 +220,7 @@ function ResidentPortalContent() {
                 </div>
                 <div
                     className={`${styles.idCard} ${profile?.is_verified ? styles.idCardVerified : ''}`}
-                    style={{ flex: '1 1 auto', minWidth: '350px', maxWidth: '450px', cursor: 'pointer' }}
+                    style={{ flex: '1 1 auto', width: '100%', maxWidth: '450px', cursor: 'pointer' }}
                     onClick={() => setActiveTab('profile')}
                 >
                     <div className={styles.idCardMain}>
@@ -307,15 +307,6 @@ function ResidentPortalContent() {
                         </div>
                     </button>
 
-                    <button
-                        className={`glass-card ${styles.actionCard}`}
-                        onClick={() => { setShowScanner(true); setScanResult(null); }}
-                    >
-                        <div>
-                            <h3>Scan QR</h3>
-                            <p>Verify documents & IDs</p>
-                        </div>
-                    </button>
                 </div>
             </section>
 
@@ -471,7 +462,18 @@ function ResidentPortalContent() {
                                 className={styles.profileImage}
                             />
                         ) : (
-                            <div className={styles.placeholderImage}></div>
+                            <div className={styles.placeholderImage} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                color: '#ffffff',
+                                fontSize: '3rem',
+                                fontWeight: 800,
+                                letterSpacing: '-1px',
+                            }}>
+                                {profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                            </div>
                         )}
                     </div>
                     <h2 style={{ marginBottom: '0.5rem' }}>{profile?.full_name || 'Barangay Resident'}</h2>
@@ -686,6 +688,8 @@ function ResidentPortalContent() {
         const badgeMap: Record<string, string> = {
             community_event: 'badge badge-info',
             important: 'badge badge-warning',
+            emergency_alert: 'badge badge-error',
+            emergency_announcement: 'badge badge-warning',
             emergency: 'badge badge-error',
             general: 'badge badge-info',
         }
@@ -696,6 +700,8 @@ function ResidentPortalContent() {
         const labelMap: Record<string, string> = {
             community_event: 'Community Event',
             important: 'Important',
+            emergency_alert: 'Emergency Alert',
+            emergency_announcement: 'Emergency Announcement',
             emergency: 'Emergency',
             general: 'General',
         }
@@ -727,6 +733,15 @@ function ResidentPortalContent() {
                 )}
             </div>
         );
+    }
+
+    // Show a loading screen while the profile is being fetched to avoid the "Resident" flash
+    if (!profile) {
+        return (
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)' }}>
+                <LoadingSpinner text="Loading your profile..." />
+            </div>
+        )
     }
 
     return (

@@ -448,7 +448,8 @@
 
 /* ─── Table ───────────────────────────────────────────────── */
 .tableContainer {
-    overflow-x: auto;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
 }
 
 .table {

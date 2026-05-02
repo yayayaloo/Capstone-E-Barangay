@@ -126,6 +126,9 @@ export default function ServicesPage() {
                                         </span>
                                         <span className={styles.reqPill}>{doc.reqs}</span>
                                     </div>
+                                    <Link href={`/request/${doc.slug}`} className={styles.applyBtn}>
+                                        Apply Now →
+                                    </Link>
                                 </div>
                             </div>
                         )

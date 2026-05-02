@@ -22,8 +22,12 @@ const STORAGE_KEY = 'ebarangay_chat_history'
 
 const quickReplies = [
     'Paano makuha ang Barangay Clearance?',
+    'Paano ang Barangay Certification?',
+    'Ano ang Business Clearance?',
+    'First Time Job Seeker - paano?',
+    'Ano ang Certificate of Indigency?',
+    'Paano ang Lot Certification?',
     'I-check ang aking request status',
-    'Ano ang mga requirements?',
     'Kailan bukas ang Barangay Hall?',
 ]
 
@@ -57,17 +61,29 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
             : `You have ${pending.length} active request(s):\n${pending.map(r => `• ${r.document_type} (${r.status})`).join('\n')}`
     }
 
-    if (lower.includes('clearance')) return tl
-        ? 'Para sa Barangay Clearance, kailangan mo ng: Valid Government ID, Cedula/CTC. Bayad: ₱50–₱100. Processing: 1–3 araw. I-click ang "Request Document" para mag-apply!'
-        : 'For Barangay Clearance, you need: Valid Government ID, Cedula/CTC. Fee: ₱50–₱100. Processing: 1–3 days. Click "Request Document" to apply!'
+    if (lower.includes('clearance') && !lower.includes('business')) return tl
+        ? 'Para sa **Barangay Clearance**, kailangan mo ng:\n• Valid Government ID\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
+        : 'For **Barangay Clearance**, you need:\n• Valid Government ID\n• Fee: ₱50.00\nClick "Request Document" to apply!'
 
-    if (lower.includes('permit') || lower.includes('negosyo')) return tl
-        ? 'Para sa Business Permit, kailangan: DTI/SEC Registration, Occupancy Permit, Lease Contract. Processing: 3–5 araw.'
-        : 'For Business Permit, you need: DTI/SEC Registration, Occupancy Permit, Lease Contract. Processing: 3–5 days.'
+    if (lower.includes('certification') || lower.includes('residency') || lower.includes('tirahan') || lower.includes('loan') || lower.includes('good moral')) return tl
+        ? 'Para sa **Barangay Certification**, kailangan mo ng:\n• Valid Government ID\n• Layunin: Residency, Loan, o Good Moral Character\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
+        : 'For **Barangay Certification**, you need:\n• Valid Government ID\n• Purpose: Residency, Loan, or Good Moral Character\n• Fee: ₱50.00\nClick "Request Document" to apply!'
 
-    if (lower.includes('indigency') || lower.includes('libre') || lower.includes('mahirap')) return tl
-        ? 'Ang Certificate of Indigency ay LIBRE! Kailangan lang ng Valid ID at patunay ng kita.'
-        : 'Certificate of Indigency is FREE! You only need a Valid ID and proof of income.'
+    if (lower.includes('business clearance') || lower.includes('negosyo') || lower.includes('business permit')) return tl
+        ? 'Para sa **Business Clearance**, kailangan mo ng:\n• DTI Certificate\n• Bayad: **Libre (Free)**\n• Para sa mga negosyante para sa compliance ng business permit.\nI-click ang "Request Document" para mag-apply!'
+        : 'For **Business Clearance**, you need:\n• DTI Certificate\n• Fee: **Free**\n• For business owners for compliance with business permit.\nClick "Request Document" to apply!'
+
+    if (lower.includes('lot') || lower.includes('occupancy') || lower.includes('fencing') || lower.includes('building')) return tl
+        ? 'Para sa **Lot Certification**, kailangan mo ng:\n• Certification mula sa Purok Leader\n• Titulo o Tax Declaration\n• Latest Tax Payment\n• Bayad: ₱1.00 per square meter\nI-click ang "Request Document" para mag-apply!'
+        : 'For **Lot Certification**, you need:\n• Certification from Purok Leader\n• Title or Tax Declaration\n• Latest Tax Payment\n• Fee: ₱1.00 per square meter\nClick "Request Document" to apply!'
+
+    if (lower.includes('first time') || lower.includes('job seeker') || lower.includes('ftjs') || lower.includes('trabaho')) return tl
+        ? 'Ang **First Time Job Seeker** certificate ay:\n• Para sa mga 18–30 taong gulang\n• Libreng pagkuha ng pre-employment requirements (RA 11261)\n• Bayad: **Libre (Free)**\n• Kailangan: Valid ID\nI-click ang "Request Document" para mag-apply!'
+        : 'The **First Time Job Seeker** certificate is:\n• For ages 18–30 years old\n• Free waiver for pre-employment requirements (RA 11261)\n• Fee: **Free**\n• Requirement: Valid ID\nClick "Request Document" to apply!'
+
+    if (lower.includes('indigency') || lower.includes('mahirap') || lower.includes('financial')) return tl
+        ? 'Ang **Certificate of Indigency** ay:\n• Patunay ng financial status para sa tulong/assistance\n• Bayad: **Libre (Free)**\n• Kailangan: Valid ID\nI-click ang "Request Document" para mag-apply!'
+        : 'The **Certificate of Indigency** is:\n• Proof of financial status for assistance\n• Fee: **Free**\n• Requirement: Valid ID\nClick "Request Document" to apply!'
 
     if (lower.includes('hours') || lower.includes('open') || lower.includes('bukas') || lower.includes('oras') || lower.includes('location') || lower.includes('hall')) return tl
         ? 'Bukas ang Barangay Hall tuwing Lunes–Biyernes, 8:00 AM – 5:00 PM. Sarado sa Sabado, Linggo, at mga holiday. Tel: 223-5497.'
@@ -76,10 +92,6 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
     if (lower.includes('id')) return tl
         ? (userProfile?.is_verified ? 'Aktibo na ang iyong Digital ID! Tingnan ang QR code sa Profile tab.' : 'Para makuha ang Barangay ID, kumpletuhin ang iyong profile at hintayin ang verification ng admin.')
         : (userProfile?.is_verified ? 'Your Digital ID is active! View the QR code on your Profile tab.' : 'To get your Barangay ID, complete your profile and wait for admin verification.')
-
-    if (lower.includes('residency') || lower.includes('tirahan')) return tl
-        ? 'Para sa Certificate of Residency, kailangan ng Valid ID at utility bill o lease contract. Bayad: ₱50. Processing: 1–2 araw.'
-        : 'For Certificate of Residency, you need a Valid ID and utility bill or lease contract. Fee: ₱50. Processing: 1–2 days.'
 
     if (lower.includes('hello') || lower.includes('hi') || lower.includes('kumusta') || lower.includes('hey')) return tl
         ? `Kumusta, ${userProfile?.first_name || 'Residente'}! Paano kita matutulungan ngayon?`
@@ -94,7 +106,7 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
 export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotProps) {
     const defaultMessage: Message = {
         id: 1,
-        text: `Hello ${userProfile?.first_name || 'Residente'}! 👋 Ako ang iyong AI Assistant para sa E-Barangay Gordon Heights. Maaari akong tumulong sa iyong mga dokumento, requirements, at barangay information. Paano kita matutulungan ngayon?`,
+        text: `Hello ${userProfile?.first_name || 'Residente'}!  Ako ang iyong AI Assistant para sa E-Barangay Gordon Heights. Maaari akong tumulong sa iyong mga dokumento, requirements, at barangay information. Paano kita matutulungan ngayon?`,
         sender: 'bot',
         timestamp: new Date(),
     }
@@ -277,7 +289,7 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                         </div>
                     ))}
 
-                        {isTyping && (
+                    {isTyping && (
                         <div className={`${styles.message} ${styles.botMessage}`}>
                             <div className={styles.messageAvatar}>
                                 <img src="/logo.png" alt="Bot" />

@@ -4,7 +4,7 @@ export type UserRole = 'resident' | 'admin'
 
 export type RequestStatus = 'pending' | 'processing' | 'ready' | 'completed' | 'rejected'
 
-export type AnnouncementCategory = 'community_event' | 'important' | 'emergency' | 'general'
+export type AnnouncementCategory = 'community_event' | 'important' | 'emergency_alert' | 'emergency_announcement' | 'emergency' | 'general'
 
 export interface Profile {
     id: string

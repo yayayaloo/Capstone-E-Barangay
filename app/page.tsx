@@ -65,11 +65,11 @@ export default function Home() {
                                 <span></span>
                                 Get Started
                             </Link>
-                            <Link href="/services" className="btn btn-outline" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}>
-                                Request Documents
-                            </Link>
                             <Link href="/login" className="btn btn-outline" style={{ borderColor: 'transparent' }}>
                                 Sign In
+                            </Link>
+                            <Link href="/services" className="btn btn-outline">
+                                Request Documents
                             </Link>
                         </div>
 

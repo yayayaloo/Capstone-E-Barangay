@@ -66,8 +66,12 @@ function LoginContent() {
             // This is instantly available from the JWT without an extra DB query.
             const { data: { session } } = await supabase.auth.getSession()
             const role = session?.user?.user_metadata?.role || 'resident'
+            
+            const redirectUrl = searchParams.get('redirect')
 
-            if (role === 'admin') {
+            if (redirectUrl && redirectUrl.startsWith('/')) {
+                router.push(redirectUrl)
+            } else if (role === 'admin') {
                 router.push('/admin')
             } else {
                 router.push('/resident')
@@ -216,7 +220,7 @@ function LoginContent() {
 
                     <div className={styles.footer}>
                         <p>Don&apos;t have an account?{' '}
-                            <Link href="/register" className={styles.link}>Sign up here</Link>
+                            <Link href={searchParams.get('redirect') ? `/register?redirect=${searchParams.get('redirect')}` : "/register"} className={styles.link}>Sign up here</Link>
                         </p>
                     </div>
                 </div>

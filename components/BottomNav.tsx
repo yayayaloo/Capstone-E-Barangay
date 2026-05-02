@@ -15,13 +15,9 @@ interface BottomNavProps {
 }
 
 export default function BottomNav({ items, activeTab, setActiveTab }: BottomNavProps) {
-    // Only show 5 items max on bottom nav for clarity, rest could be under 'More' if needed
-    // But for this app, 4-5 is fine.
-    const displayItems = items.slice(0, 5)
-
     return (
         <nav className={styles.bottomNav}>
-            {displayItems.map(item => (
+            {items.map(item => (
                 <button
                     key={item.id}
                     className={`${styles.navItem} ${activeTab === item.id ? styles.active : ''}`}

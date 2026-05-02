@@ -153,13 +153,9 @@ export default function AgeDemographicChart({ profiles }: { profiles: any[] }) {
                                         />
                                     )}
                                 </div>
-                                <span className={styles.barValue}>
+                                <span className={styles.barValue} style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                                     {item.total > 0 ? (
-                                        <>
-                                            <span style={{ color: '#4A90D9' }}>{item.male}</span>
-                                            {' / '}
-                                            <span style={{ color: '#E8638A' }}>{item.female}</span>
-                                        </>
+                                        item.total
                                     ) : (
                                         <span style={{ opacity: 0.4 }}>0</span>
                                     )}
