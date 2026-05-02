@@ -567,7 +567,7 @@ function RegisterContent() {
                                 }}
                             >
                                 <span>
-                                    📋 Sectoral Classification
+                                    Sectoral Classification
                                     <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: '0.5rem', fontSize: '0.75rem' }}>
                                         (Optional{sectors.length > 0 ? ` • ${sectors.length} selected` : ''})
                                     </span>

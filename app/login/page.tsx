@@ -62,8 +62,20 @@ function LoginContent() {
             }
             setLoading(false)
         } else {
-            // Once sign-in succeeds, use session metadata to dynamically route them. 
-            // This is instantly available from the JWT without an extra DB query.
+            // After sign-in, verify the email is actually confirmed.
+            // This is a safety net in case Supabase's "Confirm email" setting
+            // is misconfigured or the PKCE flow confirmed without our route catching it.
+            const { data: { user } } = await supabase.auth.getUser()
+
+            if (!user?.email_confirmed_at) {
+                // Email not confirmed — block login and sign them out
+                await supabase.auth.signOut()
+                setError('Please verify your email address before logging in. Check your inbox for the confirmation link.')
+                setLoading(false)
+                return
+            }
+
+            // Email confirmed — route by role
             const { data: { session } } = await supabase.auth.getSession()
             const role = session?.user?.user_metadata?.role || 'resident'
             

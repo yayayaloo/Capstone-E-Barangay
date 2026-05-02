@@ -217,6 +217,18 @@ a:hover {
   color: var(--primary-700);
 }
 
+.btn-ghost {
+  background: transparent;
+  border: 1.5px solid var(--gray-300);
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+  color: var(--text-primary);
+}
+
 /* Container & Layout */
 .container {
   max-width: 1200px;

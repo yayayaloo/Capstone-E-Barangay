@@ -61,11 +61,10 @@ export default function Home() {
                             Processing {stats.requests} requests for our {stats.residents} residents.
                         </p>
                         <div className={styles.heroCTA}>
-                            <Link href="/register" className="btn btn-primary">
-                                <span></span>
+                            <Link href="/register" className="btn btn-ghost">
                                 Get Started
                             </Link>
-                            <Link href="/login" className="btn btn-outline" style={{ borderColor: 'transparent' }}>
+                            <Link href="/login" className="btn btn-ghost">
                                 Sign In
                             </Link>
                             <Link href="/services" className="btn btn-outline">

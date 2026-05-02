@@ -331,7 +331,19 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const signOut = async () => {
+        // 1. Call the server-side logout route to clear HTTP-only session cookies.
+        //    Without this, the middleware still sees a stale cookie after logout
+        //    and blocks navigation to the home page (redirects back to dashboard).
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' })
+        } catch {
+            // Non-fatal — proceed with client-side signout regardless
+        }
+
+        // 2. Clear client-side session state
         await supabase.auth.signOut()
+
+        // 3. Navigate to login
         router.push('/login')
     }
 
