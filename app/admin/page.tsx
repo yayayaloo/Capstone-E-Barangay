@@ -11,9 +11,6 @@ import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 import { ServiceRequest, Announcement, Profile, AuditLog, BlotterReport, BlotterStatus } from '@/lib/types'
 import { logAdminAction } from '@/lib/audit'
-import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { QRCodeCanvas } from 'qrcode.react'
 import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
 import WeeklyPerformanceChart from '@/components/WeeklyPerformanceChart'
@@ -336,6 +333,8 @@ function AdminDashboardContent() {
     }
 
     const handleGeneratePdf = async (req: ServiceRequest) => {
+        const jsPDF = (await import('jspdf')).default;
+        const html2canvas = (await import('html2canvas')).default;
         try {
             setGeneratingPdfId(req.id)
 
@@ -468,9 +467,11 @@ function AdminDashboardContent() {
         }
     }
 
-    const exportToPDF = (data: Profile[], filename: string) => {
+    const exportToPDF = async (data: Profile[], filename: string) => {
         if (data.length === 0) return
 
+        const jsPDF = (await import('jspdf')).default;
+        const autoTable = (await import('jspdf-autotable')).default;
         const doc = new jsPDF()
 
         // Header Title
@@ -516,9 +517,11 @@ function AdminDashboardContent() {
         showToast('PDF Export generated successfully', 'success')
     }
 
-    const exportRequestsToPDF = (data: ServiceRequest[], filename: string) => {
+    const exportRequestsToPDF = async (data: ServiceRequest[], filename: string) => {
         if (data.length === 0) return
 
+        const jsPDF = (await import('jspdf')).default;
+        const autoTable = (await import('jspdf-autotable')).default;
         const doc = new jsPDF()
 
         // Header Title
@@ -591,7 +594,8 @@ function AdminDashboardContent() {
         showToast('CSV Export generated successfully', 'success');
     }
 
-    const handlePrintAllQR = () => {
+    const handlePrintAllQR = async () => {
+        const jsPDF = (await import('jspdf')).default;
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
         const pageW = 210
         const colW = pageW / 2
@@ -725,9 +729,11 @@ function AdminDashboardContent() {
         }
     }
 
-    const exportBlotterToPDF = (data: BlotterReport[], filename: string) => {
+    const exportBlotterToPDF = async (data: BlotterReport[], filename: string) => {
         if (data.length === 0) return
 
+        const jsPDF = (await import('jspdf')).default;
+        const autoTable = (await import('jspdf-autotable')).default;
         const doc = new jsPDF()
 
         // Header Title
@@ -1032,7 +1038,7 @@ function AdminDashboardContent() {
                                                     <strong>Print QR Code Sheet</strong>
                                                     <span>Generate PDF for Document Services</span>
                                                 </div>
-                                                <span className={styles.quickArrow}>📄</span>
+                                                <span className={styles.quickArrow}></span>
                                             </div>
                                         </div>
 
@@ -1440,7 +1446,7 @@ function AdminDashboardContent() {
                                             </label>
                                             {res.id_document_url ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                                    <span style={{ fontSize: '0.9rem', color: 'var(--success-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>✅ Document uploaded</span>
+                                                    <span style={{ fontSize: '0.9rem', color: 'var(--success-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}> Document uploaded</span>
                                                     <button
                                                         className="btn btn-primary"
                                                         style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}

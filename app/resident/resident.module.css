@@ -335,7 +335,7 @@
     width: 65px;
     height: 65px;
     background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
+    
     border-radius: 1rem;
     display: flex;
     align-items: center;

@@ -146,7 +146,7 @@ export default function WeeklyPerformanceChart() {
                     type: 'low',
                     message: `Lowest activity: ${minWeek.total} requests — may indicate holidays or reduced staffing`,
                     weekLabel: minWeek.weekLabel,
-                    icon: '💤'
+                    icon: ''
                 })
             }
         }
@@ -234,8 +234,8 @@ export default function WeeklyPerformanceChart() {
                 </div>
                 <div className={styles.headerRight}>
                     <div className={styles.trendBadge} data-trend={trendDirection}>
-                        {trendDirection === 'upward' && '↗ Trending Up'}
-                        {trendDirection === 'downward' && '↘ Trending Down'}
+                        {trendDirection === 'upward' && ' Trending Up'}
+                        {trendDirection === 'downward' && ' Trending Down'}
                         {trendDirection === 'stable' && '→ Stable'}
                     </div>
                     {latestChange !== 0 && (

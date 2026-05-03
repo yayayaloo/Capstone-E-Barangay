@@ -71,7 +71,7 @@
     align-items: center;
     gap: 0.4rem;
     background: rgba(255,255,255,0.15);
-    backdrop-filter: blur(10px);
+    
     color: #fff;
     padding: 0.4rem 1rem;
     border-radius: 999px;

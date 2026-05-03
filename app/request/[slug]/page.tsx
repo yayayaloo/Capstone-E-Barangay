@@ -317,7 +317,7 @@ export default function RequestPage() {
                             <span className={`${styles.metaBadge} ${doc.feeType === 'free' ? styles.metaFree : styles.metaPaid}`}>
                                 {doc.fee}
                             </span>
-                            <span className={`${styles.metaBadge} ${styles.metaReq}`}>📎 {doc.reqs}</span>
+                            <span className={`${styles.metaBadge} ${styles.metaReq}`}> {doc.reqs}</span>
                         </div>
                     </div>
                 </div>

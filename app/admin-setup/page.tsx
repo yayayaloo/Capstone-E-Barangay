@@ -52,7 +52,7 @@ export default function AdminSetup() {
 
     return (
         <div style={{ padding: '4rem', fontFamily: 'sans-serif', maxWidth: '500px', margin: '0 auto' }}>
-            <h2>Secret Admin Generator 🤫</h2>
+            <h2>Secret Admin Generator </h2>
             <p>This page will create a new admin account for you automatically.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>

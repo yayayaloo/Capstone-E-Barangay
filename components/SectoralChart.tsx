@@ -82,7 +82,7 @@ export default function SectoralChart({ profiles }: { profiles: any[] }) {
             <div className={styles.header}>
                 <div>
                     <h3 className={styles.title}>
-                        <span>📊</span> Sectoral Demographic
+                        <span></span> Sectoral Demographic
                     </h3>
                     <p className={styles.subtitle}>
                         Gender breakdown across {SECTORS.length} sectors • {totalResidents} registered residents

@@ -56,9 +56,9 @@ function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: nu
     }, [toast.id, onRemove])
 
     const icons: Record<ToastType, string> = {
-        success: '✅',
-        error: '❌',
-        info: 'ℹ️',
+        success: '',
+        error: '',
+        info: '',
     }
 
     return (

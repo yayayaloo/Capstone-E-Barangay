@@ -104,7 +104,7 @@ export default function AgeDemographicChart({ profiles }: { profiles: any[] }) {
             <div className={styles.header}>
                 <div>
                     <h3 className={styles.title}>
-                        <span>🎂</span> Age Demographic
+                        <span></span> Age Demographic
                     </h3>
                     <p className={styles.subtitle}>
                         Population distribution by age bracket • {totalResidents} registered residents
@@ -188,7 +188,7 @@ export default function AgeDemographicChart({ profiles }: { profiles: any[] }) {
 
             {noBirthdateCount > 0 && (
                 <p className={styles.note}>
-                    ⚠️ {noBirthdateCount} resident{noBirthdateCount > 1 ? 's have' : ' has'} no birthdate on file and {noBirthdateCount > 1 ? 'are' : 'is'} excluded from this chart.
+                    ️ {noBirthdateCount} resident{noBirthdateCount > 1 ? 's have' : ' has'} no birthdate on file and {noBirthdateCount > 1 ? 'are' : 'is'} excluded from this chart.
                 </p>
             )}
         </div>

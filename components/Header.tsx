@@ -20,7 +20,7 @@ export default function Header({ title, userName, onSignOut, variant = 'resident
                     <span>{title}</span>
                 </Link>
                 <div className={styles.userMenu}>
-                    <span className={styles.userName}>👤 {userName}</span>
+                    <span className={styles.userName}> {userName}</span>
                     <button className="btn btn-outline" style={{ padding: '0.5rem 1rem' }} onClick={onSignOut}>
                         Sign Out
                     </button>
