@@ -561,6 +561,8 @@
     font-weight: 700;
     font-size: 0.9rem;
     flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
 }
 
 /* ─── Empty State ─────────────────────────────────────────── */

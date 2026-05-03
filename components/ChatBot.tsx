@@ -284,7 +284,22 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                                 </div>
                             </div>
                             {message.sender === 'user' && (
-                                <div className={styles.messageAvatar}></div>
+                                <div className={styles.messageAvatar} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                    {userProfile?.profile_picture_url ? (
+                                        <img 
+                                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${userProfile.profile_picture_url}`} 
+                                            alt="You" 
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.onerror = null;
+                                                target.style.display = 'none';
+                                            }}
+                                        />
+                                    ) : (
+                                        userProfile?.full_name?.charAt(0)?.toUpperCase() || 'U'
+                                    )}
+                                </div>
                             )}
                         </div>
                     ))}

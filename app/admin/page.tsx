@@ -1273,7 +1273,20 @@ function AdminDashboardContent() {
                                                             <td>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                                     <div className={styles.avatarCircle}>
-                                                                        {res.full_name.charAt(0)}
+                                                                        {res.profile_picture_url ? (
+                                                                            <img 
+                                                                                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`} 
+                                                                                alt={res.full_name} 
+                                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                                                onError={(e) => {
+                                                                                    const target = e.target as HTMLImageElement;
+                                                                                    target.onerror = null;
+                                                                                    target.style.display = 'none';
+                                                                                }}
+                                                                            />
+                                                                        ) : (
+                                                                            res.full_name.charAt(0)
+                                                                        )}
                                                                     </div>
                                                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                                         <strong>{res.full_name}</strong>
@@ -1353,9 +1366,18 @@ function AdminDashboardContent() {
                                         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '1.5rem', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.15)', marginBottom: '1.5rem' }}>
                                             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '3px solid rgba(99, 102, 241, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
                                                 {res.profile_picture_url ? (
-                                                    <img src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    <img 
+                                                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`} 
+                                                        alt="Profile" 
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                        onError={(e) => {
+                                                            const target = e.target as HTMLImageElement;
+                                                            target.onerror = null;
+                                                            target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%236366f1"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="50" font-family="sans-serif" font-weight="bold" fill="white">${res.full_name?.charAt(0)?.toUpperCase() || '?'}</text></svg>`;
+                                                        }}
+                                                    />
                                                 ) : (
-                                                    <span style={{ fontSize: '2rem' }}></span>
+                                                    <span style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary-600)' }}>{res.full_name?.charAt(0)?.toUpperCase() || '?'}</span>
                                                 )}
                                             </div>
                                             <div style={{ flex: 1 }}>

@@ -230,6 +230,11 @@ function ResidentPortalContent() {
                                     src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`}
                                     alt="Profile"
                                     className={styles.idCardImage}
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.onerror = null;
+                                        target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%236366f1"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="50" font-family="sans-serif" font-weight="bold" fill="white">${profile?.full_name?.charAt(0)?.toUpperCase() || '?'}</text></svg>`;
+                                    }}
                                 />
                             </div>
                         )}
@@ -460,6 +465,11 @@ function ResidentPortalContent() {
                                 src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}`}
                                 alt="Profile"
                                 className={styles.profileImage}
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.onerror = null;
+                                    target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%236366f1"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="50" font-family="sans-serif" font-weight="bold" fill="white">${profile?.full_name?.charAt(0)?.toUpperCase() || '?'}</text></svg>`;
+                                }}
                             />
                         ) : (
                             <div className={styles.placeholderImage} style={{

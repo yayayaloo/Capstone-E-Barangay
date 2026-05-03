@@ -101,7 +101,9 @@ export default function Home() {
                             </div>
                             <div className={styles.mockupContent}>
                                 <div className={styles.chatBubble}>
-                                    <div className={styles.avatar}></div>
+                                    <div className={styles.avatar} style={{ background: 'white', overflow: 'hidden' }}>
+                                        <Image src="/logo.png" alt="AI Assistant Logo" width={32} height={32} style={{ objectFit: 'contain' }} />
+                                    </div>
                                     <div>
                                         <strong>AI Assistant</strong>
                                         <p>How can I help you today?</p>
