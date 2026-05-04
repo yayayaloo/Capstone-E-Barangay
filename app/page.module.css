@@ -99,10 +99,6 @@
     align-items: center;
 }
 
-.heroContent {
-    /* animation: fadeIn 0.6s ease-out; */
-}
-
 .badge {
     margin-bottom: 1.5rem;
     display: inline-block;
@@ -147,10 +143,6 @@
 }
 
 /* Hero Visual */
-.heroVisual {
-    /* animation: fadeIn 0.8s ease-out; */
-}
-
 .mockupCard {
     max-width: 500px;
     margin: 0 auto;

@@ -47,6 +47,8 @@ function RegisterContent() {
     const [sectors, setSectors] = useState<string[]>([])
     const [showSectors, setShowSectors] = useState(false)
     const [agreedToTerms, setAgreedToTerms] = useState(false)
+    const [showTermsModal, setShowTermsModal] = useState(false)
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
@@ -111,6 +113,19 @@ function RegisterContent() {
 
         setLoading(true)
 
+        // Check if email already exists to prevent duplicate accounts
+        // This requires the 'check_email_exists' RPC to be added to the Supabase database
+        const { data: emailExists, error: checkError } = await supabase.rpc('check_email_exists', { p_email: email })
+        
+        if (checkError) {
+            console.error('Error checking email existence:', checkError.message)
+            // If RPC is missing, it will fall through to normal signUp (which might silently fail due to enumeration protection)
+        } else if (emailExists) {
+            setError('This email address is already registered. Please use a different email or log in.')
+            setLoading(false)
+            return
+        }
+
         const fullName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}${suffix ? ' ' + suffix : ''}`.trim()
 
         const { error: signUpError, userId: newUserId } = await signUp(email, password, {
@@ -145,7 +160,11 @@ function RegisterContent() {
 
                     const { error: uploadError } = await supabase.storage
                         .from('resident-requirements')
-                        .upload(filePath, idDocument)
+                        .upload(filePath, idDocument, {
+                            cacheControl: '3600',
+                            upsert: false,
+                            contentType: idDocument.type
+                        })
 
                     if (uploadError) {
                         console.error(`Failed to upload ID document: ${uploadError.message}`)
@@ -239,7 +258,7 @@ function RegisterContent() {
                             <h2 style={{ color: '#111827', fontSize: '1.75rem', marginBottom: '1rem', fontWeight: 'bold' }}>Registration Successful!</h2>
                             <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
-                            <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className={styles.link}>Go to Login →</Link>
+                            <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className={styles.link}>Go to Login</Link>
                         </div>
                     </div>
                 </div>
@@ -305,7 +324,7 @@ function RegisterContent() {
             {/* Right Panel - Form Container */}
             <div className={loginStyles.formPanel} style={{ overflowY: 'auto' }}>
                 <Link href="/" className={loginStyles.backButton} style={{ position: 'sticky', background: '#fff', zIndex: 10, width: '100%', padding: '1.75rem 2rem', top: 0, left: 0, borderBottom: '1px solid #f1f5f9' }}>
-                    ← Back to Home
+                    Back to Home
                 </Link>
                 <div className={styles.registerCard}>
                     <div className={styles.logoSection}>
@@ -629,7 +648,7 @@ function RegisterContent() {
                                                         fontSize: '0.6rem',
                                                         color: '#fff',
                                                     }}>
-                                                        {isSelected && '✓'}
+                                                        {isSelected && 'Selected'}
                                                     </span>
                                                     <span>{opt.icon}</span>
                                                     {opt.value}
@@ -668,7 +687,7 @@ function RegisterContent() {
                                 required
                             />
                             <label htmlFor="terms">
-                                I have read and agree to the <Link href="/terms" className={styles.inlineLink} target="_blank" rel="noopener noreferrer">Terms and Conditions</Link> and <Link href="/privacy" className={styles.inlineLink} target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
+                                I have read and agree to the <button type="button" onClick={() => setShowTermsModal(true)} className={styles.inlineButton}>Terms and Conditions</button> and <button type="button" onClick={() => setShowPrivacyModal(true)} className={styles.inlineButton}>Privacy Policy</button>
                             </label>
                         </div>
 
@@ -688,6 +707,59 @@ function RegisterContent() {
                     </div>
                 </div>
             </div>
+
+            {/* Modals */}
+            {showTermsModal && (
+                <div className={styles.modalOverlay} onClick={() => setShowTermsModal(false)}>
+                    <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <h3>Terms and Conditions</h3>
+                            <button type="button" onClick={() => setShowTermsModal(false)} className={styles.closeButton}>&times;</button>
+                        </div>
+                        <div className={styles.modalBody}>
+                            <p>These Terms and Conditions represent a binding contract between you (the user) and the E-Barangay application. By creating an account, you agree to:</p>
+                            <ul>
+                                <li>Provide accurate and truthful information during registration.</li>
+                                <li>Use the application services solely for legitimate barangay-related transactions.</li>
+                                <li>Maintain the confidentiality of your account credentials and not share them with others.</li>
+                                <li>Comply with all local and national laws while using the platform.</li>
+                                <li>Acknowledge that any misuse of the platform may lead to account suspension.</li>
+                            </ul>
+                            <h4>1. Acceptance of Terms</h4>
+                            <p>By accessing or using E-Barangay, you agree to be bound by these terms. If you do not agree, please do not use our services.</p>
+                            <h4>2. Account Responsibility</h4>
+                            <p>You are responsible for all activities that occur under your account. You must notify us immediately of any unauthorized use.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showPrivacyModal && (
+                <div className={styles.modalOverlay} onClick={() => setShowPrivacyModal(false)}>
+                    <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <h3>Privacy Policy</h3>
+                            <button type="button" onClick={() => setShowPrivacyModal(false)} className={styles.closeButton}>&times;</button>
+                        </div>
+                        <div className={styles.modalBody}>
+                            <p>We value your privacy and are committed to full compliance with Data Privacy Laws (e.g., Data Privacy Act of 2012). This policy explains our practices regarding your information.</p>
+                            <h4>Data Collection & Storage</h4>
+                            <p>We collect personal information such as your name, email, birthdate, phone number, and address to facilitate barangay services. This data is stored securely using industry-standard encryption protocols provided by Supabase.</p>
+                            <h4>User Rights</h4>
+                            <p>As a user, you have the following rights regarding your data:</p>
+                            <ul>
+                                <li><strong>Right to be Informed:</strong> Know how your data is collected and processed.</li>
+                                <li><strong>Right to Access:</strong> View the information we have on file for you.</li>
+                                <li><strong>Right to Rectification:</strong> Request corrections to inaccurate data.</li>
+                                <li><strong>Right to Erasure:</strong> Request deletion of your account and associated data.</li>
+                                <li><strong>Right to Object:</strong> Object to unauthorized data processing.</li>
+                            </ul>
+                            <h4>Compliance</h4>
+                            <p>E-Barangay adheres to the standards set by the National Privacy Commission and ensures that all data handlers are trained in privacy best practices.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

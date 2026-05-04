@@ -5,7 +5,7 @@ import styles from './RequestModal.module.css'
 
 interface RequestModalProps {
     onClose: () => void
-    onSubmit: (documentType: string, purpose: string, attachment: File | null) => Promise<void>
+    onSubmit: (documentType: string, purpose: string, attachments: File[]) => Promise<void>
     initialType?: string
 }
 
@@ -21,20 +21,22 @@ const documentTypes = [
 export default function RequestModal({ onClose, onSubmit, initialType }: RequestModalProps) {
     const [selectedType, setSelectedType] = useState(initialType || '')
     const [purpose, setPurpose] = useState('')
-    const [attachment, setAttachment] = useState<File | null>(null)
+    const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0]
-            if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                setError('File size must be less than 5MB')
-                return
-            }
-            setAttachment(file)
+        if (e.target.files && e.target.files.length > 0) {
+            const newFiles = Array.from(e.target.files)
+            setAttachments(prev => [...prev, ...newFiles])
             setError('')
+            // Reset input so user can select again
+            e.target.value = ''
         }
+    }
+
+    const removeFile = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index))
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -51,9 +53,14 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
             return
         }
 
+        if (attachments.length === 0) {
+            setError('Please upload at least one valid ID or requirement before submitting')
+            return
+        }
+
         setSubmitting(true)
         try {
-            await onSubmit(selectedType, purpose.trim(), attachment)
+            await onSubmit(selectedType, purpose.trim(), attachments)
             onClose()
         } catch (err: any) {
             setError(err?.message || 'Failed to submit request. Please try again.')
@@ -109,7 +116,7 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                     </div>
 
                     <div className={styles.inputGroup}>
-                        <label>Attach Requirements (Photos/Docs)</label>
+                        <label>Upload Valid ID / Requirements *</label>
                         <div className={styles.fileUploadArea}>
                             <input
                                 type="file"
@@ -117,28 +124,31 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                                 onChange={handleFileChange}
                                 className={styles.fileInput}
                                 accept="image/*,.pdf,.doc,.docx"
+                                multiple
                             />
                             <label htmlFor="attachment" className={styles.fileLabel}>
-                                {attachment ? (
-                                    <span className={styles.fileName}>{attachment.name}</span>
-                                ) : (
-                                    <>
-                                        <span className={styles.uploadIcon}></span>
-                                        <span>Click to upload or drag requirements here</span>
-                                        <small>(1x1 Photo, ID, or other supporting documents)</small>
-                                    </>
-                                )}
+                                <span className={styles.uploadIcon}></span>
+                                <span>Click to upload your Valid ID and requirements</span>
+                                <small>(You can select multiple files)</small>
                             </label>
-                            {attachment && (
-                                <button
-                                    type="button"
-                                    className={styles.clearFile}
-                                    onClick={() => setAttachment(null)}
-                                >
-                                    Remove
-                                </button>
-                            )}
                         </div>
+                        {attachments.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                {attachments.map((file, idx) => (
+                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card-bg, #f8fafc)', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '260px' }}>{file.name}</span>
+                                        <button
+                                            type="button"
+                                            className={styles.clearFile}
+                                            onClick={() => removeFile(idx)}
+                                            style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className={styles.actions}>

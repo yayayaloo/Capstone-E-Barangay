@@ -110,10 +110,10 @@ export default function Home() {
                                     </div>
                                 </div>
                                 <div className={styles.serviceGrid}>
-                                    <div className={styles.serviceItem}> Clearance</div>
-                                    <div className={styles.serviceItem}> Permits</div>
-                                    <div className={styles.serviceItem}> ID Request</div>
-                                    <div className={styles.serviceItem}> QR Verify</div>
+                                    <div className={styles.serviceItem}>Clearance</div>
+                                    <div className={styles.serviceItem}>Permits</div>
+                                    <div className={styles.serviceItem}>ID Request</div>
+                                    <div className={styles.serviceItem}>QR Verify</div>
                                 </div>
                             </div>
                         </div>

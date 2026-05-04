@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -9,13 +9,14 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
-import { ServiceRequest, Announcement, Profile, AuditLog, BlotterReport, BlotterStatus } from '@/lib/types'
+import { ServiceRequest, Announcement, Profile, AuditLog, BlotterReport, BlotterStatus, Complaint, ComplaintStatus } from '@/lib/types'
 import { logAdminAction } from '@/lib/audit'
 import { QRCodeCanvas } from 'qrcode.react'
 import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
 import WeeklyPerformanceChart from '@/components/WeeklyPerformanceChart'
 import SectoralChart from '@/components/SectoralChart'
 import AgeDemographicChart from '@/components/AgeDemographicChart'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import styles from './admin.module.css'
 
 const Scanner = dynamic(
@@ -132,6 +133,38 @@ function AdminDashboardContent() {
     const [blotterModal, setBlotterModal] = useState<{ isOpen: boolean, report: Partial<BlotterReport> | null }>({ isOpen: false, report: null })
     const [savingBlotter, setSavingBlotter] = useState(false)
 
+    // Complaints state (merged into Blotter tab)
+    const [blotterView, setBlotterView] = useState<'reports' | 'complaints'>('reports')
+    const [complaints, setComplaints] = useState<Complaint[]>([])
+    const [complaintSearch, setComplaintSearch] = useState('')
+    const [complaintStatusFilter, setComplaintStatusFilter] = useState('all')
+    const [complaintModal, setComplaintModal] = useState<{ isOpen: boolean, complaint: Complaint | null }>({ isOpen: false, complaint: null })
+    const [complaintNotes, setComplaintNotes] = useState('')
+    const [complaintNewStatus, setComplaintNewStatus] = useState<ComplaintStatus>('Received')
+    const [savingComplaint, setSavingComplaint] = useState(false)
+
+    // ─── Custom Confirm Dialog ───────────────────────────────────────────────────
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean
+        title: string
+        message: string
+        confirmLabel: string
+        variant: 'danger' | 'warning' | 'info'
+        onConfirm: () => void
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        confirmLabel: 'Confirm',
+        variant: 'danger',
+        onConfirm: () => { }
+    })
+    const [filePreview, setFilePreview] = useState<{ url: string; name: string } | null>(null)
+
+    const closeConfirmDialog = useCallback(() => {
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+    }, [])
+
     useEffect(() => {
         fetchDataForTab(activeTab)
     }, [activeTab])
@@ -208,10 +241,18 @@ function AdminDashboardContent() {
                 }))
                 setAuditLogs(mappedAudit as AuditLog[])
             } else if (tab === 'blotter') {
-                const { data, error } = await supabase.from('blotter_reports').select('*').order('created_at', { ascending: false }).limit(100)
-                console.log('Blotter fetch data:', data, 'error:', error)
-                if (error) throw error
-                setBlotterReports(data as BlotterReport[])
+                const [blotterRes, complaintsRes] = await Promise.all([
+                    supabase.from('blotter_reports').select('*').order('created_at', { ascending: false }).limit(100),
+                    supabase.from('complaints').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(100)
+                ])
+                if (blotterRes.error) throw blotterRes.error
+                setBlotterReports(blotterRes.data as BlotterReport[])
+                if (!complaintsRes.error) {
+                    const mappedComplaints = (complaintsRes.data || []).map((c: any) => ({
+                        ...c, resident_name: c.profiles?.full_name || 'Unknown Resident'
+                    }))
+                    setComplaints(mappedComplaints as Complaint[])
+                }
             }
         } catch (error: any) {
             console.error('Error fetching tab data:', error)
@@ -266,8 +307,27 @@ function AdminDashboardContent() {
 
             // Auto-generate QR code ref when marking as 'ready'
             // This enables the document QR verification flow
-            if (newStatus === 'ready' && !request.qr_code_ref) {
-                updatePayload.qr_code_ref = crypto.randomUUID()
+            if (newStatus === 'ready') {
+                if (!request.qr_code_ref) {
+                    updatePayload.qr_code_ref = crypto.randomUUID()
+                }
+
+                // Calculate issuance and expiration dates
+                const now = new Date()
+                updatePayload.issued_at = now.toISOString()
+
+                const type = request.document_type.toLowerCase()
+                const expiry = new Date(now)
+                if (type.includes('job seeker') || type.includes('business clearance')) {
+                    expiry.setFullYear(expiry.getFullYear() + 1)
+                } else {
+                    expiry.setMonth(expiry.getMonth() + 6)
+                }
+                updatePayload.expires_at = expiry.toISOString()
+
+                // Update local state optimistic update
+                request.issued_at = updatePayload.issued_at
+                request.expires_at = updatePayload.expires_at
             }
 
             const { error: reqError } = await supabase
@@ -339,11 +399,24 @@ function AdminDashboardContent() {
             setGeneratingPdfId(req.id)
 
             // Set data for template rendering
+            const issueDateObj = req.issued_at ? new Date(req.issued_at) : new Date()
+            let expDateObj = req.expires_at ? new Date(req.expires_at) : new Date(issueDateObj)
+
+            if (!req.expires_at) {
+                const type = req.document_type.toLowerCase()
+                if (type.includes('job seeker') || type.includes('business clearance')) {
+                    expDateObj.setFullYear(expDateObj.getFullYear() + 1)
+                } else {
+                    expDateObj.setMonth(expDateObj.getMonth() + 6)
+                }
+            }
+
             setCertData({
                 residentName: req.resident_name || 'Unknown Resident',
                 documentType: req.document_type,
                 purpose: req.purpose || 'General Requirement',
-                dateIssued: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                dateIssued: issueDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                expirationDate: expDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
             })
 
             // Wait brief moment for React to render the hidden component with new data
@@ -389,7 +462,35 @@ function AdminDashboardContent() {
         }
     }
 
-    const deleteAnnouncement = async (id: string) => {
+    const deleteAnnouncement = (id: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Delete Announcement',
+            message: 'Are you sure you want to delete this announcement? This action cannot be undone.',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+            onConfirm: async () => {
+                closeConfirmDialog()
+                try {
+                    setAnnouncements(prev => prev.filter(a => a.id !== id))
+                    const { error } = await supabase.from('announcements').delete().eq('id', id)
+                    if (error) {
+                        fetchDataForTab(activeTab)
+                        throw error
+                    }
+                    showToast('Announcement deleted', 'success')
+                    if (profile?.id) {
+                        await logAdminAction('DELETE_ANNOUNCEMENT', `Deleted announcement ID ${id.slice(0, 8)}`, profile.id)
+                    }
+                } catch (error) {
+                    console.error('Error deleting announcement:', error)
+                    showToast('Failed to delete announcement', 'error')
+                }
+            }
+        })
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _deleteAnnouncementLegacy = async (id: string) => {
         try {
             // Optimistic deletion
             setAnnouncements(prev => prev.filter(a => a.id !== id))
@@ -412,20 +513,48 @@ function AdminDashboardContent() {
             showToast('Failed to delete announcement', 'error')
         }
     }
+    // end legacy (unused)
 
 
 
-    const verifyResident = async (residentId: string) => {
+    const verifyResident = (residentId: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Verify Resident',
+            message: 'Are you sure you want to VERIFY this resident? This will grant them full resident status and generate their Resident ID.',
+            confirmLabel: 'Verify',
+            variant: 'info',
+            onConfirm: async () => {
+                closeConfirmDialog()
+                try {
+                    const idNumber = `GH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`
+                    setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, is_rejected: false, resident_id_number: idNumber } : r))
+                    const { error } = await supabase.from('profiles').update({ is_verified: true, is_rejected: false, resident_id_number: idNumber }).eq('id', residentId)
+                    if (error) { fetchDataForTab(activeTab); throw error }
+                    showToast('Resident verified successfully! Resident ID has been generated.', 'success')
+                    if (profile?.id) await logAdminAction('VERIFY_RESIDENT', `Verified resident ID ${residentId.slice(0, 8)}`, profile.id)
+                } catch (error: any) {
+                    console.error('Error verifying resident:', error)
+                    showToast('Failed to verify resident', 'error')
+                }
+            }
+        })
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _verifyResidentLegacy = async (residentId: string) => {
+        const confirmed = true
+        if (!confirmed) return
         try {
             const idNumber = `GH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`
 
             // Optimistic update
-            setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, resident_id_number: idNumber } : r))
+            setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, is_rejected: false, resident_id_number: idNumber } : r))
 
             const { error } = await supabase
                 .from('profiles')
                 .update({
                     is_verified: true,
+                    is_rejected: false,
                     resident_id_number: idNumber
                 })
                 .eq('id', residentId)
@@ -435,7 +564,7 @@ function AdminDashboardContent() {
                 throw error
             }
 
-            showToast('Resident verified successfully!', 'success')
+            showToast('Resident verified successfully! Resident ID has been generated.', 'success')
             if (profile?.id) {
                 await logAdminAction('VERIFY_RESIDENT', `Verified resident ID ${residentId.slice(0, 8)}`, profile.id);
             }
@@ -445,27 +574,91 @@ function AdminDashboardContent() {
         }
     }
 
+    const rejectResident = (residentId: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Reject Registration',
+            message: 'Are you sure you want to REJECT this resident registration? They will need to re-register or contact the barangay office.',
+            confirmLabel: 'Reject',
+            variant: 'danger',
+            onConfirm: async () => {
+                closeConfirmDialog()
+                try {
+                    setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: false, is_rejected: true } : r))
+                    const { error } = await supabase.from('profiles').update({ is_verified: false, is_rejected: true }).eq('id', residentId)
+                    if (error) { fetchDataForTab(activeTab); throw error }
+                    showToast('Resident registration has been rejected.', 'error')
+                    if (profile?.id) await logAdminAction('REJECT_RESIDENT', `Rejected resident registration ID ${residentId.slice(0, 8)}`, profile.id)
+                } catch (error: any) {
+                    console.error('Error rejecting resident:', error)
+                    showToast('Failed to reject resident', 'error')
+                }
+            }
+        })
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _rejectResidentLegacy = async (residentId: string) => {
+        const confirmed = true
+        if (!confirmed) return
+        try {
+            // Optimistic update
+            setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: false, is_rejected: true } : r))
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    is_verified: false,
+                    is_rejected: true
+                })
+                .eq('id', residentId)
+
+            if (error) {
+                fetchDataForTab(activeTab) // Revert
+                throw error
+            }
+
+            showToast('Resident registration has been rejected.', 'error')
+            if (profile?.id) {
+                await logAdminAction('REJECT_RESIDENT', `Rejected resident registration ID ${residentId.slice(0, 8)}`, profile.id);
+            }
+        } catch (error: any) {
+            console.error('Error rejecting resident:', error)
+            showToast('Failed to reject resident', 'error')
+        }
+    }
+
     const viewAttachment = async (path: string) => {
         if (!path) return
         try {
             const { data, error } = await supabase.storage
                 .from('resident-requirements')
-                .createSignedUrl(path, 3600) // Increased to 1 hour
+                .createSignedUrl(path, 3600, { download: false })
 
             if (error) {
-                console.error('Supabase Storage Error:', error)
-                throw error
+                console.error('Supabase Signed URL Error:', error)
+                throw new Error(`Storage access error: ${error.message}. Please check the Storage RLS policies in Supabase.`)
             }
 
             if (data?.signedUrl) {
-                window.open(data.signedUrl, '_blank')
+                // Determine if it's a PDF or image
+                const isPdf = path.toLowerCase().endsWith('.pdf')
+                const fileName = path.split('/').pop() || 'Attachment'
+                if (isPdf) {
+                    // For PDFs open in new tab since iframes block them sometimes
+                    window.open(data.signedUrl, '_blank')
+                } else {
+                    // For images show in-app preview modal
+                    setFilePreview({ url: data.signedUrl, name: fileName })
+                }
+            } else {
+                throw new Error('No signed URL returned from storage.')
             }
         } catch (error: any) {
             console.error('Error opening attachment:', error)
-            const msg = error.message || 'Unknown error'
-            showToast(`Failed to open file: ${msg}. Make sure the "resident-requirements" bucket exists and RLS policies are set.`, 'error')
+            showToast(`Failed to open file: ${error.message}`, 'error')
         }
     }
+
 
     const exportToPDF = async (data: Profile[], filename: string) => {
         if (data.length === 0) return
@@ -567,31 +760,52 @@ function AdminDashboardContent() {
         showToast('PDF Export generated successfully', 'success')
     }
 
-    const exportToCSV = (data: AuditLog[], filename: string) => {
-        if (data.length === 0) return;
+    const exportAuditToPDF = async (data: AuditLog[], filename: string) => {
+        if (data.length === 0) return
 
-        const headers = ['Date & Time', 'Admin', 'Action', 'Description'];
-        const csvRows = [headers.join(',')];
+        const jsPDF = (await import('jspdf')).default;
+        const autoTable = (await import('jspdf-autotable')).default;
+        const doc = new jsPDF()
+
+        // Header Title
+        doc.setFontSize(18)
+        doc.setTextColor(40, 40, 40)
+        doc.text('Barangay Gordon Heights', 14, 22)
+
+        doc.setFontSize(12)
+        doc.setTextColor(100, 100, 100)
+        doc.text('System Audit Trail', 14, 30)
+        doc.setFontSize(10)
+        doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 36)
+
+        // Map data to tidy rows
+        const tableColumn = ["Date & Time", "Admin", "Action", "Description"]
+        const tableRows: any[] = []
 
         data.forEach(log => {
-            const row = [
-                `"${new Date(log.created_at).toLocaleString().replace(/"/g, '""')}"`,
-                `"${(log.admin_name || 'Admin User').replace(/"/g, '""')}"`,
-                `"${log.action.replace(/"/g, '""')}"`,
-                `"${log.description.replace(/"/g, '""')}"`
-            ];
-            csvRows.push(row.join(','));
-        });
+            const logData = [
+                new Date(log.created_at).toLocaleString(),
+                log.admin_name || 'Admin User',
+                log.action,
+                log.description
+            ]
+            tableRows.push(logData)
+        })
 
-        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const link = document.createElement("a");
-        link.setAttribute("href", encodeURI(csvContent));
-        link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Draw Table
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 45,
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [63, 81, 181], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { top: 40 }
+        })
 
-        showToast('CSV Export generated successfully', 'success');
+        doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`)
+        showToast('PDF Export generated successfully', 'success')
     }
 
     const handlePrintAllQR = async () => {
@@ -622,7 +836,7 @@ function AdminDashboardContent() {
 
             const url = `${origin}/request/${d.slug}`
             const canvas = document.querySelector(`canvas[data-qr-slug="${d.slug}"]`) as HTMLCanvasElement
-            
+
             if (canvas) {
                 try {
                     const imgData = canvas.toDataURL('image/png')
@@ -709,8 +923,31 @@ function AdminDashboardContent() {
         }
     }
 
-    const deleteBlotterReport = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this blotter report?')) return
+    const deleteBlotterReport = (id: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Delete Blotter Report',
+            message: 'Are you sure you want to delete this blotter report? This action cannot be undone.',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+            onConfirm: async () => {
+                closeConfirmDialog()
+                try {
+                    const { error } = await supabase.from('blotter_reports').delete().eq('id', id)
+                    if (error) throw error
+                    showToast('Blotter report deleted', 'success')
+                    if (profile?.id) await logAdminAction('DELETE_BLOTTER', `Deleted blotter report ID: ${id.slice(0, 8)}`, profile.id)
+                    fetchDataForTab('blotter')
+                } catch (error: any) {
+                    console.error('Error deleting blotter report:', error)
+                    showToast('Failed to delete blotter report', 'error')
+                }
+            }
+        })
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _deleteBlotterLegacy = async (id: string) => {
+        if (!true) return
         try {
             const { error } = await supabase
                 .from('blotter_reports')
@@ -779,6 +1016,120 @@ function AdminDashboardContent() {
         showToast('PDF Export generated successfully', 'success')
     }
 
+
+    // Complaint Operations
+    const updateComplaintStatus = async (complaintId: string, newStatus: ComplaintStatus, notes?: string) => {
+        setSavingComplaint(true)
+        try {
+            const updatePayload: Record<string, any> = { status: newStatus }
+            if (notes) updatePayload.admin_notes = notes
+            const { error } = await supabase.from('complaints').update(updatePayload).eq('id', complaintId)
+            if (error) throw error
+            showToast(`Complaint status updated to ${newStatus}`, 'success')
+            if (profile?.id) {
+                await logAdminAction('UPDATE_COMPLAINT', `Updated complaint ${complaintId.slice(0, 8)} to ${newStatus}`, profile.id)
+            }
+            fetchDataForTab('blotter')
+            setComplaintModal({ isOpen: false, complaint: null })
+            setComplaintNotes('')
+        } catch (error: any) {
+            console.error('Error updating complaint:', error)
+            showToast(error.message || 'Failed to update complaint', 'error')
+        } finally {
+            setSavingComplaint(false)
+        }
+    }
+
+    const deleteComplaint = (id: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Delete Complaint',
+            message: 'Are you sure you want to delete this complaint? This action cannot be undone.',
+            confirmLabel: 'Delete',
+            variant: 'danger',
+            onConfirm: async () => {
+                closeConfirmDialog()
+                try {
+                    const { error } = await supabase.from('complaints').delete().eq('id', id)
+                    if (error) throw error
+                    showToast('Complaint deleted', 'success')
+                    if (profile?.id) await logAdminAction('DELETE_COMPLAINT', `Deleted complaint ID: ${id.slice(0, 8)}`, profile.id)
+                    fetchDataForTab('blotter')
+                } catch (error: any) {
+                    console.error('Error deleting complaint:', error)
+                    showToast('Failed to delete complaint', 'error')
+                }
+            }
+        })
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _deleteComplaintLegacy = async (id: string) => {
+        if (!true) return
+        try {
+            const { error } = await supabase.from('complaints').delete().eq('id', id)
+            if (error) throw error
+            showToast('Complaint deleted', 'success')
+            if (profile?.id) {
+                await logAdminAction('DELETE_COMPLAINT', `Deleted complaint ID: ${id.slice(0, 8)}`, profile.id)
+            }
+            fetchDataForTab('blotter')
+        } catch (error: any) {
+            console.error('Error deleting complaint:', error)
+            showToast('Failed to delete complaint', 'error')
+        }
+    }
+
+    const escalateToBlotter = async (complaint: Complaint) => {
+        try {
+            const { error } = await supabase.from('blotter_reports').insert({
+                complainant: complaint.resident_name || 'Unknown',
+                respondent: complaint.respondent_name,
+                incident_details: `[Escalated from Complaint #${complaint.id.slice(0, 6).toUpperCase()}] Type: ${complaint.complaint_type} | Subject: ${complaint.subject} | ${complaint.description}`,
+                incident_date: complaint.created_at,
+                location: complaint.location,
+                status: 'Pending',
+                created_by: profile?.id
+            })
+            if (error) throw error
+            await supabase.from('complaints').update({ status: 'Under Investigation', admin_notes: (complaint.admin_notes ? complaint.admin_notes + ' | ' : '') + '[Escalated to Blotter Report]' }).eq('id', complaint.id)
+            showToast('Complaint escalated to Blotter Report', 'success')
+            if (profile?.id) {
+                await logAdminAction('ESCALATE_COMPLAINT', `Escalated complaint ${complaint.id.slice(0, 8)} to blotter report`, profile.id)
+            }
+            fetchDataForTab('blotter')
+        } catch (error: any) {
+            console.error('Error escalating complaint:', error)
+            showToast('Failed to escalate complaint', 'error')
+        }
+    }
+
+    const exportComplaintsToPDF = async (data: Complaint[], filename: string) => {
+        if (data.length === 0) return
+        const jsPDF = (await import('jspdf')).default;
+        const autoTable = (await import('jspdf-autotable')).default;
+        const doc = new jsPDF()
+        doc.setFontSize(18)
+        doc.setTextColor(40, 40, 40)
+        doc.text('Barangay Gordon Heights', 14, 22)
+        doc.setFontSize(12)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Resident Complaints Report', 14, 30)
+        doc.setFontSize(10)
+        doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 36)
+        const tableColumn = ['ID', 'Resident', 'Type', 'Subject', 'Respondent', 'Location', 'Status', 'Date Filed']
+        const tableRows: any[] = []
+        data.forEach(c => {
+            tableRows.push([c.id.slice(0, 6).toUpperCase(), c.resident_name || 'N/A', c.complaint_type, c.subject, c.respondent_name, c.location, c.status, new Date(c.created_at).toLocaleDateString()])
+        })
+        autoTable(doc, {
+            head: [tableColumn], body: tableRows, startY: 45, theme: 'grid',
+            styles: { fontSize: 7, cellPadding: 2 },
+            headStyles: { fillColor: [63, 81, 181], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] }, margin: { top: 40 }
+        })
+        doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`)
+        showToast('Complaints PDF exported successfully', 'success')
+    }
 
     const handleScan = async (results: any[]) => {
         if (!results || results.length === 0) return;
@@ -915,6 +1266,14 @@ function AdminDashboardContent() {
         )
     )
 
+    const filteredComplaints = complaints.filter(c => {
+        const matchSearch = c.subject.toLowerCase().includes(complaintSearch.toLowerCase()) ||
+            c.respondent_name.toLowerCase().includes(complaintSearch.toLowerCase()) ||
+            (c.resident_name || '').toLowerCase().includes(complaintSearch.toLowerCase())
+        const matchStatus = complaintStatusFilter === 'all' || c.status === complaintStatusFilter
+        return matchSearch && matchStatus
+    })
+
     const navItems = [
         { id: 'overview', icon: '', label: 'Overview' },
         { id: 'requests', icon: '', label: 'Document Requests' },
@@ -1045,11 +1404,11 @@ function AdminDashboardContent() {
                                         {/* Hidden QR Codes for PDF generation */}
                                         <div style={{ display: 'none' }}>
                                             {DOCUMENTS.map(doc => (
-                                                <QRCodeCanvas 
-                                                    key={doc.slug} 
-                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/request/${doc.slug}`} 
+                                                <QRCodeCanvas
+                                                    key={doc.slug}
+                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/request/${doc.slug}`}
                                                     size={200}
-                                                    data-qr-slug={doc.slug} 
+                                                    data-qr-slug={doc.slug}
                                                 />
                                             ))}
                                         </div>
@@ -1169,13 +1528,18 @@ function AdminDashboardContent() {
                                                         <td>{req.document_type}</td>
                                                         <td>
                                                             {req.attachment_url ? (
-                                                                <button
-                                                                    className="btn btn-outline"
-                                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
-                                                                    onClick={() => viewAttachment(req.attachment_url!)}
-                                                                >
-                                                                    View File
-                                                                </button>
+                                                                <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                                                                    {req.attachment_url.split(',').map((path, idx) => (
+                                                                        <button
+                                                                            key={idx}
+                                                                            className="btn btn-outline"
+                                                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
+                                                                            onClick={() => viewAttachment(path.trim())}
+                                                                        >
+                                                                            File {req.attachment_url!.includes(',') ? idx + 1 : ''}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
                                                             ) : (
                                                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No Attachment</span>
                                                             )}
@@ -1274,10 +1638,10 @@ function AdminDashboardContent() {
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                                     <div className={styles.avatarCircle}>
                                                                         {res.profile_picture_url ? (
-                                                                            <img 
-                                                                                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`} 
-                                                                                alt={res.full_name} 
-                                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                                            <img
+                                                                                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`}
+                                                                                alt={res.full_name}
+                                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                                                 onError={(e) => {
                                                                                     const target = e.target as HTMLImageElement;
                                                                                     target.onerror = null;
@@ -1295,12 +1659,16 @@ function AdminDashboardContent() {
                                                                                 <div className={styles.verifiedBadge}>
                                                                                     VERIFIED
                                                                                 </div>
+                                                                            ) : res.is_rejected ? (
+                                                                                <div style={{ display: 'inline-block', padding: '0.2rem 0.55rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+                                                                                    REJECTED
+                                                                                </div>
                                                                             ) : (
                                                                                 <button
                                                                                     className={styles.verifyBtn}
-                                                                                    onClick={() => verifyResident(res.id)}
+                                                                                    onClick={(e) => { e.stopPropagation(); setSelectedResident(res); }}
                                                                                 >
-                                                                                    Verify
+                                                                                    Review
                                                                                 </button>
                                                                             )}
                                                                         </div>
@@ -1358,18 +1726,18 @@ function AdminDashboardContent() {
                                     <div className="glass-card" style={{ maxWidth: '720px', width: '100%', padding: '2.5rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                                         {/* Header */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-                                            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}> Resident Profile</h2>
-                                            <button style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', cursor: 'pointer' }} onClick={() => setSelectedResident(null)}>✕</button>
+                                            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>Resident Profile</h2>
+                                            <button style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', cursor: 'pointer' }} onClick={() => setSelectedResident(null)}>X</button>
                                         </div>
 
                                         {/* Profile Header Card */}
                                         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '1.5rem', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.15)', marginBottom: '1.5rem' }}>
                                             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '3px solid rgba(99, 102, 241, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
                                                 {res.profile_picture_url ? (
-                                                    <img 
-                                                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`} 
-                                                        alt="Profile" 
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    <img
+                                                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`}
+                                                        alt="Profile"
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                         onError={(e) => {
                                                             const target = e.target as HTMLImageElement;
                                                             target.onerror = null;
@@ -1385,8 +1753,8 @@ function AdminDashboardContent() {
                                                 <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontFamily: 'monospace' }}>
                                                     ID: {res.resident_id_number || res.id?.slice(0, 12).toUpperCase()}
                                                 </p>
-                                                <span className={res.is_verified ? 'badge badge-success' : 'badge badge-warning'} style={{ fontSize: '0.75rem' }}>
-                                                    {res.is_verified ? 'Verified Resident' : 'Pending Verification'}
+                                                <span className={res.is_verified ? 'badge badge-success' : res.is_rejected ? 'badge badge-error' : 'badge badge-warning'} style={{ fontSize: '0.75rem' }}>
+                                                    {res.is_verified ? 'Verified Resident' : res.is_rejected ? 'Registration Rejected' : 'Pending Verification'}
                                                 </span>
                                             </div>
                                         </div>
@@ -1493,8 +1861,8 @@ function AdminDashboardContent() {
                                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Registered</div>
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
-                                                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: res.is_verified ? 'var(--success-500)' : 'var(--warning-500)' }}>
-                                                    {res.is_verified ? 'Verified' : 'Waiting for Approval'}
+                                                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: res.is_verified ? 'var(--success-500)' : res.is_rejected ? '#ef4444' : 'var(--warning-500)' }}>
+                                                    {res.is_verified ? 'Verified' : res.is_rejected ? 'Rejected' : 'Awaiting Review'}
                                                 </div>
                                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Status</div>
                                             </div>
@@ -1521,13 +1889,44 @@ function AdminDashboardContent() {
                                         )}
 
                                         {/* Actions */}
-                                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                                            {!res.is_verified && (
-                                                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { verifyResident(res.id); setSelectedResident(null); }}>
-                                                    Verify Resident
+                                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+                                            {!res.is_verified && !(res.is_rejected) && (
+                                                <>
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        style={{ flex: 1, minWidth: '140px', background: 'linear-gradient(135deg, #22c55e, #16a34a)', borderColor: '#16a34a' }}
+                                                        onClick={async () => { await verifyResident(res.id); setSelectedResident(null); fetchDataForTab('residents'); }}
+                                                    >
+                                                        Verify Resident
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-outline"
+                                                        style={{ flex: 1, minWidth: '140px', borderColor: '#ef4444', color: '#ef4444' }}
+                                                        onClick={async () => { await rejectResident(res.id); setSelectedResident(null); fetchDataForTab('residents'); }}
+                                                    >
+                                                        Reject Registration
+                                                    </button>
+                                                </>
+                                            )}
+                                            {res.is_rejected && (
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{ flex: 1, minWidth: '140px' }}
+                                                    onClick={async () => { await verifyResident(res.id); setSelectedResident(null); fetchDataForTab('residents'); }}
+                                                >
+                                                    Approve Instead
                                                 </button>
                                             )}
-                                            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSelectedResident(null)}>
+                                            {res.is_verified && (
+                                                <button
+                                                    className="btn btn-outline"
+                                                    style={{ flex: 1, minWidth: '140px', borderColor: '#ef4444', color: '#ef4444' }}
+                                                    onClick={async () => { await rejectResident(res.id); setSelectedResident(null); fetchDataForTab('residents'); }}
+                                                >
+                                                    Revoke Verification
+                                                </button>
+                                            )}
+                                            <button className="btn btn-outline" style={{ flex: 1, minWidth: '120px' }} onClick={() => setSelectedResident(null)}>
                                                 Close
                                             </button>
                                         </div>
@@ -1546,7 +1945,7 @@ function AdminDashboardContent() {
                                     </div>
                                 </div>
 
-                                <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: annCategory === 'emergency_alert' ? '4px solid #ef4444' : annCategory === 'emergency_announcement' ? '4px solid #f59e0b' : undefined }}>
+                                <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: annCategory === 'emergency_alert' ? '4px solid #ef4444' : annCategory === 'emergency_announcement' ? '4px solid #f59e0b' : annCategory === 'important' ? '4px solid #f97316' : annCategory === 'community_event' ? '4px solid #3b82f6' : '4px solid #6b7280' }}>
                                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                         Create New Announcement
                                         {annCategory === 'emergency_alert' && (
@@ -1580,13 +1979,13 @@ function AdminDashboardContent() {
                                                 annCategory === 'emergency_alert'
                                                     ? 'ALERT: What is happening NOW and where?'
                                                     : annCategory === 'emergency_announcement'
-                                                    ? 'Describe the emergency details and what residents should prepare for.'
-                                                    : 'Write the announcement content here...'
+                                                        ? 'Describe the emergency details and what residents should prepare for.'
+                                                        : 'Write the announcement content here...'
                                             }
                                             value={annContent}
                                             onChange={e => setAnnContent(e.target.value)}
                                             style={{
-                                                borderColor: annCategory === 'emergency_alert' ? 'rgba(239,68,68,0.5)' : annCategory === 'emergency_announcement' ? 'rgba(245,158,11,0.5)' : undefined
+                                                borderColor: annCategory === 'emergency_alert' ? 'rgba(239,68,68,0.5)' : annCategory === 'emergency_announcement' ? 'rgba(245,158,11,0.5)' : annCategory === 'important' ? 'rgba(249,115,22,0.5)' : annCategory === 'community_event' ? 'rgba(59,130,246,0.5)' : 'rgba(107,114,128,0.4)'
                                             }}
                                         />
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -1612,9 +2011,9 @@ function AdminDashboardContent() {
                                                 onClick={publishAnnouncement}
                                                 disabled={publishing || !annContent.trim() || (annCategory !== 'emergency_alert' && !annTitle.trim())}
                                                 style={{
-                                                    background: annCategory === 'emergency_alert' ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : undefined,
-                                                    borderColor: annCategory === 'emergency_alert' ? '#dc2626' : annCategory === 'emergency_announcement' ? '#d97706' : undefined,
-                                                    boxShadow: annCategory === 'emergency_alert' ? '0 0 16px rgba(239,68,68,0.4)' : undefined
+                                                    background: annCategory === 'emergency_alert' ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : annCategory === 'emergency_announcement' ? 'linear-gradient(135deg, #d97706, #b45309)' : annCategory === 'important' ? 'linear-gradient(135deg, #ea580c, #c2410c)' : annCategory === 'community_event' ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : undefined,
+                                                    borderColor: annCategory === 'emergency_alert' ? '#dc2626' : annCategory === 'emergency_announcement' ? '#d97706' : annCategory === 'important' ? '#ea580c' : annCategory === 'community_event' ? '#2563eb' : undefined,
+                                                    boxShadow: annCategory === 'emergency_alert' ? '0 0 16px rgba(239,68,68,0.4)' : annCategory === 'emergency_announcement' ? '0 0 16px rgba(217,119,6,0.3)' : annCategory === 'important' ? '0 0 16px rgba(234,88,12,0.3)' : annCategory === 'community_event' ? '0 0 16px rgba(37,99,235,0.3)' : undefined
                                                 }}
                                             >
                                                 {publishing ? 'Publishing...' : annCategory === 'emergency_alert' ? 'Publish Alert' : 'Publish'}
@@ -1865,15 +2264,35 @@ function AdminDashboardContent() {
                             </div>
                         )}
 
-                        {/* ── BLOTTER REPORTS ── */}
+                        {/* ── BLOTTER & COMPLAINTS ── */}
                         {activeTab === 'blotter' && (
                             <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
-                                        <h1>Blotter Reports</h1>
-                                        <p className={styles.pageSubtitle}>Manage official blotter and incident reports.</p>
+                                        <h1>Blotter &amp; Complaints</h1>
+                                        <p className={styles.pageSubtitle}>Manage official blotter reports and resident-submitted complaints.</p>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                </div>
+
+                                {/* Sub-navigation */}
+                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                                    <button
+                                        className={`btn ${blotterView === 'reports' ? 'btn-primary' : 'btn-outline'}`}
+                                        onClick={() => setBlotterView('reports')}
+                                    >
+                                        Blotter Reports ({blotterReports.length})
+                                    </button>
+                                    <button
+                                        className={`btn ${blotterView === 'complaints' ? 'btn-primary' : 'btn-outline'}`}
+                                        onClick={() => setBlotterView('complaints')}
+                                    >
+                                        Resident Complaints ({complaints.length})
+                                    </button>
+                                </div>
+
+                                {/* ── BLOTTER REPORTS SUB-VIEW ── */}
+                                {blotterView === 'reports' && (<>
+                                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', justifyContent: 'flex-end' }}>
                                         <button className="btn btn-secondary" onClick={() => setBlotterModal({ isOpen: true, report: { incident_date: new Date().toISOString().slice(0, 16) } })}>
                                             + New Report
                                         </button>
@@ -1881,78 +2300,104 @@ function AdminDashboardContent() {
                                             Export PDF
                                         </button>
                                     </div>
-                                </div>
 
-                                <div className={styles.filterBar}>
-                                    <input
-                                        type="text"
-                                        placeholder="Search complainant or respondent..."
-                                        value={blotterSearch}
-                                        onChange={e => setBlotterSearch(e.target.value)}
-                                        className={styles.searchInput}
-                                    />
-                                    <select
-                                        value={blotterStatusFilter}
-                                        onChange={e => setBlotterStatusFilter(e.target.value)}
-                                        className={styles.filterSelect}
-                                    >
-                                        <option value="all">All Status</option>
-                                        <option value="Pending">Pending</option>
-                                        <option value="Ongoing">Ongoing</option>
-                                        <option value="Resolved">Resolved</option>
-                                        <option value="Referred">Referred</option>
-                                    </select>
-                                    <span className={styles.searchCount}>{blotterReports.length} report{blotterReports.length !== 1 ? 's' : ''}</span>
-                                </div>
+                                    <div className={styles.filterBar}>
+                                        <input type="text" placeholder="Search complainant or respondent..." value={blotterSearch} onChange={e => setBlotterSearch(e.target.value)} className={styles.searchInput} />
+                                        <select value={blotterStatusFilter} onChange={e => setBlotterStatusFilter(e.target.value)} className={styles.filterSelect}>
+                                            <option value="all">All Status</option>
+                                            <option value="Pending">Pending</option>
+                                            <option value="Ongoing">Ongoing</option>
+                                            <option value="Resolved">Resolved</option>
+                                            <option value="Referred">Referred</option>
+                                        </select>
+                                        <span className={styles.searchCount}>{blotterReports.length} report{blotterReports.length !== 1 ? 's' : ''}</span>
+                                    </div>
 
-                                <div className={`${styles.tableContainer} ${styles.glassTable}`}>
-                                    {loading ? <LoadingSpinner text="Loading reports..." /> : (
-                                        <table className={styles.table}>
-                                            <thead>
-                                                <tr>
-                                                    <th>Case ID</th>
-                                                    <th>Complainant</th>
-                                                    <th>Respondent</th>
-                                                    <th>Location</th>
-                                                    <th>Incident Date</th>
-                                                    <th>Status</th>
-                                                    <th>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {blotterReports.filter(rep => {
-                                                    const matchSearch = rep.complainant.toLowerCase().includes(blotterSearch.toLowerCase()) || rep.respondent.toLowerCase().includes(blotterSearch.toLowerCase());
-                                                    const matchStatus = blotterStatusFilter === 'all' || rep.status === blotterStatusFilter;
-                                                    return matchSearch && matchStatus;
-                                                }).map(rep => (
-                                                    <tr key={rep.id}>
-                                                        <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{rep.id.slice(0, 6).toUpperCase()}</td>
-                                                        <td><strong>{rep.complainant}</strong></td>
-                                                        <td><strong>{rep.respondent}</strong></td>
-                                                        <td style={{ color: 'var(--text-muted)' }}>{rep.location}</td>
-                                                        <td>{new Date(rep.incident_date).toLocaleString()}</td>
-                                                        <td>
-                                                            <span className={rep.status === 'Resolved' ? 'badge badge-success' : rep.status === 'Ongoing' ? 'badge badge-info' : rep.status === 'Referred' ? 'badge badge-warning' : 'badge badge-error'}>
-                                                                {rep.status}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                                <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setBlotterModal({ isOpen: true, report: rep })}>Edit</button>
-                                                                <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteBlotterReport(rep.id)}>Delete</button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {blotterReports.length === 0 && (
-                                                    <tr>
-                                                        <td colSpan={7} className={styles.emptyMessage}>No blotter reports found.</td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    )}
-                                </div>
+                                    <div className={`${styles.tableContainer} ${styles.glassTable}`}>
+                                        {loading ? <LoadingSpinner text="Loading reports..." /> : (
+                                            <table className={styles.table}>
+                                                <thead><tr><th>ID</th><th>Complainant</th><th>Incident Details</th><th>Respondent</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                                                <tbody>
+                                                    {blotterReports.filter(rep => {
+                                                        const matchSearch = rep.complainant.toLowerCase().includes(blotterSearch.toLowerCase()) || rep.respondent.toLowerCase().includes(blotterSearch.toLowerCase());
+                                                        const matchStatus = blotterStatusFilter === 'all' || rep.status === blotterStatusFilter;
+                                                        return matchSearch && matchStatus;
+                                                    }).map(rep => (
+                                                        <tr key={rep.id}>
+                                                            <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{rep.id.slice(0, 6).toUpperCase()}</td>
+                                                            <td><strong>{rep.complainant}</strong></td>
+                                                            <td><span style={{ fontSize: '0.85rem' }}>{rep.location}</span></td>
+                                                            <td><strong>{rep.respondent}</strong></td>
+                                                            <td style={{ fontSize: '0.85rem' }}>{new Date(rep.incident_date).toLocaleDateString()}</td>
+                                                            <td><span className={rep.status === 'Resolved' ? 'badge badge-success' : rep.status === 'Ongoing' ? 'badge badge-info' : rep.status === 'Pending' ? 'badge badge-warning' : 'badge badge-error'}>{rep.status}</span></td>
+                                                            <td>
+                                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setBlotterModal({ isOpen: true, report: rep })}>Review</button>
+                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteBlotterReport(rep.id)}>Delete</button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {blotterReports.length === 0 && (<tr><td colSpan={7} className={styles.emptyMessage}>No blotter reports found.</td></tr>)}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </div>
+                                </>)}
+
+                                {/* ── RESIDENT COMPLAINTS SUB-VIEW ── */}
+                                {blotterView === 'complaints' && (<>
+                                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', justifyContent: 'flex-end' }}>
+                                        <button className="btn btn-primary" onClick={() => exportComplaintsToPDF(complaints, 'Complaints_Report')}>Export PDF</button>
+                                    </div>
+
+                                    <div className={styles.filterBar}>
+                                        <input type="text" placeholder="Search by subject, respondent, or resident..." value={complaintSearch} onChange={e => setComplaintSearch(e.target.value)} className={styles.searchInput} />
+                                        <select value={complaintStatusFilter} onChange={e => setComplaintStatusFilter(e.target.value)} className={styles.filterSelect}>
+                                            <option value="all">All Status</option>
+                                            <option value="Received">Received</option>
+                                            <option value="Under Investigation">Under Investigation</option>
+                                            <option value="Resolved">Resolved</option>
+                                            <option value="Dismissed">Dismissed</option>
+                                        </select>
+                                        <span className={styles.searchCount}>{filteredComplaints.length} complaint{filteredComplaints.length !== 1 ? 's' : ''}</span>
+                                    </div>
+
+                                    <div className={`${styles.tableContainer} ${styles.glassTable}`}>
+                                        {loading ? <LoadingSpinner text="Loading complaints..." /> : (
+                                            <table className={styles.table}>
+                                                <thead><tr><th>ID</th><th>Complainant</th><th>Incident Details</th><th>Respondent</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                                                <tbody>
+                                                    {filteredComplaints.map(c => (
+                                                        <tr key={c.id}>
+                                                            <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{c.id.slice(0, 6).toUpperCase()}</td>
+                                                            <td><strong>{c.resident_name}</strong></td>
+                                                            <td>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                                                    <span className="badge badge-info" style={{ fontSize: '0.65rem', alignSelf: 'flex-start' }}>{c.complaint_type}</span>
+                                                                    <span style={{ fontSize: '0.85rem' }}>{c.subject}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td><strong>{c.respondent_name}</strong></td>
+                                                            <td style={{ fontSize: '0.85rem' }}>{new Date(c.created_at).toLocaleDateString()}</td>
+                                                            <td><span className={c.status === 'Resolved' ? 'badge badge-success' : c.status === 'Under Investigation' ? 'badge badge-info' : c.status === 'Dismissed' ? 'badge badge-error' : 'badge badge-warning'}>{c.status}</span></td>
+                                                            <td>
+                                                                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }} onClick={() => { setComplaintModal({ isOpen: true, complaint: c }); setComplaintNotes(c.admin_notes || ''); setComplaintNewStatus(c.status); }}>Review</button>
+                                                                    {c.status !== 'Resolved' && c.status !== 'Dismissed' && (
+                                                                        <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderColor: 'var(--warning-500)', color: 'var(--warning-500)' }} onClick={() => escalateToBlotter(c)}>Escalate</button>
+                                                                    )}
+                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteComplaint(c.id)}>Delete</button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {filteredComplaints.length === 0 && (<tr><td colSpan={8} className={styles.emptyMessage}>No complaints found.</td></tr>)}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </div>
+                                </>)}
                             </div>
                         )}
 
@@ -1964,9 +2409,11 @@ function AdminDashboardContent() {
                                         <h1>System Audit Trail</h1>
                                         <p className={styles.pageSubtitle}>Log of all administrative actions in the E-Barangay system.</p>
                                     </div>
-                                    <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportToCSV(auditLogs, 'Audit_Logs')}>
-                                        Export Logs CSV
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                        <button className="btn btn-primary" style={{ gap: '0.5rem' }} onClick={() => exportAuditToPDF(auditLogs, 'Audit_Logs')}>
+                                            Export Logs PDF
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className={`${styles.tableContainer} ${styles.glassTable}`}>
@@ -2066,8 +2513,9 @@ function AdminDashboardContent() {
                                     <input
                                         type="datetime-local"
                                         required
+                                        disabled={!!blotterModal.report.id}
                                         className={styles.searchInput}
-                                        style={{ width: '100%' }}
+                                        style={{ width: '100%', opacity: blotterModal.report.id ? 0.6 : 1, cursor: blotterModal.report.id ? 'not-allowed' : 'auto' }}
                                         value={blotterModal.report.incident_date ? new Date(blotterModal.report.incident_date).toISOString().slice(0, 16) : ''}
                                         onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, incident_date: new Date(e.target.value).toISOString() } })}
                                     />
@@ -2090,7 +2538,8 @@ function AdminDashboardContent() {
                                 <textarea
                                     required
                                     rows={4}
-                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                                    className={styles.searchInput}
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', resize: 'vertical' }}
                                     value={blotterModal.report.incident_details || ''}
                                     onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, incident_details: e.target.value } })}
                                 />
@@ -2120,6 +2569,170 @@ function AdminDashboardContent() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Complaint Detail Modal */}
+            {complaintModal.isOpen && complaintModal.complaint && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setComplaintModal({ isOpen: false, complaint: null })}>
+                    <div className="glass-card" style={{ maxWidth: '600px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: '1.5rem' }}>Complaint Details</h3>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Complaint ID</label>
+                                <strong style={{ fontFamily: 'monospace' }}>{complaintModal.complaint.id.slice(0, 8).toUpperCase()}</strong>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Filed By</label>
+                                <strong>{complaintModal.complaint.resident_name}</strong>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Type</label>
+                                <span className="badge badge-info">{complaintModal.complaint.complaint_type}</span>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Date Filed</label>
+                                <span>{new Date(complaintModal.complaint.created_at).toLocaleString()}</span>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Respondent</label>
+                                <strong>{complaintModal.complaint.respondent_name}</strong>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Location</label>
+                                <span>{complaintModal.complaint.location}</span>
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Subject</label>
+                            <strong>{complaintModal.complaint.subject}</strong>
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Description</label>
+                            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{complaintModal.complaint.description}</p>
+                        </div>
+
+                        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>Update Status</label>
+                            <select
+                                className={styles.filterSelect}
+                                style={{ width: '100%', marginBottom: '1rem' }}
+                                value={complaintNewStatus}
+                                onChange={e => setComplaintNewStatus(e.target.value as any)}
+                            >
+                                <option value="Received">Received</option>
+                                <option value="Under Investigation">Under Investigation</option>
+                                <option value="Resolved">Resolved</option>
+                                <option value="Dismissed">Dismissed</option>
+                            </select>
+
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>Admin Notes</label>
+                            <textarea
+                                rows={3}
+                                className={styles.searchInput}
+                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem', resize: 'vertical' }}
+                                placeholder="Add notes for this complaint..."
+                                value={complaintNotes}
+                                onChange={e => setComplaintNotes(e.target.value)}
+                            />
+
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setComplaintModal({ isOpen: false, complaint: null })}>Cancel</button>
+                                <button className="btn btn-primary" style={{ flex: 1 }} disabled={savingComplaint} onClick={() => updateComplaintStatus(complaintModal.complaint!.id, complaintNewStatus, complaintNotes)}>
+                                    {savingComplaint ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Custom Confirm Dialog ─────────────────────────────────────── */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                confirmLabel={confirmDialog.confirmLabel}
+                variant={confirmDialog.variant}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={closeConfirmDialog}
+            />
+
+            {/* ─── File Preview Modal ──────────────────────────────────────────── */}
+            {filePreview && (
+                <div
+                    onClick={() => setFilePreview(null)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 9999,
+                        background: 'rgba(0,0,0,0.3)',
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        padding: '2rem',
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: '#ffffff',
+                            borderRadius: '12px',
+                            padding: '1.5rem',
+                            maxWidth: '90vw',
+                            maxHeight: '90vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            boxShadow: '0 25px 50px rgba(0,0,0,0.2)',
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#1e293b', fontWeight: 600, fontSize: '0.95rem', wordBreak: 'break-all' }}>
+                                {filePreview.name}
+                            </span>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <a
+                                    href={filePreview.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-outline"
+                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                                >
+                                    Open in New Tab
+                                </a>
+                                <button
+                                    onClick={() => setFilePreview(null)}
+                                    className="btn btn-outline"
+                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: '#ef4444' }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={filePreview.url}
+                            alt={filePreview.name}
+                            style={{
+                                maxWidth: '80vw',
+                                maxHeight: '75vh',
+                                objectFit: 'contain',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(0,0,0,0.1)',
+                            }}
+                            onError={(e) => {
+                                // If image fails, it might be a PDF/doc - show open in new tab message
+                                const target = e.currentTarget as HTMLImageElement
+                                target.style.display = 'none'
+                                const msg = document.createElement('p')
+                                msg.textContent = 'This file cannot be previewed inline. Click "Open in New Tab" to view it.'
+                                msg.style.color = '#94a3b8'
+                                msg.style.textAlign = 'center'
+                                target.parentNode?.appendChild(msg)
+                            }}
+                        />
                     </div>
                 </div>
             )}

@@ -17,7 +17,7 @@ import ProfileModal from '@/components/ProfileModal'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
-import { ServiceRequest, Announcement, Profile } from '@/lib/types'
+import { ServiceRequest, Announcement, Profile, Complaint, ComplaintType } from '@/lib/types'
 import { QRCodeSVG } from 'qrcode.react'
 import styles from './resident.module.css'
 
@@ -43,12 +43,23 @@ function ResidentPortalContent() {
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
     const [selectedQR, setSelectedQR] = useState<{ ref: string, title: string } | null>(null)
 
+    // Complaint State
+    const [complaints, setComplaints] = useState<Complaint[]>([])
+    const [loadingComplaints, setLoadingComplaints] = useState(false)
+    const [showComplaintModal, setShowComplaintModal] = useState(false)
+    const [submittingComplaint, setSubmittingComplaint] = useState(false)
+    const [complaintForm, setComplaintForm] = useState<{
+        type: ComplaintType | '', customType: string, subject: string, description: string, respondent: string, location: string
+    }>({ type: '', customType: '', subject: '', description: '', respondent: '', location: '' })
+
     useEffect(() => {
         if (profile?.id) {
             if (activeTab === 'overview') {
                 fetchAnnouncements()
             } else if (activeTab === 'requests') {
                 fetchRequests()
+            } else if (activeTab === 'complaints') {
+                fetchComplaints()
             }
         }
     }, [profile?.id, activeTab])
@@ -92,27 +103,99 @@ function ResidentPortalContent() {
         }
     }
 
-    const handleRequestSubmit = async (documentType: string, purpose: string, attachment: File | null) => {
+    const fetchComplaints = async () => {
+        if (!profile?.id) return
+        setLoadingComplaints(true)
+        try {
+            const { data, error } = await supabase
+                .from('complaints')
+                .select('*')
+                .eq('resident_id', profile.id)
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+            setComplaints(data as Complaint[])
+        } catch (error: any) {
+            console.error('Error fetching complaints:', error)
+            showToast(error.message || 'Failed to load your complaints', 'error')
+        } finally {
+            setLoadingComplaints(false)
+        }
+    }
+
+    const handleComplaintSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!profile?.id || !profile.is_verified) return
+
+        if (!complaintForm.type || !complaintForm.subject || !complaintForm.description || !complaintForm.respondent || !complaintForm.location) {
+            showToast('Please fill out all required fields', 'error')
+            return
+        }
+
+        if (complaintForm.type === 'Others' && !complaintForm.customType.trim()) {
+            showToast('Please specify the complaint type', 'error')
+            return
+        }
+
+        const finalComplaintType = complaintForm.type === 'Others' ? complaintForm.customType.trim() : complaintForm.type;
+
+        setSubmittingComplaint(true)
+        try {
+            const { data, error } = await supabase
+                .from('complaints')
+                .insert({
+                    resident_id: profile.id,
+                    complaint_type: finalComplaintType as any,
+                    subject: complaintForm.subject,
+                    description: complaintForm.description,
+                    respondent_name: complaintForm.respondent,
+                    location: complaintForm.location
+                })
+                .select()
+                .single()
+
+            if (error) throw error
+
+            setComplaints([data as Complaint, ...complaints])
+            showToast('Complaint submitted successfully. It will be reviewed by barangay officials.', 'success')
+            setShowComplaintModal(false)
+            setComplaintForm({ type: '', customType: '', subject: '', description: '', respondent: '', location: '' })
+            setActiveTab('complaints')
+        } catch (error: any) {
+            console.error('Error submitting complaint:', error)
+            showToast(error.message || 'Failed to submit complaint', 'error')
+        } finally {
+            setSubmittingComplaint(false)
+        }
+    }
+
+    const handleRequestSubmit = async (documentType: string, purpose: string, attachments: File[]) => {
         if (!profile?.id) return
 
         try {
-            let attachmentUrl = null
+            const uploadedPaths: string[] = []
 
-            if (attachment) {
-                const fileName = `${Date.now()}_${attachment.name.replace(/\s+/g, '_')}`
+            for (const file of attachments) {
+                const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
                 const filePath = `${profile.id}/${fileName}`
 
-                const { data: uploadData, error: uploadError } = await supabase.storage
+                const { error: uploadError } = await supabase.storage
                     .from('resident-requirements')
-                    .upload(filePath, attachment)
+                    .upload(filePath, file, {
+                        cacheControl: '3600',
+                        upsert: false,
+                        contentType: file.type
+                    })
 
                 if (uploadError) {
                     console.error('Upload error:', uploadError)
-                    throw new Error(`Failed to upload requirement: ${uploadError.message}`)
+                    throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`)
                 }
 
-                attachmentUrl = filePath
+                uploadedPaths.push(filePath)
             }
+
+            const attachmentUrl = uploadedPaths.length > 0 ? uploadedPaths.join(',') : null
 
             const { data, error } = await supabase
                 .from('service_requests')
@@ -129,7 +212,7 @@ function ResidentPortalContent() {
             if (error) throw error
 
             setRequests([data as ServiceRequest, ...requests])
-            showToast(`${documentType} request submitted successfully! ${attachment ? 'Requirement uploaded.' : ''}`, 'success')
+            showToast(`${documentType} request submitted successfully! ${attachments.length} file(s) uploaded.`, 'success')
             setShowRequestModal(false)
             setActiveTab('requests')
         } catch (error: any) {
@@ -245,6 +328,8 @@ function ResidentPortalContent() {
                                 <span>Gordon Heights Resident</span>
                                 {profile?.is_verified ? (
                                     <span className={styles.verifiedBadge}>Verified Account</span>
+                                ) : profile?.is_rejected ? (
+                                    <span className={styles.rejectedBadge} style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Registration Rejected</span>
                                 ) : (
                                     <span className={styles.pendingBadge}>Account for Review</span>
                                 )}
@@ -269,12 +354,21 @@ function ResidentPortalContent() {
 
             {/* Verification Restriction Notice */}
             {!profile?.is_verified && (
-                <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.05)' }}>
+                <div className="glass-card" style={{ 
+                    marginBottom: '2rem', 
+                    borderLeft: profile?.is_rejected ? '4px solid #ef4444' : '4px solid #f59e0b', 
+                    background: profile?.is_rejected ? 'rgba(239, 68, 68, 0.05)' : 'rgba(245, 158, 11, 0.05)' 
+                }}>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                         <div>
-                            <strong style={{ display: 'block' }}>Account Under Review</strong>
+                            <strong style={{ display: 'block', color: profile?.is_rejected ? '#ef4444' : 'inherit' }}>
+                                {profile?.is_rejected ? 'Registration Rejected' : 'Account Under Review'}
+                            </strong>
                             <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                Some features are restricted. Please wait for the Barangay Admin to verify your account to access all digital services.
+                                {profile?.is_rejected 
+                                    ? 'Your registration has been declined by the Barangay Admin. Please contact the barangay hall or re-submit your requirements to resolve this.' 
+                                    : 'Some features are restricted. Please wait for the Barangay Admin to verify your account to access all digital services.'
+                                }
                             </p>
                         </div>
                     </div>
@@ -502,15 +596,15 @@ function ResidentPortalContent() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Status</span>
-                            <strong style={{ color: profile?.is_verified ? 'var(--success-600)' : 'var(--warning-600)' }}>
-                                {profile?.is_verified ? 'Verified Citizen' : 'Verification Pending'}
+                            <strong style={{ color: profile?.is_verified ? 'var(--success-600)' : profile?.is_rejected ? '#ef4444' : 'var(--warning-600)' }}>
+                                {profile?.is_verified ? 'Verified Citizen' : profile?.is_rejected ? 'Rejected' : 'Verification Pending'}
                             </strong>
                         </div>
                     </div>
                 </div>
 
                 <div className="glass-card" style={{ padding: '2rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}> Profile Information</h3>
+                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>Profile Information</h3>
                     <div className={styles.infoGrid}>
                         <div className={styles.infoGroup}>
                             <label className={styles.infoLabel}>Full Name</label>
@@ -579,7 +673,7 @@ function ResidentPortalContent() {
         <section className={styles.requestsSection}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h2>My Service Requests</h2>
-                <button className="btn btn-primary" onClick={() => setShowRequestModal(true)}>+ New Request</button>
+                <button className="btn btn-primary" onClick={() => setShowRequestModal(true)}>New Request</button>
             </div>
 
             <div className={`glass-card ${styles.applicationsCard}`}>
@@ -611,6 +705,11 @@ function ResidentPortalContent() {
                                     <p className={styles.appDate}>
                                         Applied: {new Date(req.created_at).toLocaleDateString()}
                                     </p>
+                                    {req.expires_at && (
+                                        <p className={styles.appDate} style={{ color: '#ef4444', fontWeight: 600, marginTop: '0.2rem' }}>
+                                            Valid until: {new Date(req.expires_at).toLocaleDateString()}
+                                        </p>
+                                    )}
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem', width: '100%' }}>
                                         {req.purpose && (
                                             <p className={styles.appPurpose}>Purpose: {req.purpose}</p>
@@ -745,6 +844,74 @@ function ResidentPortalContent() {
         );
     }
 
+    const renderComplaints = () => (
+        <section className="animate-fadeIn">
+            <div className={styles.pageHeader}>
+                <div>
+                    <h1>My Complaints</h1>
+                    <p className={styles.pageSubtitle}>Track and manage your submitted complaints</p>
+                </div>
+                <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                        if (!profile?.is_verified) {
+                            showToast('You must be a verified resident to submit a complaint.', 'error');
+                            return;
+                        }
+                        setShowComplaintModal(true);
+                    }}
+                >
+                    + File a Complaint
+                </button>
+            </div>
+
+            <div className={`${styles.tableContainer} ${styles.glassTable}`}>
+                {loadingComplaints ? <LoadingSpinner text="Loading complaints..." /> : (
+                    <table className={styles.table}>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Incident Details</th>
+                                <th>Respondent</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Admin Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {complaints.map((c) => (
+                                <tr key={c.id}>
+                                    <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{c.id.slice(0, 8).toUpperCase()}</td>
+                                    <td>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                            <span className="badge badge-info" style={{ fontSize: '0.65rem', alignSelf: 'flex-start' }}>{c.complaint_type}</span>
+                                            <span style={{ fontSize: '0.85rem' }}>{c.subject}</span>
+                                        </div>
+                                    </td>
+                                    <td>{c.respondent_name}</td>
+                                    <td style={{ fontSize: '0.85rem' }}>{new Date(c.created_at).toLocaleDateString()}</td>
+                                    <td>
+                                        <span className={c.status === 'Resolved' ? 'badge badge-success' : c.status === 'Under Investigation' ? 'badge badge-info' : c.status === 'Dismissed' ? 'badge badge-error' : 'badge badge-warning'}>
+                                            {c.status}
+                                        </span>
+                                    </td>
+                                    <td style={{ maxWidth: '300px', whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{c.admin_notes || <span style={{ color: 'var(--text-muted)' }}>None</span>}</td>
+                                </tr>
+                            ))}
+                            {complaints.length === 0 && (
+                                <tr>
+                                    <td colSpan={7} className={styles.emptyMessage}>
+                                        You haven't filed any complaints yet.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </section>
+    )
+
     // Show a loading screen while the profile is being fetched to avoid the "Resident" flash
     if (!profile) {
         return (
@@ -771,6 +938,9 @@ function ResidentPortalContent() {
                     <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => setActiveTab('requests')}>
                         My Requests
                     </button>
+                    <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => setActiveTab('complaints')}>
+                        My Complaints
+                    </button>
                     <button className={`${styles.tabBtn} ${activeTab === 'profile' ? styles.activeTab : ''}`} onClick={() => setActiveTab('profile')}>
                         My Profile
                     </button>
@@ -782,6 +952,7 @@ function ResidentPortalContent() {
                     {activeTab === 'overview' && renderOverview()}
                     {activeTab === 'profile' && renderProfile()}
                     {activeTab === 'requests' && renderRequests()}
+                    {activeTab === 'complaints' && renderComplaints()}
                 </div>
             </main>
 
@@ -810,6 +981,105 @@ function ResidentPortalContent() {
                     onClose={() => { setShowRequestModal(false); setSelectedServiceType(''); }}
                     onSubmit={handleRequestSubmit}
                 />
+            )}
+
+            {/* Complaint Submission Modal */}
+            {showComplaintModal && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setShowComplaintModal(false)}>
+                    <div className="glass-card animate-fadeIn" style={{ maxWidth: '500px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary-400)' }}>File a Complaint</h2>
+                        <form onSubmit={handleComplaintSubmit}>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Complaint Type *</label>
+                                <select
+                                    required
+                                    className={styles.formInput}
+                                    style={{ width: '100%' }}
+                                    value={complaintForm.type}
+                                    onChange={e => setComplaintForm({ ...complaintForm, type: e.target.value as ComplaintType })}
+                                >
+                                    <option value="" disabled>Select Type</option>
+                                    <option value="Noise Disturbance">Noise Disturbance</option>
+                                    <option value="Property Dispute">Property Dispute</option>
+                                    <option value="Public Disturbance">Public Disturbance</option>
+                                    <option value="Vandalism">Vandalism</option>
+                                    <option value="Illegal Structures">Illegal Structures</option>
+                                    <option value="Waste Disposal">Waste Disposal</option>
+                                    <option value="Others">Others</option>
+                                </select>
+                            </div>
+                            {complaintForm.type === 'Others' && (
+                                <div style={{ marginBottom: '1rem', animation: 'fadeIn 0.2s ease-out' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Specify Complaint Type *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className={styles.formInput}
+                                        style={{ width: '100%' }}
+                                        placeholder="e.g. Stray Animals, Parking Issue"
+                                        value={complaintForm.customType}
+                                        onChange={e => setComplaintForm({ ...complaintForm, customType: e.target.value })}
+                                    />
+                                </div>
+                            )}
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Subject *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className={styles.formInput}
+                                    style={{ width: '100%' }}
+                                    placeholder="Brief summary of the complaint"
+                                    value={complaintForm.subject}
+                                    onChange={e => setComplaintForm({ ...complaintForm, subject: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Respondent / Person Complained Of *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className={styles.formInput}
+                                    style={{ width: '100%' }}
+                                    placeholder="Name of the person or entity"
+                                    value={complaintForm.respondent}
+                                    onChange={e => setComplaintForm({ ...complaintForm, respondent: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Location of Incident *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className={styles.formInput}
+                                    style={{ width: '100%' }}
+                                    placeholder="Where did it happen?"
+                                    value={complaintForm.location}
+                                    onChange={e => setComplaintForm({ ...complaintForm, location: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Full Description *</label>
+                                <textarea
+                                    required
+                                    rows={4}
+                                    className={styles.formInput}
+                                    style={{ width: '100%', resize: 'vertical' }}
+                                    placeholder="Provide complete details of the incident..."
+                                    value={complaintForm.description}
+                                    onChange={e => setComplaintForm({ ...complaintForm, description: e.target.value })}
+                                />
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowComplaintModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submittingComplaint}>
+                                    {submittingComplaint ? 'Submitting...' : 'Submit Complaint'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
 
             {/* Profile Edit Modal */}

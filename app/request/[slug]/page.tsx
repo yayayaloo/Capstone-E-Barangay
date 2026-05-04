@@ -77,7 +77,7 @@ export default function RequestPage() {
     })
     const [errors, setErrors] = useState<FormErrors>({})
     const [touched, setTouched] = useState<Record<string, boolean>>({})
-    const [attachment, setAttachment] = useState<File | null>(null)
+    const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [globalError, setGlobalError] = useState('')
     const [success, setSuccess] = useState<{ id: string; docType: string } | null>(null)
@@ -137,15 +137,16 @@ export default function RequestPage() {
     }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            const file = e.target.files[0]
-            if (file.size > 5 * 1024 * 1024) {
-                setGlobalError('File size must be less than 5MB')
-                return
-            }
-            setAttachment(file)
+        if (e.target.files && e.target.files.length > 0) {
+            const newFiles = Array.from(e.target.files)
+            setAttachments(prev => [...prev, ...newFiles])
             setGlobalError('')
+            e.target.value = ''
         }
+    }
+
+    const removeFile = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index))
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -163,6 +164,11 @@ export default function RequestPage() {
             return
         }
 
+        if (attachments.length === 0) {
+            setGlobalError('Please upload at least one valid ID or requirement before submitting.')
+            return
+        }
+
         if (!user || !profile) {
             setGlobalError('You must be logged in to submit a request.')
             return
@@ -170,17 +176,23 @@ export default function RequestPage() {
 
         setSubmitting(true)
         try {
-            let attachmentUrl: string | null = null
+            const uploadedPaths: string[] = []
 
-            if (attachment) {
-                const fileName = `${Date.now()}_${attachment.name.replace(/\s+/g, '_')}`
+            for (const file of attachments) {
+                const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
                 const filePath = `${profile.id}/${fileName}`
                 const { error: uploadError } = await supabase.storage
                     .from('resident-requirements')
-                    .upload(filePath, attachment)
-                if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`)
-                attachmentUrl = filePath
+                    .upload(filePath, file, {
+                        cacheControl: '3600',
+                        upsert: false,
+                        contentType: file.type
+                    })
+                if (uploadError) throw new Error(`Upload failed for ${file.name}: ${uploadError.message}`)
+                uploadedPaths.push(filePath)
             }
+
+            const attachmentUrl = uploadedPaths.length > 0 ? uploadedPaths.join(',') : null
 
             const { data, error } = await supabase
                 .from('service_requests')
@@ -227,7 +239,7 @@ export default function RequestPage() {
             <div className={styles.pageWrapper}>
                 <header className={styles.header}>
                     <div className={styles.headerInner}>
-                        <Link href="/services" className={styles.backBtn}>←</Link>
+                        <Link href="/services" className={styles.backBtn}>Back</Link>
                         <div className={styles.headerInfo}>
                             <h1 className={styles.headerTitle}>Request Submitted</h1>
                             <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -236,7 +248,7 @@ export default function RequestPage() {
                 </header>
                 <div className={styles.successWrapper}>
                     <div className={styles.successCard}>
-                        <div className={styles.successIcon}>✓</div>
+                        <div className={styles.successIcon}>OK</div>
                         <h2 className={styles.successTitle}>Request Submitted!</h2>
                         <p className={styles.successMsg}>
                             Your {success.docType} request has been received. The Barangay will process it and notify you when it&apos;s ready.
@@ -261,7 +273,7 @@ export default function RequestPage() {
                         </div>
                         <div className={styles.successActions}>
                             <Link href="/resident" className={styles.authBtnPrimary}>
-                                Track My Request →
+                                Track My Request
                             </Link>
                             <Link href="/services" className={styles.authBtnOutline}>
                                 Request Another Document
@@ -279,7 +291,7 @@ export default function RequestPage() {
             <div className={styles.pageWrapper}>
                 <header className={styles.header}>
                     <div className={styles.headerInner}>
-                        <Link href="/services" className={styles.backBtn}>←</Link>
+                        <Link href="/services" className={styles.backBtn}>Back</Link>
                         <div className={styles.headerInfo}>
                             <h1 className={styles.headerTitle}>{doc.name}</h1>
                             <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -301,7 +313,7 @@ export default function RequestPage() {
             <div className={styles.pageWrapper}>
                 <header className={styles.header}>
                     <div className={styles.headerInner}>
-                        <Link href="/services" className={styles.backBtn}>←</Link>
+                        <Link href="/services" className={styles.backBtn}>Back</Link>
                         <div className={styles.headerInfo}>
                             <h1 className={styles.headerTitle}>{doc.name}</h1>
                             <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -358,7 +370,7 @@ export default function RequestPage() {
         <div className={styles.pageWrapper}>
             <header className={styles.header}>
                 <div className={styles.headerInner}>
-                    <Link href="/services" className={styles.backBtn}>←</Link>
+                    <Link href="/services" className={styles.backBtn}>Back</Link>
                     <div className={styles.headerInfo}>
                         <h1 className={styles.headerTitle}>{doc.name}</h1>
                         <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -481,36 +493,41 @@ export default function RequestPage() {
                         {/* File Upload */}
                         <div className={styles.fieldGroup}>
                             <div className={styles.fieldLabel}>
-                                <span className={styles.fieldLabelText}>Attach Requirements</span>
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Optional</span>
+                                <span className={styles.fieldLabelText}>Upload Valid ID / Requirements</span>
+                                <span className={styles.fieldRequired}>Required *</span>
                             </div>
-                            <div className={`${styles.fileArea} ${attachment ? styles.fileAreaActive : ''}`}>
+                            <div className={`${styles.fileArea} ${attachments.length > 0 ? styles.fileAreaActive : ''}`}>
                                 <input
                                     type="file"
                                     className={styles.fileInput}
                                     onChange={handleFileChange}
                                     accept="image/*,.pdf,.doc,.docx"
                                     id="req-file"
+                                    multiple
                                 />
-                                {attachment ? (
-                                    <>
-                                        <p className={styles.fileName}>{attachment.name}</p>
-                                        <button
-                                            type="button"
-                                            className={styles.fileClear}
-                                            onClick={(e) => { e.stopPropagation(); setAttachment(null); }}
-                                        >
-                                            Remove File
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className={styles.fileIcon}></div>
-                                        <p className={styles.fileText}>Tap to upload your requirements</p>
-                                        <p className={styles.fileSmall}>ID photo, certificates, etc. (Max 5MB)</p>
-                                    </>
-                                )}
+                                <>
+                                    <div className={styles.fileIcon}></div>
+                                    <p className={styles.fileText}>Tap to upload your requirements</p>
+                                    <p className={styles.fileSmall}>You can select multiple files</p>
+                                </>
                             </div>
+                            {attachments.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                    {attachments.map((file, idx) => (
+                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card-bg, #f8fafc)', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '260px' }}>{file.name}</span>
+                                            <button
+                                                type="button"
+                                                className={styles.fileClear}
+                                                onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                                                style={{ fontSize: '0.75rem' }}
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <button

@@ -147,7 +147,7 @@ function LoginContent() {
             {/* Right Panel - Form */}
             <div className={styles.formPanel}>
                 <Link href="/" className={styles.backButton}>
-                    ← Back to Home
+                    Back to Home
                 </Link>
                 <div className={styles.loginCard}>
                     <div className={styles.logoSection}>

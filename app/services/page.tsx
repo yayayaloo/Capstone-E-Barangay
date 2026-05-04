@@ -16,6 +16,7 @@ const DOCUMENTS = [
         fee: 'Php 50.00',
         feeType: 'paid' as const,
         reqs: 'Valid ID',
+        validity: '6 months',
     },
     {
         slug: 'barangay-certification',
@@ -25,6 +26,7 @@ const DOCUMENTS = [
         fee: 'Php 50.00',
         feeType: 'paid' as const,
         reqs: 'Valid ID',
+        validity: '6 months',
     },
     {
         slug: 'business-clearance',
@@ -34,6 +36,7 @@ const DOCUMENTS = [
         fee: 'Free',
         feeType: 'free' as const,
         reqs: 'DTI Certificate',
+        validity: 'Renewed annually',
     },
     {
         slug: 'lot-certification',
@@ -43,6 +46,7 @@ const DOCUMENTS = [
         fee: 'Php 1.00/sqm',
         feeType: 'paid' as const,
         reqs: 'Purok Cert, Tax Dec, Latest Tax Payment',
+        validity: '6 months',
     },
     {
         slug: 'first-time-job-seeker',
@@ -52,6 +56,7 @@ const DOCUMENTS = [
         fee: 'Free',
         feeType: 'free' as const,
         reqs: 'Valid ID',
+        validity: '1 year',
     },
     {
         slug: 'indigency',
@@ -61,6 +66,7 @@ const DOCUMENTS = [
         fee: 'Free',
         feeType: 'free' as const,
         reqs: 'Valid ID',
+        validity: '6 months',
     },
 ]
 
@@ -73,6 +79,9 @@ export default function ServicesPage() {
             {/* Hero Banner */}
             <section className={styles.hero}>
                 <div className={styles.heroInner}>
+                    <Link href="/" className={styles.backHomeBtn}>
+                        Back to Home
+                    </Link>
                     <div className={styles.heroLogo}>
                         <Image src="/logo.png" alt="Barangay Gordon Heights" width={44} height={44} className={styles.heroLogoImg} />
                         <span className={styles.heroLogoText}>E-Barangay Gordon Heights</span>
@@ -121,13 +130,13 @@ export default function ServicesPage() {
                                 <div className={styles.docCardBody}>
                                     <div className={styles.docMeta}>
                                         <span className={`${styles.feeBadge} ${doc.feeType === 'free' ? styles.feeFree : styles.feePaid}`}>
-                                            {doc.feeType === 'free' ? '✓ ' : ''}
                                             {doc.fee}
                                         </span>
-                                        <span className={styles.reqPill}>{doc.reqs}</span>
+                                        <span className={styles.reqPill} title="Requirements">{doc.reqs}</span>
+                                        <span className={styles.reqPill} title="Validity Period" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569' }}>Valid: {doc.validity}</span>
                                     </div>
                                     <Link href={`/request/${doc.slug}`} className={styles.applyBtn}>
-                                        Apply Now →
+                                        Apply Now
                                     </Link>
                                 </div>
                             </div>

@@ -22,6 +22,7 @@ export interface Profile {
     role: UserRole
     resident_qr_id: string | null
     is_verified: boolean
+    is_rejected: boolean
     resident_id_number: string | null
     birthdate: string | null
     profile_picture_url: string | null
@@ -42,6 +43,8 @@ export interface ServiceRequest {
     attachment_url: string | null
     created_at: string
     updated_at: string
+    issued_at?: string | null
+    expires_at?: string | null
     // Joined fields
     resident_name?: string
 }
@@ -91,4 +94,24 @@ export interface BlotterReport {
     created_at: string
     updated_at: string
     created_by: string | null
+}
+
+export type ComplaintType = 'Noise Disturbance' | 'Property Dispute' | 'Public Disturbance' | 'Vandalism' | 'Illegal Structures' | 'Waste Disposal' | 'Others'
+
+export type ComplaintStatus = 'Received' | 'Under Investigation' | 'Resolved' | 'Dismissed'
+
+export interface Complaint {
+    id: string
+    resident_id: string
+    complaint_type: ComplaintType
+    subject: string
+    description: string
+    respondent_name: string
+    location: string
+    status: ComplaintStatus
+    admin_notes: string | null
+    created_at: string
+    updated_at: string
+    // Joined fields
+    resident_name?: string
 }
