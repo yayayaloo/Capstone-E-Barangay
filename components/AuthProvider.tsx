@@ -210,6 +210,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                         birthdate: currentUser.user_metadata?.birthdate || null,
                         role: currentUser.user_metadata?.role || 'resident',
                         is_verified: false,
+                        is_rejected: false,
                         resident_id_number: null,
                         resident_qr_id: null,
                         sectors: currentUser.user_metadata?.sectors || [],
