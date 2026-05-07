@@ -621,7 +621,7 @@ function RegisterContent() {
                                                         padding: '0.5rem 0.65rem',
                                                         borderRadius: '8px',
                                                         border: `1.5px solid ${isSelected ? '#6366f1' : '#e2e8f0'}`,
-                                                        background: isSelected ? 'rgba(99, 102, 241, 0.06)' : '#fff',
+                                                        background: isSelected ? 'rgba(34, 197, 94, 0.06)' : '#fff',
                                                         cursor: 'pointer',
                                                         transition: 'all 0.15s ease',
                                                         fontSize: '0.78rem',
@@ -696,7 +696,14 @@ function RegisterContent() {
                             className={styles.submitButton}
                             disabled={loading}
                         >
-                            {loading ? 'Creating Account and Uploading ID...' : 'Create Account'}
+                            {loading ? (
+                                <>
+                                    <span className={styles.spinner}></span>
+                                    Creating Account...
+                                </>
+                            ) : (
+                                'Create Account'
+                            )}
                         </button>
                     </form>
 

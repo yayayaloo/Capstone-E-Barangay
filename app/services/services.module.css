@@ -4,7 +4,7 @@
 }
 
 .hero {
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+    background: linear-gradient(135deg, #1e3a8a 0%, #16a34a 50%, #22c55e 100%);
     padding: 3rem 0 4rem;
     position: relative;
     overflow: hidden;
@@ -250,7 +250,7 @@
 }
 
 .feeFree { background: #d1fae5; color: #065f46; }
-.feePaid { background: #dbeafe; color: #1e40af; }
+.feePaid { background: #dcfce7; color: #1e40af; }
 
 .reqPill {
     display: inline-flex;
@@ -285,7 +285,7 @@
 .applyBtn:hover {
     background: var(--primary-700);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
     color: #fff;
 }
 

@@ -46,7 +46,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
                     <div style={{
                         width: '48px',
                         height: '48px',
-                        border: '4px solid rgba(99, 102, 241, 0.3)',
+                        border: '4px solid rgba(34, 197, 94, 0.3)',
                         borderTop: '4px solid #6366f1',
                         borderRadius: '50%',
                         animation: 'spin 1s linear infinite',

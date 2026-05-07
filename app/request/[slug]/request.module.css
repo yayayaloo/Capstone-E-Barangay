@@ -5,7 +5,7 @@
 
 /* ── Header ── */
 .header {
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    background: linear-gradient(135deg, #1e3a8a 0%, #16a34a 100%);
     padding: 1.25rem 0;
     position: sticky;
     top: 0;
@@ -102,7 +102,7 @@
 }
 
 .metaFree { background: #d1fae5; color: #065f46; }
-.metaPaid { background: #dbeafe; color: #1e40af; }
+.metaPaid { background: #dcfce7; color: #1e40af; }
 .metaReq { background: var(--bg-tertiary); color: var(--text-secondary); }
 
 /* ── Form Container ── */
@@ -287,7 +287,7 @@
 .submitBtn:hover:not(:disabled) {
     background: var(--primary-700);
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 16px rgba(22, 163, 74, 0.3);
 }
 
 .submitBtn:disabled {

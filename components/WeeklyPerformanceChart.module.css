@@ -77,9 +77,9 @@
 }
 
 .trendBadge[data-trend="stable"] {
-    background: rgba(99, 102, 241, 0.12);
+    background: rgba(34, 197, 94, 0.12);
     color: #a5b4fc;
-    border: 1px solid rgba(99, 102, 241, 0.25);
+    border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
 .changeBadge {
@@ -131,7 +131,7 @@
     background: #ffffff !important;
     border-color: #6366f1 !important;
     color: #6366f1 !important;
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
 }
 
 .metricActive[data-metric="completed"] {
@@ -312,7 +312,7 @@
 }
 
 .insight_stable {
-    border-left: 3px solid #3b82f6;
+    border-left: 3px solid #22c55e;
 }
 
 .insightIcon {

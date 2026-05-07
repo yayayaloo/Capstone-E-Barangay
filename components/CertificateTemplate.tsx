@@ -9,6 +9,7 @@ export interface CertificateData {
     purpose: string
     dateIssued: string
     expirationDate?: string
+    formData?: Record<string, any>
 }
 
 interface Props {
@@ -21,152 +22,294 @@ const CertificateTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) =>
     const renderBody = () => {
         const type = data.documentType.toLowerCase()
         const upperName = data.residentName.toUpperCase()
+        
+        const d = new Date(data.dateIssued);
+        let ordinalDate = data.dateIssued;
+        let dayStr = "";
+        let suffixStr = "";
+        let monthName = "";
+        let yearNum = "";
+        if (!isNaN(d.getTime())) {
+            const day = d.getDate();
+            dayStr = day.toString();
+            suffixStr = (day > 0 ? ['th', 'st', 'nd', 'rd'][(day > 3 && day < 21) || day % 10 > 3 ? 0 : day % 10] : '');
+            monthName = d.toLocaleDateString('en-US', { month: 'long' });
+            yearNum = d.getFullYear().toString();
+            ordinalDate = `${dayStr}${suffixStr} day of ${monthName} ${yearNum}`;
+        }
 
-        if (type.includes('job seeker')) {
+        if (type.includes('job seeker') || type.includes('first time')) {
             return (
                 <div style={{ fontSize: '16px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
-                    <h1 style={{ textAlign: 'center', fontSize: '22px', textTransform: 'uppercase', marginBottom: '40px', letterSpacing: '1px', color: '#111827' }}>
-                        FIRST TIME JOB SEEKER CERTIFICATE <br/> <span style={{fontSize: '16px'}}>(R.A. 11261)</span>
+                    <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 'bold', marginBottom: '5px', color: '#000' }}>
+                        BARANGAY CERTIFICATION
                     </h1>
-                    <p style={{ fontWeight: 'bold', marginBottom: '20px' }}>TO WHOM IT MAY CONCERN:</p>
+                    <h2 style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', marginBottom: '30px', color: '#000' }}>
+                        (First Time Jobseekers Assistance Act-RA 11261)
+                    </h2>
                     <p style={{ textIndent: '40px' }}>
-                        This is to certify that <strong>{upperName}</strong>, of legal age, is a bonafide resident of Barangay Gordon Heights, Olongapo City.
+                        <strong>THIS IS TO CERTIFY</strong> that MR./MS. <strong>{upperName}</strong>, is a bona fide resident of this barangay with postal address of <strong>{data.formData?.address || '__________________________________________'}</strong> (complete address) for <strong>{data.formData?.yearsOfResidency || '______'}</strong> year(s), is a qualified availee of <strong>RA 11261</strong> or the <strong>First Time Jobseekers Assistance Act of 2019.</strong>
                     </p>
                     <p style={{ textIndent: '40px' }}>
-                        This certification is issued pursuant to <strong>Republic Act No. 11261</strong>, otherwise known as the "First Time Jobseekers Assistance Act", to attest that the above-named individual is a first-time job seeker and is qualified to avail of the benefits and privileges granted under the said law.
+                        I further certify that the holder/bearer was informed of his/her rights, including the duties and responsibilities accorded by RA 11261 through the <strong>Oath of Undertaking</strong> he/she has signed and executed in the presence of Barangay Official/s.
+                    </p>
+                    <p style={{ textIndent: '40px', marginTop: '20px' }}>
+                        Signed this <strong>{dayStr}<sup>{suffixStr.toUpperCase()}</sup></strong> day of <strong>{monthName.toUpperCase()} {yearNum}</strong> in the City/Municipality of <strong>OLONGAPO CITY</strong>.
                     </p>
                     <p style={{ textIndent: '40px' }}>
-                        I further certify that the applicant has been informed of his/her rights and responsibilities and has executed the Oath of Undertaking before me this day.
+                        This certification is valid only until <strong>{data.expirationDate?.toUpperCase() || '_________________'}</strong> one (1) year from the issuance
                     </p>
-                    <p style={{ textIndent: '40px', marginTop: '30px' }}>
-                        Issued this <strong>{data.dateIssued}</strong> at the Office of the Punong Barangay, Gordon Heights, Olongapo City.
-                    </p>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40px' }}>
+                        <div>
+                            <p style={{ margin: 0, fontWeight: 'bold' }}>HON. EVANGELINE D. TINGA</p>
+                            <p style={{ margin: 0, fontSize: '14px' }}>BARANGAY KAGAWAD</p>
+                            <p style={{ margin: 0, fontSize: '14px', fontStyle: 'italic' }}>Signature over Printed name</p>
+                            <p style={{ margin: '15px 0 0 0', fontWeight: 'bold' }}>{data.dateIssued.toUpperCase()}</p>
+                            <p style={{ margin: 0, fontSize: '14px' }}>Date</p>
+                            
+                            <p style={{ margin: '20px 0 0 0' }}>Witnessed by:</p>
+                            <p style={{ margin: '20px 0 0 0', fontWeight: 'bold' }}>SEC. SHAN RACEN GENRHYC B. LABABIT</p>
+                            <p style={{ margin: 0, fontSize: '14px' }}>BARANGAY SECRETARY</p>
+                            <p style={{ margin: 0, fontSize: '14px', fontStyle: 'italic' }}>Signature over Printed Name</p>
+                            <p style={{ margin: '15px 0 0 0', fontWeight: 'bold' }}>{data.dateIssued.toUpperCase()}</p>
+                            <p style={{ margin: 0, fontSize: '14px' }}>Date</p>
+                        </div>
+                    </div>
+                    
+                    <div style={{ marginTop: '30px' }}>
+                        <p style={{ margin: 0 }}>Type of ID: {data.formData?.idType || '__________________'}</p>
+                        <p style={{ margin: 0 }}>ID Number: {data.formData?.idNumber || '__________________'}</p>
+                        <p style={{ margin: '20px 0 0 0', fontWeight: 'bold' }}>THIS FORM NEED NOT BE NOTARIZED</p>
+                        <p style={{ margin: 0, fontSize: '12px' }}>RA 11261 Form 1</p>
+                    </div>
                 </div>
             )
         }
 
         if (type.includes('indigency')) {
             return (
-                <div style={{ fontSize: '18px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
-                    <h1 style={{ textAlign: 'center', fontSize: '28px', textTransform: 'uppercase', marginBottom: '40px', letterSpacing: '2px', color: '#111827' }}>
+                <div style={{ fontSize: '16px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
+                    <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 'bold', marginBottom: '30px', color: '#000' }}>
                         CERTIFICATE OF INDIGENCY
                     </h1>
                     <p style={{ fontWeight: 'bold', marginBottom: '20px' }}>TO WHOM IT MAY CONCERN:</p>
                     <p style={{ textIndent: '40px' }}>
-                        This is to certify that <strong>{upperName}</strong>, of legal age, is a bonafide resident of Barangay Gordon Heights, Olongapo City.
+                        <strong>THIS IS TO CERTIFY</strong> that <strong>{upperName}</strong>, <strong>{data.formData?.age || '_____'}</strong> years old, <strong>{data.formData?.civilStatus || '____________'}</strong> (civil status), born on <strong>{data.formData?.birthdate ? new Date(data.formData.birthdate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '__________________'}</strong>, is a bona fide resident of this barangay with postal address <strong>{data.formData?.address || '__________________________________________'}</strong>, belongs to an <strong>indigent family</strong>.
                     </p>
                     <p style={{ textIndent: '40px' }}>
-                        Based on the records and evaluation of this office, it is hereby certified that the above-named individual belongs to an indigent family and/or marginalized sector within our barangay jurisdiction.
+                        As verified in our existing records and from other reliable sources, the subject person has never been accused, investigated, or detained for any crime inimical to moral turpitude or other related criminal acts.
                     </p>
                     <p style={{ textIndent: '40px' }}>
-                        This <strong>Certificate of Indigency</strong> is being issued upon the request of the aforementioned person to be used for <strong>{data.purpose || 'medical assistance, scholarship, or financial aid'}</strong>.
+                        This certification is issued upon the request of <strong>{upperName}</strong> for his/her <strong>{data.purpose.toUpperCase() || 'EDUCATIONAL ASSISTANCE PURPOSES'}</strong> and for whatever <strong>LEGAL INTENT</strong> it may serve.
                     </p>
                     <p style={{ textIndent: '40px', marginTop: '30px' }}>
-                        Issued this <strong>{data.dateIssued}</strong> at the Office of the Punong Barangay, Gordon Heights, Olongapo City.
+                        Issued this <strong>{dayStr}<sup>{suffixStr}</sup></strong> day of <strong>{monthName} {yearNum}</strong> at <strong>Barangay Gordon Heights, Olongapo City, Philippines.</strong>
                     </p>
-                </div>
-            )
-        }
-
-        if (type.includes('clearance') && !type.includes('business')) {
-            return (
-                <div style={{ fontSize: '18px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '30px' }}>
-                    <h1 style={{ textAlign: 'center', fontSize: '28px', textTransform: 'uppercase', marginBottom: '40px', letterSpacing: '2px', color: '#111827' }}>
-                        BARANGAY CLEARANCE
-                    </h1>
-                    <p style={{ fontWeight: 'bold', marginBottom: '20px' }}>TO WHOM IT MAY CONCERN:</p>
-                    <p style={{ textIndent: '40px' }}>
-                        This is to certify that <strong>{upperName}</strong>, of legal age, is a bonafide resident of Barangay Gordon Heights, Olongapo City.
-                    </p>
-                    <p style={{ textIndent: '40px' }}>
-                        Based on the records of this office, the above-named individual is known to be of good moral character, a law-abiding citizen, and has <strong>NO PENDING DEROGATORY RECORD</strong> or criminal case filed against them at the barangay level as of this date.
-                    </p>
-                    <p style={{ textIndent: '40px' }}>
-                        This <strong>Barangay Clearance</strong> is being issued upon the request of the aforementioned person for <strong>{data.purpose || 'employment or legal purposes'}</strong>.
-                    </p>
-                    <p style={{ textIndent: '40px', marginTop: '30px', marginBottom: '30px' }}>
-                        Issued this <strong>{data.dateIssued}</strong> at the Office of the Punong Barangay, Gordon Heights, Olongapo City.
-                    </p>
-
-                    <div style={{ display: 'flex', gap: '40px', marginTop: '20px', justifyContent: 'flex-start', alignItems: 'flex-end' }}>
-                        <div style={{ width: '120px', height: '120px', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ color: '#aaa', fontSize: '12px', textAlign: 'center' }}>Right<br/>Thumbmark</span>
-                        </div>
-                        <div style={{ textAlign: 'center', flex: 1, maxWidth: '250px' }}>
-                            <div style={{ borderBottom: '1px solid #000', height: '40px', width: '100%' }}></div>
-                            <p style={{ margin: '5px 0 0 0', fontSize: '14px', fontWeight: 'bold' }}>{upperName}</p>
-                            <p style={{ margin: '0', fontSize: '12px' }}>Signature of Applicant</p>
-                        </div>
+                    <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'center', paddingRight: '40px' }}>
+                        <p style={{ margin: '0 0 20px 0' }}>By the authority of the Punong Barangay:</p>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>HON. PRISCILLA B. PONGE</p>
+                        <br/>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>SEC. SHAN RACEN GENRHYC B. LABABIT</p>
+                        <p style={{ margin: 0, fontSize: '14px' }}>Barangay Secretary</p>
+                    </div>
+                    <div style={{ marginTop: '40px', fontSize: '14px' }}>
+                        <p style={{ margin: 0 }}>Note: This clearance is valid only for six months upon issue.</p>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>NOT VALID WITHOUT THE BARANGAY SEAL</p>
                     </div>
                 </div>
             )
         }
 
-        if (type.includes('lot') || type.includes('building')) {
+        if (type.includes('residency') || type.includes('clearance') && !type.includes('business')) {
             return (
-                <div style={{ fontSize: '18px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
-                    <h1 style={{ textAlign: 'center', fontSize: '28px', textTransform: 'uppercase', marginBottom: '40px', letterSpacing: '2px', color: '#111827' }}>
-                        LOT / BUILDING CERTIFICATION
+                <div style={{ fontSize: '16px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
+                    <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 'bold', marginBottom: '30px', color: '#000' }}>
+                        CERTIFICATE OF RESIDENCY
                     </h1>
                     <p style={{ fontWeight: 'bold', marginBottom: '20px' }}>TO WHOM IT MAY CONCERN:</p>
                     <p style={{ textIndent: '40px' }}>
-                        This is to certify that <strong>{upperName}</strong> is a bonafide resident of Barangay Gordon Heights, Olongapo City, and is the recognized occupant/claimant of a lot/structure located within the jurisdiction of this barangay.
+                        <strong>THIS IS TO CERTIFY</strong> that <strong>{upperName}</strong>, <strong>{data.formData?.age || '_____'}</strong> years old, <strong>{data.formData?.civilStatus || '____________'}</strong> (civil status), born on <strong>{data.formData?.birthdate ? new Date(data.formData.birthdate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '__________________'}</strong>, is a bona fide resident of this barangay since <strong>{data.formData?.residentSince || '________'}</strong> up to present with postal address at <strong>{data.formData?.address || '__________________________________________'}</strong> is known to me as a person of good moral character, and a law-abiding citizen of the community.
                     </p>
                     <p style={{ textIndent: '40px' }}>
-                        This further certifies that, as per records of the Barangay Lupon, there are currently <strong>no boundary disputes, conflicts, or pending cases</strong> filed against the said property at the barangay level.
+                        As verified in our existing records and from other reliable source, subject person has never been accused, investigated nor detained for any crime inimical to moral turpitude and other related criminal acts.
                     </p>
                     <p style={{ textIndent: '40px' }}>
-                        This <strong>Lot/Building Certification</strong> is issued upon the request of the aforementioned person in connection with <strong>{data.purpose || 'building permit application or electrical/water connection'}</strong>.
+                        This certification is issued upon the request of <strong>{upperName}</strong> for <strong>{data.purpose.toUpperCase() || 'RECORD PURPOSES'}</strong> and for whatever <strong>LEGAL INTENT</strong> it may serve.
                     </p>
                     <p style={{ textIndent: '40px', marginTop: '30px' }}>
-                        Issued this <strong>{data.dateIssued}</strong> at the Office of the Punong Barangay, Gordon Heights, Olongapo City.
+                        Issued this <strong>{dayStr}<sup>{suffixStr}</sup></strong> day of <strong>{monthName} {yearNum}</strong> at <strong>Barangay Gordon Heights, Olongapo City, Philippines.</strong>
                     </p>
+                    <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'center', paddingRight: '40px' }}>
+                        <p style={{ margin: '0 0 20px 0' }}>By the authority of the Punong Barangay:</p>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>HON. PRISCILLA B. PONGE</p>
+                        <br/>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>SHAN RACEN GENRHYC B. LABABIT</p>
+                        <p style={{ margin: 0, fontSize: '14px' }}>Barangay Secretary</p>
+                    </div>
+                    <div style={{ marginTop: '30px' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>{upperName}</p>
+                        <p style={{ margin: 0, fontStyle: 'italic', fontSize: '14px' }}>(Signature)</p>
+                    </div>
+                    <div style={{ marginTop: '40px', fontSize: '14px' }}>
+                        <p style={{ margin: 0 }}>Note: This clearance is valid only for three months upon issue.</p>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>NOT VALID WITHOUT THE BARANGAY SEAL.</p>
+                    </div>
+                </div>
+            )
+        }
+
+        if (type.includes('lot') || type.includes('occupancy') || type.includes('building')) {
+            return (
+                <div style={{ fontSize: '16px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
+                    <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 'bold', marginBottom: '30px', color: '#000' }}>
+                        CERTIFICATION OF LOT OCCUPANCY/POSSESSION
+                    </h1>
+                    <p style={{ fontWeight: 'bold', marginBottom: '20px', fontStyle: 'italic' }}>TO WHOM IT MAY CONCERN:</p>
+                    <p style={{ textIndent: '40px', fontStyle: 'italic' }}>
+                        This is to certify that as per records shown and submitted at this office by the applicant, and as verified, <strong>{upperName}</strong> is the lawful owners and actual occupants of a certain parcel of lot approximately <strong>{data.formData?.lotArea || '__________'}</strong> square meters, more or less, paid under Tax Declaration No. <strong>{data.formData?.taxDecNo || '____________________'}</strong> located at <strong>{data.formData?.propertyLocation || '__________________________________________'}</strong>, particularly described as follows;
+                    </p>
+                    <div style={{ paddingLeft: '40px', fontStyle: 'italic', margin: '20px 0' }}>
+                        <p style={{ margin: 0 }}>Bounded: On the North by OCCUPIED LOT</p>
+                        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', paddingTop: '5px' }}>On the South by OCCUPIED LOT</h2>
+                        <p style={{ margin: 0, paddingTop: '5px' }}>On the East by OCCUPIED LOT</p>
+                        <p style={{ margin: 0 }}>On the West by OCCUPIED LOT</p>
+                    </div>
+                    <p style={{ fontStyle: 'italic' }}>
+                        Containing an area of approximately <strong>{data.formData?.lotArea || '__________'}</strong> square meters more or less,
+                    </p>
+                    <p style={{ fontStyle: 'italic' }}>
+                        That <strong>{upperName}</strong> is in the possession of the aforementioned lot since <strong>{data.formData?.occupiedSince || '__________'}</strong>
+                    </p>
+                    <p style={{ fontStyle: 'italic' }}>
+                        <strong>/ XX /- DEED OF SALE</strong> as per Doc. No. <strong>{data.formData?.docNo || '______'}</strong>, Page No. <strong>{data.formData?.pageNo || '______'}</strong>, Book No. <strong>{data.formData?.bookNo || '______'}</strong>, Series of <strong>{data.formData?.seriesOf || '______'}</strong>.
+                    </p>
+                    <p style={{ fontStyle: 'italic' }}>
+                        That the <strong>DEED OF SALE</strong> was notarized by Atty. <strong>{data.formData?.notarizedBy || '____________________'}</strong> on the <strong>{data.formData?.notarizedOn || '____________________'}</strong>;
+                    </p>
+                    <p style={{ fontStyle: 'italic' }}>
+                        This certification is issued upon request of <strong>{upperName}</strong> for <strong>{data.purpose.toUpperCase() || 'LEGAL PURPOSES'}</strong> without prejudice action to other interested parties may deem on the premises.
+                    </p>
+                    <p style={{ textIndent: '40px', marginTop: '20px', fontStyle: 'italic' }}>
+                        Issued this <strong>{dayStr}<sup>{suffixStr}</sup></strong> day of <strong>{monthName} {yearNum}</strong> at Barangay Gordon Heights, Olongapo City, Philippines.
+                    </p>
+                    <div style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'center', paddingRight: '40px' }}>
+                        <p style={{ margin: '0 0 20px 0', fontStyle: 'italic' }}>By the Authority of Punong Barangay <strong>Hon. PRISCILLA B. PONGE.</strong></p>
+                        <p style={{ margin: 0, fontWeight: 'bold', fontStyle: 'italic' }}>SHAN RACEN GENRHYC B. LABABIT</p>
+                        <p style={{ margin: 0, fontSize: '14px', fontStyle: 'italic' }}>Barangay Secretary</p>
+                    </div>
+                    <div style={{ marginTop: '30px', fontStyle: 'italic', fontSize: '14px' }}>
+                        <p style={{ margin: 0 }}>Paid under:</p>
+                        <div style={{ paddingLeft: '40px', marginTop: '10px' }}>
+                            <p style={{ margin: 0 }}>O.R. No.: {data.formData?.orNo || '_________________'}</p>
+                            <p style={{ margin: 0 }}>Amount: Php {data.formData?.amount || '_________________'}</p>
+                            <p style={{ margin: 0 }}>Issued on: {data.formData?.orIssuedOn || '_________________'}</p>
+                            <p style={{ margin: 0 }}>Issued at: Barangay Gordon Heights, Olongapo City</p>
+                        </div>
+                    </div>
+                    <div style={{ marginTop: '40px' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold', fontStyle: 'italic' }}>NOT VALID WITHOUT BARANGAY SEAL</p>
+                    </div>
                 </div>
             )
         }
 
         if (type.includes('business')) {
             return (
-                <div style={{ fontSize: '18px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
-                    <h1 style={{ textAlign: 'center', fontSize: '28px', textTransform: 'uppercase', marginBottom: '40px', letterSpacing: '2px', color: '#111827' }}>
-                        BARANGAY BUSINESS CLEARANCE
+                <div style={{ fontSize: '16px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
+                    <p style={{ margin: 0 }}><strong>GDH</strong>-BPI-{yearNum}-_____</p>
+                    <p style={{ margin: 0 }}><strong>New Business / Renewal</strong></p>
+                    
+                    <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 'bold', margin: '30px 0', color: '#000' }}>
+                        ENDORSEMENT
                     </h1>
-                    <p style={{ fontWeight: 'bold', marginBottom: '20px' }}>TO WHOM IT MAY CONCERN:</p>
+                    
+                    <p style={{ fontWeight: 'bold', textAlign: 'center' }}>THIS IS TO ENDORSE</p>
+                    
+                    <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold', textDecoration: 'underline' }}>{data.formData?.businessName?.toUpperCase() || '__________________________________________'}</p>
+                        <p style={{ margin: 0, fontSize: '14px' }}>(Business Name or Trade Activity)</p>
+                    </div>
+                    
+                    <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold', textDecoration: 'underline' }}>{data.formData?.businessLocation?.toUpperCase() || '__________________________________________'}</p>
+                        <p style={{ margin: 0, fontSize: '14px' }}>(Location)</p>
+                    </div>
+                    
+                    <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>{data.formData?.operatorName?.toUpperCase() || upperName}</p>
+                        <p style={{ margin: 0, fontSize: '14px' }}>(Operator/Manager)</p>
+                    </div>
+                    
+                    <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold', textDecoration: 'underline' }}>{data.formData?.operatorAddress?.toUpperCase() || '__________________________________________'}</p>
+                        <p style={{ margin: 0, fontSize: '14px' }}>(Address)</p>
+                    </div>
+                    
+                    <p style={{ marginTop: '30px' }}>
+                        Applying for the corresponding <strong>BUSINESS PERMIT</strong> that has been found to be:
+                    </p>
+                    
+                    <div style={{ paddingLeft: '20px', margin: '15px 0' }}>
+                        <p style={{ margin: 0 }}><strong>___ COMPLIANT</strong> with the provisions of existing Barangay Ordinances, rules and regulations being enforced in this barangay;</p>
+                        <p style={{ margin: '10px 0' }}><strong>/</strong></p>
+                        <p style={{ margin: 0 }}><strong>___ NON-COMPLIANT</strong> with the provisions of existing Barangay Ordinances, rules and regulations being enforced in this barangay.</p>
+                    </div>
+                    
                     <p style={{ textIndent: '40px' }}>
-                        This clearance is hereby granted to <strong>{upperName}</strong> to establish, operate, and maintain a business/enterprise within the territorial jurisdiction of Barangay Gordon Heights, Olongapo City.
+                        In view of the foregoing, this barangay, thru the undersigned,
                     </p>
-                    <p style={{ textIndent: '40px' }}>
-                        This certifies that the business operation does not violate any existing barangay ordinances and that the operator has complied with the preliminary requirements set forth by the barangay.
+                    
+                    <div style={{ paddingLeft: '20px', margin: '15px 0' }}>
+                        <p style={{ margin: 0 }}>___ <strong>Interposes NO OBJECTION</strong> for the issuance of the corresponding Mayor's Permit being applied for.</p>
+                        <p style={{ margin: '10px 0' }}><strong>/</strong></p>
+                        <p style={{ margin: 0 }}>___ <strong>Recommends for the NON-ISSUANCE</strong> of the corresponding Mayor's Permit being applied for.</p>
+                    </div>
+                    
+                    <p style={{ marginTop: '30px' }}>
+                        Issued this <strong>{dayStr}<sup>{suffixStr}</sup> day</strong> of <strong>{monthName} {yearNum}.</strong>
                     </p>
-                    <p style={{ textIndent: '40px' }}>
-                        This <strong>Barangay Business Clearance</strong> is issued for the purpose of securing a Mayor's Permit or Business License, subject to the provisions of the City Revenue Code and other applicable laws.
-                    </p>
-                    <p style={{ textIndent: '40px', marginTop: '30px' }}>
-                        Issued this <strong>{data.dateIssued}</strong> at the Office of the Punong Barangay, Gordon Heights, Olongapo City.
-                    </p>
+                    
+                    <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <p style={{ margin: '0 0 20px 0', fontWeight: 'bold' }}>BY AUTHORITY OF THE PUNONG BARANGAY</p>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>HON. PRISCILLA B. PONGE</p>
+                        <br/>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>SHAN RACEN GENRHYC B. LABABIT</p>
+                        <p style={{ margin: 0, fontSize: '14px' }}>Barangay Secretary</p>
+                    </div>
                 </div>
             )
         }
 
         // Default Certification
         return (
-            <div style={{ fontSize: '18px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
-                <h1 style={{ textAlign: 'center', fontSize: '28px', textTransform: 'uppercase', marginBottom: '40px', letterSpacing: '2px', color: '#111827' }}>
-                    BARANGAY CERTIFICATION
+            <div style={{ fontSize: '16px', lineHeight: '1.8', textAlign: 'justify', marginBottom: '40px' }}>
+                <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 'bold', marginBottom: '30px', color: '#000' }}>
+                    BARANGAY CLEARANCE / CERTIFICATION
                 </h1>
                 <p style={{ fontWeight: 'bold', marginBottom: '20px' }}>TO WHOM IT MAY CONCERN:</p>
                 <p style={{ textIndent: '40px' }}>
-                    This is to certify that <strong>{upperName}</strong>, of legal age, is a bonafide resident of Barangay Gordon Heights, Olongapo City.
+                    <strong>THIS IS TO CERTIFY</strong> that <strong>{upperName}</strong>, of legal age, is a bona fide resident of this barangay.
                 </p>
                 <p style={{ textIndent: '40px' }}>
-                    Based on the records of this office, the above-named individual is known to be of good moral character, a law-abiding citizen, and has no pending derogatory record/s filed against them as of this date.
+                    As verified in our existing records and from other reliable sources, the subject person has never been accused, investigated, or detained for any crime inimical to moral turpitude or other related criminal acts.
                 </p>
                 <p style={{ textIndent: '40px' }}>
-                    This <strong>{data.documentType}</strong> is being issued upon the request of the aforementioned person for the purpose of <strong>{data.purpose || 'general requirements'}</strong>.
+                    This <strong>{data.documentType.toUpperCase()}</strong> is being issued upon the request of the aforementioned person for <strong>{data.purpose.toUpperCase() || 'GENERAL PURPOSES'}</strong> and for whatever <strong>LEGAL INTENT</strong> it may serve.
                 </p>
                 <p style={{ textIndent: '40px', marginTop: '30px' }}>
-                    Issued this <strong>{data.dateIssued}</strong> at the Office of the Punong Barangay, Gordon Heights, Olongapo City, Philippines.
+                    Issued this <strong>{data.dateIssued}</strong> at <strong>Barangay Gordon Heights, Olongapo City, Philippines.</strong>
                 </p>
+                <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'center', paddingRight: '40px' }}>
+                    <p style={{ margin: '0 0 20px 0' }}>By the authority of the Punong Barangay:</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>HON. PRISCILLA B. PONGE</p>
+                    <br/>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>SEC. SHAN RACEN GENRHYC B. LABABIT</p>
+                    <p style={{ margin: 0, fontSize: '14px' }}>Barangay Secretary</p>
+                </div>
+                <div style={{ marginTop: '40px', fontSize: '14px' }}>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>NOT VALID WITHOUT THE BARANGAY SEAL</p>
+                </div>
             </div>
         )
     }
@@ -237,24 +380,6 @@ const CertificateTemplate = forwardRef<HTMLDivElement, Props>(({ data }, ref) =>
                 <hr style={{ border: 'none', borderTop: '2px solid #000', marginTop: '10px', marginBottom: '40px' }} />
 
                 {renderBody()}
-
-                {/* Footer & Signature Block */}
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    {/* Notes on the left */}
-                    <div style={{ fontSize: '12px', color: '#333' }}>
-                        <p style={{ margin: '0 0 3px 0', fontWeight: 'bold' }}>Issued on: {data.dateIssued}</p>
-                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', color: '#dc2626' }}>
-                            Valid until: {data.expirationDate || 'N/A'}
-                        </p>
-                        <p style={{ margin: 0 }}>Not valid without the official dry seal.</p>
-                    </div>
-
-                    {/* Signature on the right */}
-                    <div style={{ textAlign: 'center', width: '300px' }}>
-                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>Hon. PRISCILLA B. PONGE</h3>
-                        <p style={{ margin: 0, fontSize: '16px' }}>Punong Barangay</p>
-                    </div>
-                </div>
 
             </div>
         </div>

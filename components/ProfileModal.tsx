@@ -141,7 +141,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                             Change Photo
                         </label>
 
-                        <div style={{ padding: '1rem', background: 'rgba(37, 99, 235, 0.05)', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.1)', width: '100%' }}>
+                        <div style={{ padding: '1rem', background: 'rgba(22, 163, 74, 0.05)', borderRadius: '12px', border: '1px solid rgba(22, 163, 74, 0.1)', width: '100%' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--primary-600)', fontSize: '0.85rem', fontWeight: 700 }}>
                                 <AlertCircle size={16} /> REQUIRED GUIDELINES:
                             </div>
@@ -243,7 +243,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                                             padding: '0.6rem 0.75rem',
                                             borderRadius: '8px',
                                             border: `1.5px solid ${isSelected ? 'var(--primary-500, #6366f1)' : 'var(--border-color)'}`,
-                                            background: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                                            background: isSelected ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
                                             cursor: 'pointer',
                                             transition: 'all 0.15s ease',
                                             fontSize: '0.8rem',

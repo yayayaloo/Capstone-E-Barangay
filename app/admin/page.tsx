@@ -13,9 +13,9 @@ import { ServiceRequest, Announcement, Profile, AuditLog, BlotterReport, Blotter
 import { logAdminAction } from '@/lib/audit'
 import { QRCodeCanvas } from 'qrcode.react'
 import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
-import WeeklyPerformanceChart from '@/components/WeeklyPerformanceChart'
-import SectoralChart from '@/components/SectoralChart'
-import AgeDemographicChart from '@/components/AgeDemographicChart'
+const WeeklyPerformanceChart = dynamic(() => import('@/components/WeeklyPerformanceChart'), { ssr: false })
+const SectoralChart = dynamic(() => import('@/components/SectoralChart'), { ssr: false })
+const AgeDemographicChart = dynamic(() => import('@/components/AgeDemographicChart'), { ssr: false })
 import ConfirmDialog from '@/components/ConfirmDialog'
 import styles from './admin.module.css'
 
@@ -90,6 +90,7 @@ function AdminDashboardContent() {
     const [activeTab, setActiveTab] = useState('overview')
     const [analyticsView, setAnalyticsView] = useState<'overview' | 'trends' | 'demographics'>('overview')
     const [loading, setLoading] = useState(true)
+    const loadedTabs = useRef<Record<string, boolean>>({})
 
     const [requests, setRequests] = useState<ServiceRequest[]>([])
     const [residents, setResidents] = useState<Profile[]>([])
@@ -166,7 +167,7 @@ function AdminDashboardContent() {
     }, [])
 
     useEffect(() => {
-        fetchDataForTab(activeTab)
+        fetchDataForTab(activeTab, true)
     }, [activeTab])
 
     const fetchOverviewStats = async () => {
@@ -198,7 +199,9 @@ function AdminDashboardContent() {
         }
     }
 
-    const fetchDataForTab = async (tab: string) => {
+    const fetchDataForTab = async (tab: string, forceRefresh = false) => {
+        if (!forceRefresh && loadedTabs.current[tab]) return;
+
         setLoading(true)
         try {
             if (tab === 'overview') {
@@ -254,6 +257,7 @@ function AdminDashboardContent() {
                     setComplaints(mappedComplaints as Complaint[])
                 }
             }
+            loadedTabs.current[tab] = true;
         } catch (error: any) {
             console.error('Error fetching tab data:', error)
             showToast('Failed to load dashboard data', 'error')
@@ -348,7 +352,7 @@ function AdminDashboardContent() {
                 await logAdminAction('UPDATE_REQUEST', `Updated request ${requestId.slice(0, 8)} to ${newStatus}${newStatus === 'ready' ? ' (QR code generated)' : ''}`, profile.id);
             }
 
-            fetchDataForTab(activeTab)
+            fetchDataForTab(activeTab, true)
             setNoteModal(null)
             setAdminNote('')
         } catch (error: any) {
@@ -475,7 +479,7 @@ function AdminDashboardContent() {
                     setAnnouncements(prev => prev.filter(a => a.id !== id))
                     const { error } = await supabase.from('announcements').delete().eq('id', id)
                     if (error) {
-                        fetchDataForTab(activeTab)
+                        fetchDataForTab(activeTab, true)
                         throw error
                     }
                     showToast('Announcement deleted', 'success')
@@ -501,7 +505,7 @@ function AdminDashboardContent() {
                 .eq('id', id)
 
             if (error) {
-                fetchDataForTab(activeTab)
+                fetchDataForTab(activeTab, true)
                 throw error
             }
             showToast('Announcement deleted', 'success')
@@ -530,7 +534,7 @@ function AdminDashboardContent() {
                     const idNumber = `GH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`
                     setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, is_rejected: false, resident_id_number: idNumber } : r))
                     const { error } = await supabase.from('profiles').update({ is_verified: true, is_rejected: false, resident_id_number: idNumber }).eq('id', residentId)
-                    if (error) { fetchDataForTab(activeTab); throw error }
+                    if (error) { fetchDataForTab(activeTab, true); throw error }
                     showToast('Resident verified successfully! Resident ID has been generated.', 'success')
                     if (profile?.id) await logAdminAction('VERIFY_RESIDENT', `Verified resident ID ${residentId.slice(0, 8)}`, profile.id)
                 } catch (error: any) {
@@ -560,7 +564,7 @@ function AdminDashboardContent() {
                 .eq('id', residentId)
 
             if (error) {
-                fetchDataForTab(activeTab) // Revert
+                fetchDataForTab(activeTab, true) // Revert
                 throw error
             }
 
@@ -586,7 +590,7 @@ function AdminDashboardContent() {
                 try {
                     setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: false, is_rejected: true } : r))
                     const { error } = await supabase.from('profiles').update({ is_verified: false, is_rejected: true }).eq('id', residentId)
-                    if (error) { fetchDataForTab(activeTab); throw error }
+                    if (error) { fetchDataForTab(activeTab, true); throw error }
                     showToast('Resident registration has been rejected.', 'error')
                     if (profile?.id) await logAdminAction('REJECT_RESIDENT', `Rejected resident registration ID ${residentId.slice(0, 8)}`, profile.id)
                 } catch (error: any) {
@@ -613,7 +617,7 @@ function AdminDashboardContent() {
                 .eq('id', residentId)
 
             if (error) {
-                fetchDataForTab(activeTab) // Revert
+                fetchDataForTab(activeTab, true) // Revert
                 throw error
             }
 
@@ -862,7 +866,7 @@ function AdminDashboardContent() {
             doc.text(`Fee: ${d.fee}  |  Req: ${d.reqs}`, col * colW + colW / 2, y + qrSize + 14, { align: 'center' })
 
             doc.setFontSize(6)
-            doc.setTextColor(37, 99, 235)
+            doc.setTextColor(22, 163, 74)
             doc.text(url, col * colW + colW / 2, y + qrSize + 19, { align: 'center' })
         })
 
@@ -1533,7 +1537,7 @@ function AdminDashboardContent() {
                                                                         <button
                                                                             key={idx}
                                                                             className="btn btn-outline"
-                                                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#2563eb' }}
+                                                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#16a34a' }}
                                                                             onClick={() => viewAttachment(path.trim())}
                                                                         >
                                                                             File {req.attachment_url!.includes(',') ? idx + 1 : ''}
@@ -1731,8 +1735,8 @@ function AdminDashboardContent() {
                                         </div>
 
                                         {/* Profile Header Card */}
-                                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '1.5rem', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.15)', marginBottom: '1.5rem' }}>
-                                            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '3px solid rgba(99, 102, 241, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '1.5rem', background: 'rgba(34, 197, 94, 0.06)', borderRadius: '16px', border: '1px solid rgba(34, 197, 94, 0.15)', marginBottom: '1.5rem' }}>
+                                            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '3px solid rgba(34, 197, 94, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
                                                 {res.profile_picture_url ? (
                                                     <img
                                                         src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${res.profile_picture_url}`}
@@ -1818,9 +1822,9 @@ function AdminDashboardContent() {
                                                             borderRadius: '99px',
                                                             fontSize: '0.72rem',
                                                             fontWeight: 600,
-                                                            background: 'rgba(99, 102, 241, 0.12)',
+                                                            background: 'rgba(34, 197, 94, 0.12)',
                                                             color: '#a5b4fc',
-                                                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                            border: '1px solid rgba(34, 197, 94, 0.2)',
                                                         }}>{s}</span>
                                                     ))}
                                                 </div>
@@ -1830,7 +1834,7 @@ function AdminDashboardContent() {
                                         </div>
 
                                         {/* ID Document Section */}
-                                        <div style={{ padding: '1.25rem', background: 'rgba(37, 99, 235, 0.06)', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.15)', marginBottom: '1.5rem' }}>
+                                        <div style={{ padding: '1.25rem', background: 'rgba(22, 163, 74, 0.06)', borderRadius: '12px', border: '1px solid rgba(22, 163, 74, 0.15)', marginBottom: '1.5rem' }}>
                                             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                                 Identity Verification Document
                                             </label>
@@ -1945,7 +1949,7 @@ function AdminDashboardContent() {
                                     </div>
                                 </div>
 
-                                <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: annCategory === 'emergency_alert' ? '4px solid #ef4444' : annCategory === 'emergency_announcement' ? '4px solid #f59e0b' : annCategory === 'important' ? '4px solid #f97316' : annCategory === 'community_event' ? '4px solid #3b82f6' : '4px solid #6b7280' }}>
+                                <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: annCategory === 'emergency_alert' ? '4px solid #ef4444' : annCategory === 'emergency_announcement' ? '4px solid #f59e0b' : annCategory === 'important' ? '4px solid #f97316' : annCategory === 'community_event' ? '4px solid #22c55e' : '4px solid #6b7280' }}>
                                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                         Create New Announcement
                                         {annCategory === 'emergency_alert' && (
@@ -1985,7 +1989,7 @@ function AdminDashboardContent() {
                                             value={annContent}
                                             onChange={e => setAnnContent(e.target.value)}
                                             style={{
-                                                borderColor: annCategory === 'emergency_alert' ? 'rgba(239,68,68,0.5)' : annCategory === 'emergency_announcement' ? 'rgba(245,158,11,0.5)' : annCategory === 'important' ? 'rgba(249,115,22,0.5)' : annCategory === 'community_event' ? 'rgba(59,130,246,0.5)' : 'rgba(107,114,128,0.4)'
+                                                borderColor: annCategory === 'emergency_alert' ? 'rgba(239,68,68,0.5)' : annCategory === 'emergency_announcement' ? 'rgba(245,158,11,0.5)' : annCategory === 'important' ? 'rgba(249,115,22,0.5)' : annCategory === 'community_event' ? 'rgba(34, 197, 94,0.5)' : 'rgba(107,114,128,0.4)'
                                             }}
                                         />
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -2011,9 +2015,9 @@ function AdminDashboardContent() {
                                                 onClick={publishAnnouncement}
                                                 disabled={publishing || !annContent.trim() || (annCategory !== 'emergency_alert' && !annTitle.trim())}
                                                 style={{
-                                                    background: annCategory === 'emergency_alert' ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : annCategory === 'emergency_announcement' ? 'linear-gradient(135deg, #d97706, #b45309)' : annCategory === 'important' ? 'linear-gradient(135deg, #ea580c, #c2410c)' : annCategory === 'community_event' ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : undefined,
-                                                    borderColor: annCategory === 'emergency_alert' ? '#dc2626' : annCategory === 'emergency_announcement' ? '#d97706' : annCategory === 'important' ? '#ea580c' : annCategory === 'community_event' ? '#2563eb' : undefined,
-                                                    boxShadow: annCategory === 'emergency_alert' ? '0 0 16px rgba(239,68,68,0.4)' : annCategory === 'emergency_announcement' ? '0 0 16px rgba(217,119,6,0.3)' : annCategory === 'important' ? '0 0 16px rgba(234,88,12,0.3)' : annCategory === 'community_event' ? '0 0 16px rgba(37,99,235,0.3)' : undefined
+                                                    background: annCategory === 'emergency_alert' ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : annCategory === 'emergency_announcement' ? 'linear-gradient(135deg, #d97706, #b45309)' : annCategory === 'important' ? 'linear-gradient(135deg, #ea580c, #c2410c)' : annCategory === 'community_event' ? 'linear-gradient(135deg, #16a34a, #15803d)' : undefined,
+                                                    borderColor: annCategory === 'emergency_alert' ? '#dc2626' : annCategory === 'emergency_announcement' ? '#d97706' : annCategory === 'important' ? '#ea580c' : annCategory === 'community_event' ? '#16a34a' : undefined,
+                                                    boxShadow: annCategory === 'emergency_alert' ? '0 0 16px rgba(239,68,68,0.4)' : annCategory === 'emergency_announcement' ? '0 0 16px rgba(217,119,6,0.3)' : annCategory === 'important' ? '0 0 16px rgba(234,88,12,0.3)' : annCategory === 'community_event' ? '0 0 16px rgba(22, 163, 74,0.3)' : undefined
                                                 }}
                                             >
                                                 {publishing ? 'Publishing...' : annCategory === 'emergency_alert' ? 'Publish Alert' : 'Publish'}

@@ -226,7 +226,14 @@ function LoginContent() {
                             className={styles.submitButton}
                             disabled={loading}
                         >
-                            {loading ? 'Signing In...' : 'Sign In'}
+                            {loading ? (
+                                <>
+                                    <span className={styles.spinner}></span>
+                                    Signing In...
+                                </>
+                            ) : (
+                                'Sign In'
+                            )}
                         </button>
                     </form>
 

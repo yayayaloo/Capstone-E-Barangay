@@ -168,11 +168,11 @@ export default function WeeklyPerformanceChart() {
 
     const getMetricColor = (metric: string) => {
         switch (metric) {
-            case 'total': return { main: '#6366f1', gradient: '#8b5cf6', glow: 'rgba(99,102,241,0.3)' }
+            case 'total': return { main: '#6366f1', gradient: '#8b5cf6', glow: 'rgba(34, 197, 94,0.3)' }
             case 'completed': return { main: '#10b981', gradient: '#34d399', glow: 'rgba(16,185,129,0.3)' }
             case 'pending': return { main: '#f59e0b', gradient: '#fbbf24', glow: 'rgba(245,158,11,0.3)' }
             case 'rejected': return { main: '#ef4444', gradient: '#f87171', glow: 'rgba(239,68,68,0.3)' }
-            default: return { main: '#6366f1', gradient: '#8b5cf6', glow: 'rgba(99,102,241,0.3)' }
+            default: return { main: '#6366f1', gradient: '#8b5cf6', glow: 'rgba(34, 197, 94,0.3)' }
         }
     }
 
@@ -479,7 +479,7 @@ export default function WeeklyPerformanceChart() {
                         <span className={styles.tooltipDot} style={{ background: '#f59e0b' }}></span>
                         <span>Pending</span>
                         <strong>{weeklyData[hoveredBar].pending}</strong>
-                        <span className={styles.tooltipDot} style={{ background: '#3b82f6' }}></span>
+                        <span className={styles.tooltipDot} style={{ background: '#22c55e' }}></span>
                         <span>Processing</span>
                         <strong>{weeklyData[hoveredBar].processing}</strong>
                         <span className={styles.tooltipDot} style={{ background: '#ef4444' }}></span>

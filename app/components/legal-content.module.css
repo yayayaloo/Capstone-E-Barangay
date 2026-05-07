@@ -6,7 +6,7 @@
     padding: 2rem;
     position: relative;
     overflow: hidden;
-    background: linear-gradient(135deg, #eff6ff 0%, #f9fafb 40%, #f0fdf4 100%);
+    background: linear-gradient(135deg, #f0fdf4 0%, #f9fafb 40%, #f0fdf4 100%);
 }
 
 .background {
@@ -20,7 +20,7 @@
     width: 600px;
     height: 600px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(99, 102, 241, 0.15), transparent 70%);
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.15), transparent 70%);
     top: -200px;
     left: -200px;
     animation: float 8s ease-in-out infinite;
@@ -69,13 +69,13 @@
     font-weight: 600;
     margin-bottom: 2rem;
     padding: 0.6rem 1.2rem;
-    background: rgba(99, 102, 241, 0.1);
+    background: rgba(34, 197, 94, 0.1);
     border-radius: 12px;
     transition: all 0.2s;
 }
 
 .backLink:hover {
-    background: rgba(99, 102, 241, 0.2);
+    background: rgba(34, 197, 94, 0.2);
     transform: translateX(-4px);
 }
 
@@ -165,13 +165,13 @@
     font-size: 1.75rem;
     text-decoration: none;
     border-radius: 50%;
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .iconBackButton:hover {
     transform: scale(1.1) rotate(-10deg);
-    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.5);
 }
 
 .iconBackButton span {

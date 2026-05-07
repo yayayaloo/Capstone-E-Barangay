@@ -5,7 +5,7 @@ import styles from './RequestModal.module.css'
 
 interface RequestModalProps {
     onClose: () => void
-    onSubmit: (documentType: string, purpose: string, attachments: File[]) => Promise<void>
+    onSubmit: (documentType: string, purpose: string, attachments: File[], formData?: Record<string, any>) => Promise<void>
     initialType?: string
 }
 
@@ -21,6 +21,7 @@ const documentTypes = [
 export default function RequestModal({ onClose, onSubmit, initialType }: RequestModalProps) {
     const [selectedType, setSelectedType] = useState(initialType || '')
     const [purpose, setPurpose] = useState('')
+    const [formData, setFormData] = useState<Record<string, any>>({})
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
@@ -60,7 +61,7 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
 
         setSubmitting(true)
         try {
-            await onSubmit(selectedType, purpose.trim(), attachments)
+            await onSubmit(selectedType, purpose.trim(), attachments, formData)
             onClose()
         } catch (err: any) {
             setError(err?.message || 'Failed to submit request. Please try again.')
@@ -114,6 +115,167 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                             rows={3}
                         />
                     </div>
+
+                    {(() => {
+                        if (!selectedType) return null
+
+                        const type = selectedType.toLowerCase()
+
+                        const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+                            setFormData({
+                                ...formData,
+                                [e.target.name]: e.target.value
+                            })
+                        }
+
+                        const inputStyle = { padding: '0.6rem', border: '1px solid var(--border-color)', borderRadius: '6px', width: '100%', marginTop: '0.2rem' }
+
+                        if (type.includes('job seeker') || type.includes('first time')) {
+                            return (
+                                <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                                    <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Additional Information Required</h4>
+                                    <div className={styles.inputGroup}>
+                                        <label>Complete Address *</label>
+                                        <input type="text" name="address" value={formData.address || ''} onChange={handleFormChange} required placeholder="Block 1, Lot 2, Gordon Heights..." style={inputStyle} />
+                                    </div>
+                                    <div className={styles.inputGroup}>
+                                        <label>Years of Residency *</label>
+                                        <input type="number" name="yearsOfResidency" value={formData.yearsOfResidency || ''} onChange={handleFormChange} required placeholder="e.g. 5" style={inputStyle} />
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <div className={styles.inputGroup}>
+                                            <label>Type of ID Presented *</label>
+                                            <input type="text" name="idType" value={formData.idType || ''} onChange={handleFormChange} required placeholder="e.g. National ID" style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>ID Number *</label>
+                                            <input type="text" name="idNumber" value={formData.idNumber || ''} onChange={handleFormChange} required placeholder="ID No." style={inputStyle} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (type.includes('indigency') || type.includes('certification') || type.includes('clearance') && !type.includes('business')) {
+                            return (
+                                <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                                    <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Additional Information Required</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                                        <div className={styles.inputGroup}>
+                                            <label>Age *</label>
+                                            <input type="number" name="age" value={formData.age || ''} onChange={handleFormChange} required placeholder="Age" style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Civil Status *</label>
+                                            <select name="civilStatus" value={formData.civilStatus || ''} onChange={handleFormChange} required style={inputStyle}>
+                                                <option value="">Select</option>
+                                                <option value="Single">Single</option>
+                                                <option value="Married">Married</option>
+                                                <option value="Widowed">Widowed</option>
+                                                <option value="Separated">Separated</option>
+                                            </select>
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Date of Birth *</label>
+                                            <input type="date" name="birthdate" value={formData.birthdate || ''} onChange={handleFormChange} required style={inputStyle} />
+                                        </div>
+                                    </div>
+                                    {type.includes('residency') && (
+                                        <div className={styles.inputGroup}>
+                                            <label>Resident Since (Year) *</label>
+                                            <input type="text" name="residentSince" value={formData.residentSince || ''} onChange={handleFormChange} required placeholder="e.g. 1990 or Birth" style={inputStyle} />
+                                        </div>
+                                    )}
+                                    <div className={styles.inputGroup}>
+                                        <label>Complete Address *</label>
+                                        <input type="text" name="address" value={formData.address || ''} onChange={handleFormChange} required placeholder="Block 1, Lot 2, Gordon Heights..." style={inputStyle} />
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (type.includes('lot') || type.includes('occupancy') || type.includes('building')) {
+                            return (
+                                <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                                    <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Property Details Required</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <div className={styles.inputGroup}>
+                                            <label>Lot Area (sqm) *</label>
+                                            <input type="number" name="lotArea" value={formData.lotArea || ''} onChange={handleFormChange} required placeholder="e.g. 200" style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Tax Declaration No. *</label>
+                                            <input type="text" name="taxDecNo" value={formData.taxDecNo || ''} onChange={handleFormChange} required placeholder="No." style={inputStyle} />
+                                        </div>
+                                    </div>
+                                    <div className={styles.inputGroup}>
+                                        <label>Property Location *</label>
+                                        <input type="text" name="propertyLocation" value={formData.propertyLocation || ''} onChange={handleFormChange} required placeholder="Complete address of lot" style={inputStyle} />
+                                    </div>
+                                    <div className={styles.inputGroup}>
+                                        <label>Occupied Since (Year) *</label>
+                                        <input type="text" name="occupiedSince" value={formData.occupiedSince || ''} onChange={handleFormChange} required placeholder="e.g. 1990" style={inputStyle} />
+                                    </div>
+                                    
+                                    <h5 style={{ margin: '1.5rem 0 0.5rem', color: 'var(--text-secondary)' }}>Deed of Sale Details (Optional if N/A)</h5>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem' }}>
+                                        <div className={styles.inputGroup}>
+                                            <label>Doc No.</label>
+                                            <input type="text" name="docNo" value={formData.docNo || ''} onChange={handleFormChange} style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Page No.</label>
+                                            <input type="text" name="pageNo" value={formData.pageNo || ''} onChange={handleFormChange} style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Book No.</label>
+                                            <input type="text" name="bookNo" value={formData.bookNo || ''} onChange={handleFormChange} style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Series Of</label>
+                                            <input type="text" name="seriesOf" value={formData.seriesOf || ''} onChange={handleFormChange} style={inputStyle} />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+                                        <div className={styles.inputGroup}>
+                                            <label>Notarized By (Atty.)</label>
+                                            <input type="text" name="notarizedBy" value={formData.notarizedBy || ''} onChange={handleFormChange} style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Notarized On (Date)</label>
+                                            <input type="text" name="notarizedOn" value={formData.notarizedOn || ''} onChange={handleFormChange} style={inputStyle} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        if (type.includes('business')) {
+                            return (
+                                <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                                    <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Business Details Required</h4>
+                                    <div className={styles.inputGroup}>
+                                        <label>Business Name / Trade Activity *</label>
+                                        <input type="text" name="businessName" value={formData.businessName || ''} onChange={handleFormChange} required placeholder="e.g. Chipai Taiwanese Chicken" style={inputStyle} />
+                                    </div>
+                                    <div className={styles.inputGroup}>
+                                        <label>Business Location *</label>
+                                        <input type="text" name="businessLocation" value={formData.businessLocation || ''} onChange={handleFormChange} required placeholder="Address of the business" style={inputStyle} />
+                                    </div>
+                                    <div className={styles.inputGroup}>
+                                        <label>Operator / Manager Name *</label>
+                                        <input type="text" name="operatorName" value={formData.operatorName || ''} onChange={handleFormChange} required placeholder="Name of operator" style={inputStyle} />
+                                    </div>
+                                    <div className={styles.inputGroup}>
+                                        <label>Operator Address *</label>
+                                        <input type="text" name="operatorAddress" value={formData.operatorAddress || ''} onChange={handleFormChange} required placeholder="Home address of operator" style={inputStyle} />
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        return null
+                    })()}
 
                     <div className={styles.inputGroup}>
                         <label>Upload Valid ID / Requirements *</label>

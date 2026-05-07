@@ -45,6 +45,7 @@ export interface ServiceRequest {
     updated_at: string
     issued_at?: string | null
     expires_at?: string | null
+    form_data?: Record<string, any> | null
     // Joined fields
     resident_name?: string
 }

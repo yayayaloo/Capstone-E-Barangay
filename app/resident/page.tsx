@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import ChatBot from '@/components/ChatBot'
+const ChatBot = dynamic(() => import('@/components/ChatBot'), { ssr: false })
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 const Scanner = dynamic(
@@ -40,6 +40,7 @@ function ResidentPortalContent() {
     const [requests, setRequests] = useState<ServiceRequest[]>([])
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [loadingRequests, setLoadingRequests] = useState(true)
+    const loadedTabs = useRef<Record<string, boolean>>({})
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
     const [selectedQR, setSelectedQR] = useState<{ ref: string, title: string } | null>(null)
 
@@ -160,6 +161,7 @@ function ResidentPortalContent() {
             showToast('Complaint submitted successfully. It will be reviewed by barangay officials.', 'success')
             setShowComplaintModal(false)
             setComplaintForm({ type: '', customType: '', subject: '', description: '', respondent: '', location: '' })
+            loadedTabs.current['complaints'] = false;
             setActiveTab('complaints')
         } catch (error: any) {
             console.error('Error submitting complaint:', error)
@@ -169,7 +171,7 @@ function ResidentPortalContent() {
         }
     }
 
-    const handleRequestSubmit = async (documentType: string, purpose: string, attachments: File[]) => {
+    const handleRequestSubmit = async (documentType: string, purpose: string, attachments: File[], formData?: Record<string, any>) => {
         if (!profile?.id) return
 
         try {
@@ -204,7 +206,8 @@ function ResidentPortalContent() {
                     document_type: documentType,
                     purpose: purpose,
                     attachment_url: attachmentUrl,
-                    status: 'pending'
+                    status: 'pending',
+                    form_data: formData || {}
                 })
                 .select()
                 .single()
@@ -214,6 +217,7 @@ function ResidentPortalContent() {
             setRequests([data as ServiceRequest, ...requests])
             showToast(`${documentType} request submitted successfully! ${attachments.length} file(s) uploaded.`, 'success')
             setShowRequestModal(false)
+            loadedTabs.current['requests'] = false;
             setActiveTab('requests')
         } catch (error: any) {
             console.error('Error submitting request:', error)
@@ -389,7 +393,8 @@ function ResidentPortalContent() {
                         </div>
                     </button>
 
-                    <button className={`glass-card ${styles.actionCard}`} onClick={() => setActiveTab('requests')}>
+                    <button className={`glass-card ${styles.actionCard}`} onClick={() => { loadedTabs.current['requests'] = false;
+            setActiveTab('requests'); }}>
                         <div>
                             <h3>Track Status</h3>
                             <p>Monitor your pending applications</p>
@@ -648,9 +653,9 @@ function ResidentPortalContent() {
                                             borderRadius: '99px',
                                             fontSize: '0.72rem',
                                             fontWeight: 600,
-                                            background: 'rgba(99, 102, 241, 0.12)',
+                                            background: 'rgba(34, 197, 94, 0.12)',
                                             color: '#a5b4fc',
-                                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                                            border: '1px solid rgba(34, 197, 94, 0.2)',
                                         }}>
                                             {s}
                                         </span>
@@ -749,7 +754,7 @@ function ResidentPortalContent() {
                             <div style={{ fontSize: '2rem' }}>{getDocIcon(s.type)}</div>
                             <h4 style={{ fontSize: '0.9rem', margin: 0 }}>{s.type}</h4>
                             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>{s.desc}</p>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: s.fee === 'Free' ? '#10b981' : 'var(--primary-400)', background: s.fee === 'Free' ? '#10b98115' : 'var(--primary-50, #eff6ff)', padding: '0.15rem 0.6rem', borderRadius: '999px', marginTop: '0.25rem' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: s.fee === 'Free' ? '#10b981' : 'var(--primary-400)', background: s.fee === 'Free' ? '#10b98115' : 'var(--primary-50, #f0fdf4)', padding: '0.15rem 0.6rem', borderRadius: '999px', marginTop: '0.25rem' }}>
                                 {s.fee}
                             </span>
                         </div>
@@ -935,10 +940,12 @@ function ResidentPortalContent() {
                     <button className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`} onClick={() => setActiveTab('overview')}>
                         Overview
                     </button>
-                    <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => setActiveTab('requests')}>
+                    <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => { loadedTabs.current['requests'] = false;
+            setActiveTab('requests'); }}>
                         My Requests
                     </button>
-                    <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => setActiveTab('complaints')}>
+                    <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => { loadedTabs.current['complaints'] = false;
+            setActiveTab('complaints'); }}>
                         My Complaints
                     </button>
                     <button className={`${styles.tabBtn} ${activeTab === 'profile' ? styles.activeTab : ''}`} onClick={() => setActiveTab('profile')}>
