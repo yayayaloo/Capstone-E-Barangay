@@ -5,13 +5,14 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
 import jsPDF from 'jspdf'
+import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
 import styles from './services.module.css'
 
 const DOCUMENTS = [
     {
         slug: 'barangay-clearance',
         name: 'Barangay Clearance',
-        icon: '',
+        icon: <FileCheck size={24} />,
         desc: 'Verification of residency, good moral character, and no derogatory record within the barangay.',
         fee: 'Php 50.00',
         feeType: 'paid' as const,
@@ -21,7 +22,7 @@ const DOCUMENTS = [
     {
         slug: 'barangay-certification',
         name: 'Barangay Certification',
-        icon: '',
+        icon: <FileBadge size={24} />,
         desc: 'Official certification for Residency, Loan applications, or Good Moral Character purposes.',
         fee: 'Php 50.00',
         feeType: 'paid' as const,
@@ -31,7 +32,7 @@ const DOCUMENTS = [
     {
         slug: 'business-clearance',
         name: 'Business Clearance',
-        icon: '',
+        icon: <Store size={24} />,
         desc: 'Compliance document required for business permit applications within Gordon Heights.',
         fee: 'Free',
         feeType: 'free' as const,
@@ -41,7 +42,7 @@ const DOCUMENTS = [
     {
         slug: 'lot-certification',
         name: 'Lot / Building Certification',
-        icon: '',
+        icon: <Home size={24} />,
         desc: 'Issued to actual lot occupants for compliance to government agencies.',
         fee: 'Php 1.00/sqm',
         feeType: 'paid' as const,
@@ -51,7 +52,7 @@ const DOCUMENTS = [
     {
         slug: 'first-time-job-seeker',
         name: 'First Time Job Seeker',
-        icon: '',
+        icon: <Briefcase size={24} />,
         desc: 'Waives fees for pre-employment requirements. Available for ages 18–30.',
         fee: 'Free',
         feeType: 'free' as const,
@@ -61,7 +62,7 @@ const DOCUMENTS = [
     {
         slug: 'indigency',
         name: 'Certificate of Indigency',
-        icon: '',
+        icon: <HeartHandshake size={24} />,
         desc: 'Certification of financial status for medical, educational, or social assistance.',
         fee: 'Free',
         feeType: 'free' as const,

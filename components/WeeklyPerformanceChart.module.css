@@ -16,7 +16,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    background: linear-gradient(90deg, #059669, #10b981);
 }
 
 /* ─── Header ──────────────────────────────────────────────── */
@@ -78,7 +78,7 @@
 
 .trendBadge[data-trend="stable"] {
     background: rgba(34, 197, 94, 0.12);
-    color: #a5b4fc;
+    color: #86efac;
     border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
@@ -129,8 +129,8 @@
 
 .metricActive {
     background: #ffffff !important;
-    border-color: #6366f1 !important;
-    color: #6366f1 !important;
+    border-color: #059669 !important;
+    color: #059669 !important;
     box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
 }
 
@@ -207,12 +207,17 @@
 
 /* ─── Tooltip ─────────────────────────────────────────────── */
 .tooltip {
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
     border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-xl);
     border-radius: 12px;
     padding: 1rem;
-    margin-top: 1rem;
+    position: absolute;
+    top: 5rem;
+    right: 2rem;
+    z-index: 50;
+    pointer-events: none;
     animation: tooltipIn 0.2s ease-out;
 }
 
@@ -308,11 +313,11 @@
 }
 
 .insight_low {
-    border-left: 3px solid #6366f1;
+    border-left: 3px solid #059669;
 }
 
 .insight_stable {
-    border-left: 3px solid #22c55e;
+    border-left: 3px solid #10b981;
 }
 
 .insightIcon {
@@ -360,7 +365,7 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(135deg, #059669, #10b981);
     animation: pulse 1.2s ease-in-out infinite;
 }
 

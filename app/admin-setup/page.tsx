@@ -70,7 +70,7 @@ export default function AdminSetup() {
                 />
                 <button 
                     onClick={handleCreateAdmin}
-                    style={{ padding: '1rem', background: '#6366f1', color: 'white', border: 'none', cursor: 'pointer' }}
+                    style={{ padding: '1rem', background: '#16a34a', color: 'white', border: 'none', cursor: 'pointer' }}
                 >
                     Create Admin Account
                 </button>

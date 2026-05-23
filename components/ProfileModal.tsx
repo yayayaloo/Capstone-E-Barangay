@@ -3,23 +3,23 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Profile } from '@/lib/types'
-import { Camera, AlertCircle } from 'lucide-react'
+import { Check, Camera, AlertCircle, User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX } from 'lucide-react'
 
 const SECTOR_OPTIONS = [
-    { value: 'Solo Parent', icon: '' },
-    { value: 'OFW', icon: '' },
-    { value: 'PWD', icon: '' },
-    { value: 'Senior Citizen', icon: '' },
-    { value: 'LGBTQ+', icon: '' },
-    { value: 'Employed', icon: '' },
-    { value: 'Unemployed', icon: '' },
-    { value: '4Ps Beneficiary', icon: '' },
-    { value: 'Pregnant/Lactating', icon: '' },
-    { value: 'Youth (15-30)', icon: '' },
-    { value: 'Indigenous People', icon: '' },
-    { value: 'OSC', icon: '' },
-    { value: 'OSY', icon: '' },
-    { value: 'OSA', icon: '' },
+    { value: 'Solo Parent', icon: <User size={16} /> },
+    { value: 'OFW', icon: <Plane size={16} /> },
+    { value: 'PWD', icon: <Accessibility size={16} /> },
+    { value: 'Senior Citizen', icon: <UserPlus size={16} /> },
+    { value: 'LGBTQ+', icon: <Heart size={16} /> },
+    { value: 'Employed', icon: <Briefcase size={16} /> },
+    { value: 'Unemployed', icon: <UserMinus size={16} /> },
+    { value: '4Ps Beneficiary', icon: <HandHeart size={16} /> },
+    { value: 'Pregnant/Lactating', icon: <Baby size={16} /> },
+    { value: 'Youth (15-30)', icon: <Zap size={16} /> },
+    { value: 'Indigenous People', icon: <Users size={16} /> },
+    { value: 'OSC', label: 'OSC (Out-of-School Children)', icon: <BookX size={16} /> },
+    { value: 'OSY', label: 'OSY (Out-of-School Youth)', icon: <BookX size={16} /> },
+    { value: 'OSA', label: 'OSA (Out-of-School Adult)', icon: <BookX size={16} /> },
 ]
 
 interface ProfileModalProps {
@@ -242,7 +242,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                                             gap: '0.5rem',
                                             padding: '0.6rem 0.75rem',
                                             borderRadius: '8px',
-                                            border: `1.5px solid ${isSelected ? 'var(--primary-500, #6366f1)' : 'var(--border-color)'}`,
+                                            border: `1.5px solid ${isSelected ? 'var(--primary-500, #059669)' : 'var(--border-color)'}`,
                                             background: isSelected ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
                                             cursor: 'pointer',
                                             transition: 'all 0.15s ease',
@@ -257,8 +257,8 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                                             width: '16px',
                                             height: '16px',
                                             borderRadius: '4px',
-                                            border: `2px solid ${isSelected ? 'var(--primary-500, #6366f1)' : 'var(--border-color)'}`,
-                                            background: isSelected ? 'var(--primary-500, #6366f1)' : 'transparent',
+                                            border: `2px solid ${isSelected ? 'var(--primary-500, #059669)' : 'var(--border-color)'}`,
+                                            background: isSelected ? 'var(--primary-500, #059669)' : 'transparent',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
@@ -266,10 +266,10 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                                             fontSize: '0.65rem',
                                             color: '#fff',
                                         }}>
-                                            {isSelected && '✓'}
+                                            {isSelected && <Check size={10} strokeWidth={3} />}
                                         </span>
                                         <span>{opt.icon}</span>
-                                        {opt.value}
+                                        {opt.label || opt.value}
                                     </div>
                                 )
                             })}

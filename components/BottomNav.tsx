@@ -1,10 +1,11 @@
 'use client'
 
+import { ReactNode } from 'react'
 import styles from './BottomNav.module.css'
 
 interface NavItem {
     id: string
-    icon: string
+    icon: ReactNode
     label: string
 }
 

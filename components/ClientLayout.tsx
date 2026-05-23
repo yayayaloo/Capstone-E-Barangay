@@ -15,10 +15,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }, [])
 
     return (
-        <AuthProvider>
-            <ToastProvider>
+        <ToastProvider>
+            <AuthProvider>
                 {children}
-            </ToastProvider>
-        </AuthProvider>
+            </AuthProvider>
+        </ToastProvider>
     )
 }

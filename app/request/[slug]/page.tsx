@@ -4,40 +4,41 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
 import styles from './request.module.css'
 
 /* ── Document Registry ── */
 const DOCUMENTS: Record<string, {
-    name: string; icon: string; desc: string; fee: string;
+    name: string; icon: React.ReactNode; desc: string; fee: string;
     feeType: 'free' | 'paid'; reqs: string;
 }> = {
     'barangay-clearance': {
-        name: 'Barangay Clearance', icon: '',
+        name: 'Barangay Clearance', icon: <FileCheck size={24} />,
         desc: 'Verification of residency, good moral character, and no derogatory record.',
         fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID',
     },
     'barangay-certification': {
-        name: 'Barangay Certification', icon: '',
+        name: 'Barangay Certification', icon: <FileBadge size={24} />,
         desc: 'Official certification for Residency, Loan, or Good Moral Character.',
         fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID',
     },
     'business-clearance': {
-        name: 'Business Clearance', icon: '',
+        name: 'Business Clearance', icon: <Store size={24} />,
         desc: 'Compliance for business permit within Gordon Heights.',
         fee: 'Free', feeType: 'free', reqs: 'DTI Certificate',
     },
     'lot-certification': {
-        name: 'Lot / Building Certification', icon: '',
+        name: 'Lot / Building Certification', icon: <Home size={24} />,
         desc: 'Issued to lot occupants for government compliance.',
         fee: 'Php 1.00/sqm', feeType: 'paid', reqs: 'Purok Cert, Tax Dec',
     },
     'first-time-job-seeker': {
-        name: 'First Time Job Seeker', icon: '',
+        name: 'First Time Job Seeker', icon: <Briefcase size={24} />,
         desc: 'Waives pre-employment fees for ages 18-30.',
         fee: 'Free', feeType: 'free', reqs: 'Valid ID',
     },
     'indigency': {
-        name: 'Certificate of Indigency', icon: '',
+        name: 'Certificate of Indigency', icon: <HeartHandshake size={24} />,
         desc: 'Certification of financial status for assistance.',
         fee: 'Free', feeType: 'free', reqs: 'Valid ID',
     },

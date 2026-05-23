@@ -14,7 +14,7 @@
 
 /* Left Panel - Branding */
 .brandingPanel {
-    background: linear-gradient(135deg, #0a0a1a, #131326);
+    background: linear-gradient(135deg, #064e3b, #022c22);
     /* System Dark Theme */
     color: white;
     padding: 2.5rem 7%;
@@ -95,7 +95,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2.5px;
-    color: #22c55e;
+    color: #10b981;
     /* System Indigo */
     margin-bottom: 0.5rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -156,7 +156,7 @@
 }
 
 .backButton:hover {
-    color: #16a34a;
+    color: #059669;
 }
 
 @media (min-width: 1024px) {
@@ -234,7 +234,7 @@
 }
 
 .inputGroup input:focus {
-    border-color: #22c55e;
+    border-color: #10b981;
     box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
     transform: translateY(-1px);
 }
@@ -264,12 +264,12 @@
 }
 
 .passwordToggle:hover {
-    color: #22c55e;
+    color: #10b981;
 }
 
 .submitButton {
     padding: 1.125rem;
-    background: #16a34a;
+    background: #059669;
     border: none;
     border-radius: 12px;
     color: #fff;
@@ -306,7 +306,7 @@
 }
 
 .link {
-    color: #16a34a;
+    color: #059669;
     text-decoration: none;
     font-weight: 600;
 }
@@ -329,25 +329,46 @@
 
 /* Animations */
 @keyframes slideUpFadeIn {
-    0% { opacity: 0; transform: translateY(20px); }
-    100% { opacity: 1; transform: translateY(0); }
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes shakeError {
-    0%, 100% { transform: translateX(0); }
-    20%, 60% { transform: translateX(-5px); }
-    40%, 80% { transform: translateX(5px); }
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    20%,
+    60% {
+        transform: translateX(-5px);
+    }
+
+    40%,
+    80% {
+        transform: translateX(5px);
+    }
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .spinner {
     display: inline-block;
     width: 1.1rem;
     height: 1.1rem;
-    border: 2px solid rgba(255,255,255,0.3);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
     border-top-color: #fff;
     animation: spin 0.8s linear infinite;

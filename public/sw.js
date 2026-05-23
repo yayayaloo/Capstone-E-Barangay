@@ -4,10 +4,7 @@ const OFFLINE_URL = '/~offline';
 const CACHED_FILES = [
   OFFLINE_URL,
   '/logo.png',
-  '/olongapo-logo.png',
   '/manifest.json',
-  '/icon-192.svg',
-  '/icon-512.svg'
 ];
 
 self.addEventListener('install', (event) => {

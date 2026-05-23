@@ -39,6 +39,25 @@
     background: #f0fdf4;
 }
 
+.loading {
+    border-left: 4px solid var(--primary-500, #059669);
+    background: #f8fafc;
+}
+
+.spinner {
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-top-color: var(--primary-500, #059669);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 .icon {
     font-size: 1.1rem;
     flex-shrink: 0;

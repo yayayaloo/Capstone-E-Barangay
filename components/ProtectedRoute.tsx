@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-    const { user, profile, loading } = useAuth()
+    const { user, profile, session, loading } = useAuth()
     const router = useRouter()
 
     useEffect(() => {
@@ -30,6 +30,8 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         }
     }, [user, profile, loading, requiredRole, router])
 
+    // Only show spinner during initial auth check (first page load / hard refresh).
+    // After sign-in, loading stays false so the page renders instantly.
     if (loading) {
         return (
             <div style={{
@@ -37,7 +39,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
                 justifyContent: 'center',
                 alignItems: 'center',
                 height: '100vh',
-                background: 'var(--bg-primary, #0a0a1a)',
+                background: 'var(--bg-primary, #022c22)',
                 color: 'var(--text-primary, #fff)',
                 fontSize: '1.2rem',
                 fontFamily: 'var(--font-inter, sans-serif)',
@@ -47,7 +49,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
                         width: '48px',
                         height: '48px',
                         border: '4px solid rgba(34, 197, 94, 0.3)',
-                        borderTop: '4px solid #6366f1',
+                        borderTop: '4px solid #059669',
                         borderRadius: '50%',
                         animation: 'spin 1s linear infinite',
                         margin: '0 auto 1rem',
@@ -59,7 +61,14 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     }
 
     if (!user) return null
-    if (requiredRole === 'admin' && profile?.role !== 'admin') return null
+    
+    // For admin routes, check role from session JWT (instant) or profile (when loaded)
+    if (requiredRole === 'admin') {
+        const sessionRole = session?.user?.user_metadata?.role
+        const profileRole = profile?.role
+        if (sessionRole !== 'admin' && profileRole !== 'admin') return null
+    }
 
     return <>{children}</>
 }
+

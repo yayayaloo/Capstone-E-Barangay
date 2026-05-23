@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { PieChart } from 'lucide-react'
 import styles from './SectoralChart.module.css'
 
 const SECTORS = [
@@ -82,7 +83,7 @@ export default function SectoralChart({ profiles }: { profiles: any[] }) {
             <div className={styles.header}>
                 <div>
                     <h3 className={styles.title}>
-                        <span></span> Sectoral Demographic
+                        <span style={{ marginRight: '0.5rem', display: 'inline-flex', verticalAlign: 'middle' }}><PieChart size={20} /></span> Sectoral Demographic
                     </h3>
                     <p className={styles.subtitle}>
                         Gender breakdown across {SECTORS.length} sectors • {totalResidents} registered residents

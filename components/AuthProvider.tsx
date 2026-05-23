@@ -1,17 +1,19 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
-import { User, Session } from '@supabase/supabase-js'
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Profile } from '@/lib/types'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/components/Toast'
 
 interface AuthContextType {
     user: User | null
     profile: Profile | null
     session: Session | null
     loading: boolean
-    signIn: (email: string, password?: string) => Promise<{ error: string | null }>
+    profileLoading: boolean
+    signIn: (email: string, password?: string) => Promise<{ data?: any, error: string | null }>
     verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>
     resendOtp: (email: string) => Promise<{ error: string | null }>
     signUp: (
@@ -50,9 +52,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const [profile, setProfile] = useState<Profile | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
+    const [profileLoading, setProfileLoading] = useState(false)
     const router = useRouter()
+    const { showToast, updateToast } = useToast()
     const userRef = useRef<User | null>(null)
     const profileRef = useRef<Profile | null>(null)
+    const initCompleteRef = useRef(false)
 
     // Keep refs updated
     useEffect(() => {
@@ -70,8 +75,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 if (mountedRef.current) {
                     console.error('Auth initialization timed out. Check your Supabase connection.')
                     setLoading(false)
+                    initCompleteRef.current = true
                 }
-            }, 8000)
+            }, 5000)
 
             try {
                 // Check if Supabase is actually configured
@@ -79,10 +85,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                     console.error('Supabase credentials missing in this environment.')
                     if (mountedRef.current) setLoading(false)
                     clearTimeout(timeoutId)
+                    initCompleteRef.current = true
                     return
                 }
 
-                // Get initial session
+                // Get initial session (reads from memory/cookie — fast)
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession()
                 
                 if (sessionError) throw sessionError
@@ -101,6 +108,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 console.error('Error fetching session:', error)
             } finally {
                 clearTimeout(timeoutId)
+                initCompleteRef.current = true
                 if (mountedRef.current) setLoading(false)
             }
         }
@@ -109,8 +117,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
         // Listen for auth changes
         const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-            async (event, newSession) => {
+            async (event: AuthChangeEvent, newSession: Session | null) => {
                 if (!mountedRef.current) return;
+
+                // Skip the INITIAL_SESSION event if initializeAuth already handled it.
+                // This prevents a double profile fetch on page load.
+                if (event === 'INITIAL_SESSION' && initCompleteRef.current) {
+                    return
+                }
                 
                 const currentUser = userRef.current
                 const currentProfile = profileRef.current
@@ -124,15 +138,19 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                     return
                 }
 
+                // Skip redundant fetches for token refresh events
+                if (event === 'TOKEN_REFRESHED' && currentProfile && currentUser?.id === newSession?.user?.id) {
+                    return
+                }
+
                 if (newSession?.user) {
                     // Only fetch profile if user changed or we don't have a profile yet
                     if (!currentProfile || currentUser?.id !== newSession.user.id) {
-                        // We only show loading screen if it's a completely new sign in
-                        if (event === 'SIGNED_IN') setLoading(true)
+                        // Don't block the UI with a full-page spinner on SIGNED_IN.
+                        // The page can render immediately; profile loads in background.
+                        setProfileLoading(true)
                         await fetchProfile(newSession.user.id, mountedRef)
-                        if (mountedRef.current) setLoading(false)
-                    } else {
-                        // We already have the user and profile, so just update session quietly
+                        if (mountedRef.current) setProfileLoading(false)
                     }
                 } else {
                     setProfile(null)
@@ -164,7 +182,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                     table: 'profiles',
                     filter: `id=eq.${user.id}`
                 },
-                (payload) => {
+                (payload: any) => {
                     console.log('Profile update received:', payload.new)
                     // We call fetchProfile to get the full updated row safely
                     // This prevents any "partial record" mess from before
@@ -189,7 +207,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
             if (dbError) {
                 console.warn('DB Profile error, attempting metadata fallback:', dbError.message)
                 
-                const { data: { user: currentUser } } = await supabase.auth.getUser()
+                // Fallback: use the session's user_metadata (already in memory, no network call)
+                const { data: { session: currentSession } } = await supabase.auth.getSession()
+                const currentUser = currentSession?.user
 
                 // FALLBACK: Use session user metadata if profile table row or columns are missing
                 if (currentUser && mountedRef.current) {
@@ -221,24 +241,21 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 }
             } else {
                 if (mountedRef.current && dbData) {
-                    // Check if we need fallback data
-                    const needsFallback = !dbData.gender || !dbData.relationship_status || !dbData.address || !dbData.phone || !dbData.full_name || !dbData.email;
+                    // Only fetch user metadata as fallback if critical fields are truly missing
+                    const needsFallback = !dbData.full_name || !dbData.email;
                     
-                    let currentUser = null;
+                    let sessionUser = null;
                     if (needsFallback) {
-                        const { data } = await supabase.auth.getUser();
-                        currentUser = data.user;
+                        // Use getSession (in-memory) instead of getUser (network call)
+                        const { data: { session: s } } = await supabase.auth.getSession();
+                        sessionUser = s?.user;
                     }
 
                     // Merge DB data with user_metadata in case the DB row is missing registration fields
                     const mergedProfile: Profile = {
                         ...(dbData as Profile),
-                        gender: dbData.gender || currentUser?.user_metadata?.gender || null,
-                        relationship_status: dbData.relationship_status || currentUser?.user_metadata?.relationship_status || null,
-                        address: dbData.address || currentUser?.user_metadata?.address || null,
-                        phone: dbData.phone || currentUser?.user_metadata?.phone || null,
-                        full_name: dbData.full_name || currentUser?.user_metadata?.full_name || 'Resident',
-                        email: dbData.email || currentUser?.email || ''
+                        full_name: dbData.full_name || sessionUser?.user_metadata?.full_name || 'Resident',
+                        email: dbData.email || sessionUser?.email || ''
                     }
                     setProfile(mergedProfile)
                 }
@@ -250,17 +267,16 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     const signIn = async (email: string, password?: string) => {
         if (!password) {
-            // Passwordless unsupported for now
             return { error: 'Please enter a password' }
         }
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             })
 
-            return { error: error?.message || null }
+            return { data, error: error?.message || null }
         } catch (error: any) {
             return { error: error.message || 'An error occurred during sign in' }
         }
@@ -332,6 +348,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const signOut = async () => {
+        const toastId = showToast('Signing out...', 'loading')
+
         // 1. Call the server-side logout route to clear HTTP-only session cookies.
         //    Without this, the middleware still sees a stale cookie after logout
         //    and blocks navigation to the home page (redirects back to dashboard).
@@ -344,6 +362,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         // 2. Clear client-side session state
         await supabase.auth.signOut()
 
+        // Update toast to success
+        updateToast(toastId, 'Signed out successfully!', 'success')
+
         // 3. Navigate to login
         router.push('/login')
     }
@@ -353,7 +374,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, profile, session, loading, signIn, signUp, verifyOtp, resendOtp, signOut, refreshProfile }}>
+        <AuthContext.Provider value={{ user, profile, session, loading, profileLoading, signIn, signUp, verifyOtp, resendOtp, signOut, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     )

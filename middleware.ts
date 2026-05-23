@@ -8,6 +8,19 @@ export async function middleware(request: NextRequest) {
         },
     })
 
+    const pathname = request.nextUrl.pathname
+
+    // Public routes that never need auth — skip Supabase entirely for speed
+    const isPublicRoute = pathname.startsWith('/services') || pathname.startsWith('/request')
+    if (isPublicRoute) {
+        return supabaseResponse
+    }
+
+    // Auth callback routes — let them pass through without session checks
+    if (pathname.startsWith('/auth/')) {
+        return supabaseResponse
+    }
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -16,6 +29,23 @@ export async function middleware(request: NextRequest) {
         return supabaseResponse
     }
 
+    // Quick cookie presence check — if no supabase auth cookies exist,
+    // we know the user is unauthenticated without creating a client
+    const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-'))
+
+    // For login/register pages with no auth cookie, skip session check entirely
+    if (!hasAuthCookie && (pathname === '/login' || pathname === '/register')) {
+        return supabaseResponse
+    }
+
+    // For protected routes with no auth cookie, redirect immediately
+    if (!hasAuthCookie && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        return NextResponse.redirect(redirectUrl)
+    }
+
+    // Only create Supabase client when we actually need session validation
     const supabase = createServerClient(
         url,
         key,
@@ -57,20 +87,15 @@ export async function middleware(request: NextRequest) {
 
     const { data: { session } } = await supabase.auth.getSession()
 
-    const pathname = request.nextUrl.pathname
-
-    // Public routes accessible without authentication (QR code landing pages)
-    const isPublicRoute = pathname.startsWith('/services') || pathname.startsWith('/request')
-
     // Redirect unauthenticated users trying to access protected routes
-    if (!session && !isPublicRoute && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
+    if (!session && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
         return NextResponse.redirect(redirectUrl)
     }
 
     if (session) {
-        let role = session.user.user_metadata?.role || 'resident';
+        const role = session.user.user_metadata?.role || 'resident';
 
         // Enforce Role-Based Access Control (RBAC)
         if (pathname.startsWith('/admin') && role !== 'admin') {

@@ -209,7 +209,7 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(135deg, #059669, #10b981);
     animation: pulse 1.2s ease-in-out infinite;
 }
 

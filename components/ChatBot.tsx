@@ -284,7 +284,7 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                                 </div>
                             </div>
                             {message.sender === 'user' && (
-                                <div className={styles.messageAvatar} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                <div className={styles.messageAvatar} style={{ background: 'linear-gradient(135deg, #059669, #10b981)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                                     {userProfile?.profile_picture_url ? (
                                         <img 
                                             src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${userProfile.profile_picture_url}`} 

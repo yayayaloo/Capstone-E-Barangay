@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { TrendingUp, TrendingDown, Maximize2, Minimize2 } from 'lucide-react'
 import styles from './WeeklyPerformanceChart.module.css'
 
 interface WeekData {
@@ -18,7 +19,7 @@ interface Insight {
     type: 'increase' | 'decrease' | 'stable' | 'peak' | 'low'
     message: string
     weekLabel: string
-    icon: string
+    icon: React.ReactNode
 }
 
 export default function WeeklyPerformanceChart() {
@@ -60,7 +61,7 @@ export default function WeeklyPerformanceChart() {
                 const weekEnd = new Date(weekStart)
                 weekEnd.setDate(weekEnd.getDate() + 7)
 
-                const weekRequests = (data || []).filter(r => {
+                const weekRequests = (data || []).filter((r: any) => {
                     const d = new Date(r.created_at)
                     return d >= weekStart && d < weekEnd
                 })
@@ -69,10 +70,10 @@ export default function WeeklyPerformanceChart() {
                     weekLabel: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                     weekStart,
                     total: weekRequests.length,
-                    completed: weekRequests.filter(r => r.status === 'completed').length,
-                    pending: weekRequests.filter(r => r.status === 'pending').length,
-                    rejected: weekRequests.filter(r => r.status === 'rejected').length,
-                    processing: weekRequests.filter(r => r.status === 'processing' || r.status === 'ready').length,
+                    completed: weekRequests.filter((r: any) => r.status === 'completed').length,
+                    pending: weekRequests.filter((r: any) => r.status === 'pending').length,
+                    rejected: weekRequests.filter((r: any) => r.status === 'rejected').length,
+                    processing: weekRequests.filter((r: any) => r.status === 'processing' || r.status === 'ready').length,
                 })
             }
 
@@ -109,7 +110,7 @@ export default function WeeklyPerformanceChart() {
                     type: 'increase',
                     message: `+${Math.round(change)}% spike${reasons.length > 0 ? ` — likely due to ${reasons.join(', ')}` : ' — possible event-driven demand'}`,
                     weekLabel: curr.weekLabel,
-                    icon: ''
+                    icon: <TrendingUp size={16} />
                 })
             } else if (change < -30) {
                 const reasons: string[] = []
@@ -121,7 +122,7 @@ export default function WeeklyPerformanceChart() {
                     type: 'decrease',
                     message: `${Math.round(change)}% drop${reasons.length > 0 ? ` — possibly from ${reasons.join(', ')}` : ' — typical low-activity period'}`,
                     weekLabel: curr.weekLabel,
-                    icon: ''
+                    icon: <TrendingDown size={16} />
                 })
             }
         }
@@ -133,7 +134,7 @@ export default function WeeklyPerformanceChart() {
                 type: 'peak',
                 message: `Peak activity: ${maxWeek.total} requests — highest volume in 8-week window`,
                 weekLabel: maxWeek.weekLabel,
-                icon: ''
+                icon: <Maximize2 size={16} />
             })
         }
 
@@ -146,7 +147,7 @@ export default function WeeklyPerformanceChart() {
                     type: 'low',
                     message: `Lowest activity: ${minWeek.total} requests — may indicate holidays or reduced staffing`,
                     weekLabel: minWeek.weekLabel,
-                    icon: ''
+                    icon: <Minimize2 size={16} />
                 })
             }
         }
@@ -168,11 +169,11 @@ export default function WeeklyPerformanceChart() {
 
     const getMetricColor = (metric: string) => {
         switch (metric) {
-            case 'total': return { main: '#6366f1', gradient: '#8b5cf6', glow: 'rgba(34, 197, 94,0.3)' }
+            case 'total': return { main: '#059669', gradient: '#10b981', glow: 'rgba(34, 197, 94,0.3)' }
             case 'completed': return { main: '#10b981', gradient: '#34d399', glow: 'rgba(16,185,129,0.3)' }
             case 'pending': return { main: '#f59e0b', gradient: '#fbbf24', glow: 'rgba(245,158,11,0.3)' }
             case 'rejected': return { main: '#ef4444', gradient: '#f87171', glow: 'rgba(239,68,68,0.3)' }
-            default: return { main: '#6366f1', gradient: '#8b5cf6', glow: 'rgba(34, 197, 94,0.3)' }
+            default: return { main: '#059669', gradient: '#10b981', glow: 'rgba(34, 197, 94,0.3)' }
         }
     }
 
@@ -470,7 +471,7 @@ export default function WeeklyPerformanceChart() {
                         Week of {weeklyData[hoveredBar].weekLabel}
                     </div>
                     <div className={styles.tooltipGrid}>
-                        <span className={styles.tooltipDot} style={{ background: '#6366f1' }}></span>
+                        <span className={styles.tooltipDot} style={{ background: '#059669' }}></span>
                         <span>Total</span>
                         <strong>{weeklyData[hoveredBar].total}</strong>
                         <span className={styles.tooltipDot} style={{ background: '#10b981' }}></span>
@@ -479,7 +480,7 @@ export default function WeeklyPerformanceChart() {
                         <span className={styles.tooltipDot} style={{ background: '#f59e0b' }}></span>
                         <span>Pending</span>
                         <strong>{weeklyData[hoveredBar].pending}</strong>
-                        <span className={styles.tooltipDot} style={{ background: '#22c55e' }}></span>
+                        <span className={styles.tooltipDot} style={{ background: '#10b981' }}></span>
                         <span>Processing</span>
                         <strong>{weeklyData[hoveredBar].processing}</strong>
                         <span className={styles.tooltipDot} style={{ background: '#ef4444' }}></span>

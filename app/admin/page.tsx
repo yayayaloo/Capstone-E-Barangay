@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { FileText, LayoutDashboard, Settings, UserCircle, RefreshCcw, Search, Clock, Activity, CheckCircle, Users, ArrowRight, Printer, AlertTriangle, ChevronRight, X, ShieldAlert, BookOpen, User, Phone, CheckSquare, XSquare, MessageSquare, QrCode, LogOut, Check, Megaphone, Trash2, Camera, UserMinus, Plus, BarChart3, History } from 'lucide-react'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -98,6 +99,8 @@ function AdminDashboardContent() {
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
     const [residentSearch, setResidentSearch] = useState('')
     const [requestSearch, setRequestSearch] = useState('')
+    const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false)
+    const [cameraError, setCameraError] = useState<string | null>(null)
     const [statusFilter, setStatusFilter] = useState('all')
 
     // Announcement form
@@ -180,10 +183,10 @@ function AdminDashboardContent() {
                 supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'resident')
             ])
 
-            const pending = allStatuses?.filter(r => r.status === 'pending').length || 0;
-            const processing = allStatuses?.filter(r => r.status === 'processing').length || 0;
-            const completed = allStatuses?.filter(r => r.status === 'completed').length || 0;
-            const rejected = allStatuses?.filter(r => r.status === 'rejected').length || 0;
+            const pending = allStatuses?.filter((r: { status: string }) => r.status === 'pending').length || 0;
+            const processing = allStatuses?.filter((r: { status: string }) => r.status === 'processing').length || 0;
+            const completed = allStatuses?.filter((r: { status: string }) => r.status === 'completed').length || 0;
+            const rejected = allStatuses?.filter((r: { status: string }) => r.status === 'rejected').length || 0;
             const totalRequests = allStatuses?.length || 0;
 
             setStats({
@@ -207,10 +210,11 @@ function AdminDashboardContent() {
             if (tab === 'overview') {
                 await fetchOverviewStats()
                 // Fetch recent top 5 requests & announcements
-                const [reqRes, annRes, qrRes] = await Promise.all([
+                const [reqRes, annRes, qrRes, demoRes] = await Promise.all([
                     supabase.from('service_requests').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(5),
                     supabase.from('announcements').select('*').order('published_at', { ascending: false }).limit(5),
-                    supabase.from('qr_verifications').select('*').order('verified_at', { ascending: false }).limit(5)
+                    supabase.from('qr_verifications').select('*').order('verified_at', { ascending: false }).limit(5),
+                    demographicsData ? Promise.resolve({ data: demographicsData }) : supabase.from('profiles').select('*').eq('role', 'resident')
                 ])
 
                 const mappedRequests = (reqRes.data || []).map((req: any) => ({
@@ -224,6 +228,9 @@ function AdminDashboardContent() {
                         time: new Date(v.verified_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         result: v.is_valid ? 'Valid' : 'Invalid'
                     })))
+                }
+                if (demoRes.data && !demographicsData) {
+                    setDemographicsData(demoRes.data)
                 }
             } else if (tab === 'requests') {
                 const { data } = await supabase.from('service_requests').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(100)
@@ -432,7 +439,7 @@ function AdminDashboardContent() {
 
             // Capture the template
             const canvas = await html2canvas(certRef.current, {
-                scale: 2, // High resolution
+                scale: 4, // Higher resolution for crisp text and logos
                 useCORS: true,
                 logging: false
             })
@@ -1257,7 +1264,9 @@ function AdminDashboardContent() {
         const reqName = r.resident_name || ''
         const matchSearch =
             reqName.toLowerCase().includes(requestSearch.toLowerCase()) ||
-            r.document_type.toLowerCase().includes(requestSearch.toLowerCase())
+            r.document_type.toLowerCase().includes(requestSearch.toLowerCase()) ||
+            (r.qr_code_ref || '').toLowerCase().includes(requestSearch.toLowerCase()) ||
+            r.id.toLowerCase().includes(requestSearch.toLowerCase())
         const matchStatus = statusFilter === 'all' || r.status === statusFilter
         return matchSearch && matchStatus
     })
@@ -1279,14 +1288,14 @@ function AdminDashboardContent() {
     })
 
     const navItems = [
-        { id: 'overview', icon: '', label: 'Overview' },
-        { id: 'requests', icon: '', label: 'Document Requests' },
-        { id: 'residents', icon: '', label: 'Residents' },
-        { id: 'announcements', icon: '', label: 'Announcements' },
-        { id: 'verify', icon: '', label: 'QR Verification' },
-        { id: 'analytics', icon: '', label: 'Analytics' },
-        { id: 'blotter', icon: '', label: 'Blotter Reports' },
-        { id: 'audit', icon: '', label: 'Audit Trail' },
+        { id: 'overview', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+        { id: 'requests', icon: <FileText size={20} />, label: 'Document Requests' },
+        { id: 'residents', icon: <Users size={20} />, label: 'Residents' },
+        { id: 'announcements', icon: <Megaphone size={20} />, label: 'Announcements' },
+        { id: 'verify', icon: <QrCode size={20} />, label: 'QR Verification' },
+        { id: 'analytics', icon: <BarChart3 size={20} />, label: 'Analytics' },
+        { id: 'blotter', icon: <ShieldAlert size={20} />, label: 'Blotter Reports' },
+        { id: 'audit', icon: <History size={20} />, label: 'Audit Trail' },
     ]
 
     return (
@@ -1318,11 +1327,26 @@ function AdminDashboardContent() {
                                 className={activeTab === item.id ? styles.active : ''}
                                 onClick={() => setActiveTab(item.id)}
                             >
+                                <span className={styles.navIcon}>{item.icon}</span>
                                 {item.label}
                             </button>
                         ))}
                     </nav>
 
+                    <div style={{ marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ background: 'var(--primary-100)', color: 'var(--primary-700)', padding: '0.5rem', borderRadius: '50%' }}>
+                                <UserCircle size={20} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{profile?.full_name || 'Admin'}</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>System Administrator</span>
+                            </div>
+                        </div>
+                        <button className="btn btn-outline" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem', padding: '0.6rem' }} onClick={signOut}>
+                            <LogOut size={16} /> Sign Out
+                        </button>
+                    </div>
                 </aside>
 
                 <BottomNav
@@ -1339,7 +1363,7 @@ function AdminDashboardContent() {
                             <div className="animate-fadeIn">
                                 <div className={styles.pageHeader}>
                                     <div>
-                                        <h1>Dashboard Overview</h1>
+                                        <h1>Admin Dashboard</h1>
                                         <p className={styles.pageSubtitle}>Welcome back, {profile?.full_name || 'Admin'}! Here&apos;s what&apos;s happening today.</p>
                                     </div>
                                     <div className={styles.dateBadge}>
@@ -1352,74 +1376,85 @@ function AdminDashboardContent() {
                                         {/* Stats Row */}
                                         <div className={styles.statsGrid}>
                                             <div className={`glass-card ${styles.statCard} ${styles.statPending}`}>
+                                                <div className={styles.statIcon}><Clock size={24} /></div>
                                                 <div className={styles.statValue}>{pendingCount}</div>
                                                 <div className={styles.statLabel}>Pending</div>
                                                 <div className={styles.statTrend}>requires immediate action</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statProcessing}`}>
+                                                <div className={styles.statIcon}><Activity size={24} /></div>
                                                 <div className={styles.statValue}>{processingCount}</div>
                                                 <div className={styles.statLabel}>Processing</div>
                                                 <div className={styles.statTrend}>in queue</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statCompleted}`}>
+                                                <div className={styles.statIcon}><CheckCircle size={24} /></div>
                                                 <div className={styles.statValue}>{completedCount}</div>
                                                 <div className={styles.statLabel}>Completed</div>
                                                 <div className={styles.statTrend}>{completionRate}% efficiency</div>
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statResidents}`}>
+                                                <div className={styles.statIcon}><Users size={24} /></div>
                                                 <div className={styles.statValue}>{residents.length}</div>
                                                 <div className={styles.statLabel}>Residents</div>
                                                 <div className={styles.statTrend}>Total registered</div>
                                             </div>
                                         </div>
 
-                                        {/* Quick Action Cards */}
-                                        <div className={styles.quickActions}>
-                                            <div className={styles.quickCard} onClick={() => setActiveTab('requests')}>
-                                                <div>
-                                                    <strong>Review Requests</strong>
-                                                    <span>{pendingCount} awaiting action</span>
+                                        {/* Activity Chart & Quick Actions Row */}
+                                        <div className={styles.dashboardTopRow}>
+                                            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <div className={styles.cardHeader} style={{ marginBottom: '1rem' }}>
+                                                    <h2>Weekly Performance</h2>
                                                 </div>
-                                                <span className={styles.quickArrow}>→</span>
+                                                <div style={{ flex: 1, minHeight: '320px', position: 'relative' }}>
+                                                    <WeeklyPerformanceChart />
+                                                </div>
                                             </div>
-                                            <div className={styles.quickCard} onClick={() => setActiveTab('announcements')}>
-                                                <div>
-                                                    <strong>Post Announcement</strong>
-                                                    <span>Notify {residents.length} residents</span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Quick Actions</h3>
+                                                <div className={styles.quickCard} onClick={() => setActiveTab('requests')} style={{ flex: 1 }}>
+                                                    <div>
+                                                        <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={18} /> Review Requests</strong>
+                                                        <span>{pendingCount} awaiting action</span>
+                                                    </div>
+                                                    <span className={styles.quickArrow}><ArrowRight size={16} /></span>
                                                 </div>
-                                                <span className={styles.quickArrow}>→</span>
-                                            </div>
-                                            <div className={styles.quickCard} onClick={() => setActiveTab('residents')}>
-                                                <div>
-                                                    <strong>Manage Residents</strong>
-                                                    <span>View registered accounts</span>
+                                                <div className={styles.quickCard} onClick={() => setActiveTab('announcements')} style={{ flex: 1 }}>
+                                                    <div>
+                                                        <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Megaphone size={18} /> Post Announcement</strong>
+                                                        <span>Notify {stats?.totalResidents || 0} residents</span>
+                                                    </div>
+                                                    <span className={styles.quickArrow}><ArrowRight size={16} /></span>
                                                 </div>
-                                                <span className={styles.quickArrow}>→</span>
-                                            </div>
-                                            <div className={styles.quickCard} onClick={handlePrintAllQR}>
-                                                <div>
-                                                    <strong>Print QR Code Sheet</strong>
-                                                    <span>Generate PDF for Document Services</span>
+                                                <div className={styles.quickCard} onClick={() => setActiveTab('residents')} style={{ flex: 1 }}>
+                                                    <div>
+                                                        <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Users size={18} /> Manage Residents</strong>
+                                                        <span>View registered accounts</span>
+                                                    </div>
+                                                    <span className={styles.quickArrow}><ArrowRight size={16} /></span>
                                                 </div>
-                                                <span className={styles.quickArrow}></span>
+                                                <div className={styles.quickCard} onClick={handlePrintAllQR} style={{ flex: 1 }}>
+                                                    <div>
+                                                        <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Printer size={18} /> Print QR Code Sheet</strong>
+                                                        <span>Generate PDF for Document Services</span>
+                                                    </div>
+                                                    <span className={styles.quickArrow}><Printer size={16} /></span>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Hidden QR Codes for PDF generation */}
-                                        <div style={{ display: 'none' }}>
-                                            {DOCUMENTS.map(doc => (
-                                                <QRCodeCanvas
-                                                    key={doc.slug}
-                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/request/${doc.slug}`}
-                                                    size={200}
-                                                    data-qr-slug={doc.slug}
-                                                />
-                                            ))}
-                                        </div>
-
-                                        <div className={styles.overviewGrid}>
-                                            {/* Recent Requests */}
-                                            <div className="glass-card">
+                                        {/* Sectoral Demographics & Recent Requests Row */}
+                                        <div className={styles.dashboardMiddleRow}>
+                                            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <div className={styles.cardHeader} style={{ marginBottom: '1rem' }}>
+                                                    <h2>Sectoral Demographics</h2>
+                                                </div>
+                                                <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                                    <SectoralChart profiles={demographicsData || []} />
+                                                </div>
+                                            </div>
+                                            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
                                                 <div className={styles.cardHeader}>
                                                     <h2>Recent Requests</h2>
                                                     <button className={styles.viewAll} onClick={() => setActiveTab('requests')}>View All</button>
@@ -1441,9 +1476,23 @@ function AdminDashboardContent() {
                                                     {requests.length === 0 && <p className={styles.emptyMessage}>No requests yet.</p>}
                                                 </div>
                                             </div>
+                                        </div>
 
+                                        {/* Hidden QR Codes for PDF generation */}
+                                        <div style={{ display: 'none' }}>
+                                            {DOCUMENTS.map(doc => (
+                                                <QRCodeCanvas
+                                                    key={doc.slug}
+                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/request/${doc.slug}`}
+                                                    size={200}
+                                                    data-qr-slug={doc.slug}
+                                                />
+                                            ))}
+                                        </div>
+
+                                        <div className={styles.overviewGrid}>
                                             {/* Announcements Summary */}
-                                            <div className="glass-card">
+                                            <div className="glass-card" style={{ gridColumn: '1 / -1' }}>
                                                 <div className={styles.cardHeader}>
                                                     <h2>Announcements</h2>
                                                     <button className={styles.viewAll} onClick={() => setActiveTab('announcements')}>Manage</button>
@@ -1485,13 +1534,24 @@ function AdminDashboardContent() {
                                 </div>
 
                                 <div className={styles.filterBar}>
-                                    <input
-                                        type="text"
-                                        placeholder="Search by name or document type..."
-                                        value={requestSearch}
-                                        onChange={e => setRequestSearch(e.target.value)}
-                                        className={styles.searchInput}
-                                    />
+                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, minWidth: '300px' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Search by name, doc type, or scan QR..."
+                                            value={requestSearch}
+                                            onChange={e => setRequestSearch(e.target.value)}
+                                            className={styles.searchInput}
+                                            style={{ width: '100%' }}
+                                        />
+                                        <button 
+                                            className="btn btn-outline" 
+                                            style={{ position: 'absolute', right: '0.25rem', padding: '0.4rem 0.6rem', border: 'none', background: 'transparent', color: 'var(--primary-600)' }}
+                                            onClick={() => setIsSearchScannerOpen(true)}
+                                            title="Search via QR Code"
+                                        >
+                                            <QrCode size={20} />
+                                        </button>
+                                    </div>
                                     <select
                                         value={statusFilter}
                                         onChange={e => setStatusFilter(e.target.value)}
@@ -1506,6 +1566,46 @@ function AdminDashboardContent() {
                                     </select>
                                     <span className={styles.searchCount}>{filteredRequests.length} result{filteredRequests.length !== 1 ? 's' : ''}</span>
                                 </div>
+
+                                {/* Scanner Modal for Search */}
+                                {isSearchScannerOpen && (
+                                    <div className={styles.modalOverlay}>
+                                        <div className={styles.modalContent} style={{ maxWidth: '400px', textAlign: 'center' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                                <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Scan QR Code</h2>
+                                                <button className={styles.closeModalBtn} onClick={() => setIsSearchScannerOpen(false)}><X size={20} /></button>
+                                            </div>
+                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Scan a resident's document QR code to instantly find their request.</p>
+                                            <div style={{ background: '#000', borderRadius: '8px', overflow: 'hidden', minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                                                {cameraError ? (
+                                                    <div style={{ color: '#f87171', textAlign: 'center', padding: '1.5rem' }}>
+                                                        <QrCode size={40} style={{ opacity: 0.4, marginBottom: '0.75rem' }} />
+                                                        <p style={{ fontSize: '0.85rem' }}>{cameraError}</p>
+                                                        <button className="btn btn-outline" style={{ marginTop: '1rem', color: 'white', borderColor: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }} onClick={() => setCameraError(null)}>Try Again</button>
+                                                    </div>
+                                                ) : (
+                                                <Scanner
+                                                    onScan={(results) => {
+                                                        if (results && results.length > 0) {
+                                                            const val = results[0].rawValue?.trim();
+                                                            if (val) {
+                                                                setRequestSearch(val);
+                                                                setIsSearchScannerOpen(false);
+                                                            }
+                                                        }
+                                                    }}
+                                                    onError={(err: unknown) => {
+                                                        const msg = err instanceof Error ? err.message : String(err)
+                                                        setCameraError(msg.includes('device not found') || msg.includes('NotFound') ? 'No camera found. Please allow camera access or use a device with a camera.' : msg)
+                                                    }}
+                                                    components={{ zoom: false }}
+                                                    styles={{ container: { width: '100%', maxWidth: '400px', margin: '0 auto' } }}
+                                                 />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className={`${styles.tableContainer} ${styles.glassTable}`}>
                                     {loading ? <LoadingSpinner text="Loading requests..." /> : (
@@ -2064,6 +2164,10 @@ function AdminDashboardContent() {
                                             {(!scanResult || verifying) ? (
                                                 <Scanner
                                                     onScan={handleScan}
+                                                    onError={(err: unknown) => {
+                                                        const msg = err instanceof Error ? err.message : String(err)
+                                                        console.warn('[QR Scanner]', msg)
+                                                    }}
                                                     components={{ zoom: false }}
                                                     styles={{ container: { width: '100%', maxWidth: '400px', margin: '0 auto' } }}
                                                 />

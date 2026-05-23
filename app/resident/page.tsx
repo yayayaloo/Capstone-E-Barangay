@@ -19,6 +19,7 @@ import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 import { ServiceRequest, Announcement, Profile, Complaint, ComplaintType } from '@/lib/types'
 import { QRCodeSVG } from 'qrcode.react'
+import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
 import styles from './resident.module.css'
 
 function ResidentPortalContent() {
@@ -787,15 +788,15 @@ function ResidentPortalContent() {
     }
 
     const getDocIcon = (type: string) => {
-        const iconMap: Record<string, string> = {
-            'Barangay Clearance': '',
-            'Barangay Certification': '',
-            'Business Clearance': '',
-            'Lot Certification': '',
-            'First Time Job Seeker': '',
-            'Indigency': '',
+        const iconMap: Record<string, React.ReactNode> = {
+            'Barangay Clearance': <FileCheck />,
+            'Barangay Certification': <FileBadge />,
+            'Business Clearance': <Store />,
+            'Lot Certification': <Home />,
+            'First Time Job Seeker': <Briefcase />,
+            'Indigency': <HeartHandshake />,
         }
-        return iconMap[type] || ''
+        return iconMap[type] || <FileCheck />
     }
 
     const getCategoryBadge = (category: string) => {

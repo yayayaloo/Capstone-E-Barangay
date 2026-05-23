@@ -20,7 +20,7 @@ export default function OfflinePage() {
                 <Image src="/logo.png" alt="Barangay Logo" width={120} height={120} style={{ width: '100%', height: 'auto' }} />
             </div>
             
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--accent-500, #6366f1)' }}>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--accent-500, #059669)' }}>
                 You are Offline
             </h1>
             
@@ -32,7 +32,7 @@ export default function OfflinePage() {
                 onClick={() => window.location.reload()}
                 style={{
                     padding: '0.75rem 2rem',
-                    background: 'var(--accent-500, #6366f1)',
+                    background: 'var(--accent-500, #059669)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',

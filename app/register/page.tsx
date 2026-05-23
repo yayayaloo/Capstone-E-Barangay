@@ -5,27 +5,27 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react'
+import { Eye, EyeOff, Check, CheckCircle2, XCircle, ShieldCheck, ShieldAlert, User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import styles from './register.module.css'
 import loginStyles from '../login/login.module.css'
 
 const SECTOR_OPTIONS = [
-    { value: 'Solo Parent', icon: '' },
-    { value: 'OFW', icon: '' },
-    { value: 'PWD', icon: '' },
-    { value: 'Senior Citizen', icon: '' },
-    { value: 'LGBTQ+', icon: '' },
-    { value: 'Employed', icon: '' },
-    { value: 'Unemployed', icon: '' },
-    { value: '4Ps Beneficiary', icon: '' },
-    { value: 'Pregnant/Lactating', icon: '' },
-    { value: 'Youth (15-30)', icon: '' },
-    { value: 'Indigenous People', icon: '' },
-    { value: 'OSC', icon: '' },
-    { value: 'OSY', icon: '' },
-    { value: 'OSA', icon: '' },
+    { value: 'Solo Parent', icon: <User size={16} /> },
+    { value: 'OFW', icon: <Plane size={16} /> },
+    { value: 'PWD', icon: <Accessibility size={16} /> },
+    { value: 'Senior Citizen', icon: <UserPlus size={16} /> },
+    { value: 'LGBTQ+', icon: <Heart size={16} /> },
+    { value: 'Employed', icon: <Briefcase size={16} /> },
+    { value: 'Unemployed', icon: <UserMinus size={16} /> },
+    { value: '4Ps Beneficiary', icon: <HandHeart size={16} /> },
+    { value: 'Pregnant/Lactating', icon: <Baby size={16} /> },
+    { value: 'Youth (15-30)', icon: <Zap size={16} /> },
+    { value: 'Indigenous People', icon: <Users size={16} /> },
+    { value: 'OSC', label: 'OSC (Out-of-School Children)', icon: <BookX size={16} /> },
+    { value: 'OSY', label: 'OSY (Out-of-School Youth)', icon: <BookX size={16} /> },
+    { value: 'OSA', label: 'OSA (Out-of-School Adult)', icon: <BookX size={16} /> },
 ]
 
 function RegisterContent() {
@@ -149,32 +149,39 @@ function RegisterContent() {
 
         try {
             // Use the userId from signUp response (works even without an active session)
-            const userId = newUserId || (await supabase.auth.getSession()).data.session?.user?.id
+            const userId = newUserId
 
             if (userId) {
                 let filePath = null;
 
-                if (idDocument) {
-                    const fileName = `id_verification_${Date.now()}_${idDocument.name.replace(/\s+/g, '_')}`
-                    filePath = `${userId}/${fileName}`
+                // Run file upload and profile update in parallel for speed
+                const uploadPromise = (async () => {
+                    if (idDocument) {
+                        const fileName = `id_verification_${Date.now()}_${idDocument.name.replace(/\s+/g, '_')}`
+                        filePath = `${userId}/${fileName}`
 
-                    const { error: uploadError } = await supabase.storage
-                        .from('resident-requirements')
-                        .upload(filePath, idDocument, {
-                            cacheControl: '3600',
-                            upsert: false,
-                            contentType: idDocument.type
-                        })
+                        const { error: uploadError } = await supabase.storage
+                            .from('resident-requirements')
+                            .upload(filePath, idDocument, {
+                                cacheControl: '3600',
+                                upsert: false,
+                                contentType: idDocument.type
+                            })
 
-                    if (uploadError) {
-                        console.error(`Failed to upload ID document: ${uploadError.message}`)
+                        if (uploadError) {
+                            console.error(`Failed to upload ID document: ${uploadError.message}`)
+                            filePath = null
+                        }
                     }
-                }
+                    return filePath
+                })()
+
+                const uploadedPath = await uploadPromise
 
                 // Update profile record with additional details (bypassing RLS via RPC)
                 const { error: updateError } = await supabase.rpc('complete_registration', {
                     p_user_id: userId,
-                    p_id_document_url: filePath,
+                    p_id_document_url: uploadedPath,
                     p_sectors: sectors
                 })
 
@@ -182,10 +189,11 @@ function RegisterContent() {
                     console.error('Failed to update profile record:', updateError.message)
                 }
 
-                // Sign out if we had a session (email confirmation disabled case)
-                const { data: { session: currentSession } } = await supabase.auth.getSession()
-                if (currentSession) {
+                // Sign out if we somehow got a session (email confirmation disabled case)
+                try {
                     await supabase.auth.signOut()
+                } catch {
+                    // Non-fatal
                 }
             }
         } catch (err) {
@@ -620,12 +628,12 @@ function RegisterContent() {
                                                         gap: '0.45rem',
                                                         padding: '0.5rem 0.65rem',
                                                         borderRadius: '8px',
-                                                        border: `1.5px solid ${isSelected ? '#6366f1' : '#e2e8f0'}`,
+                                                        border: `1.5px solid ${isSelected ? '#059669' : '#e2e8f0'}`,
                                                         background: isSelected ? 'rgba(34, 197, 94, 0.06)' : '#fff',
                                                         cursor: 'pointer',
                                                         transition: 'all 0.15s ease',
                                                         fontSize: '0.78rem',
-                                                        color: isSelected ? '#4338ca' : '#475569',
+                                                        color: isSelected ? '#15803d' : '#475569',
                                                         fontWeight: isSelected ? 600 : 400,
                                                         userSelect: 'none',
                                                     }}
@@ -639,8 +647,8 @@ function RegisterContent() {
                                                         width: '14px',
                                                         height: '14px',
                                                         borderRadius: '3px',
-                                                        border: `2px solid ${isSelected ? '#6366f1' : '#cbd5e1'}`,
-                                                        background: isSelected ? '#6366f1' : '#fff',
+                                                        border: `2px solid ${isSelected ? '#059669' : '#cbd5e1'}`,
+                                                        background: isSelected ? '#059669' : '#fff',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
@@ -648,10 +656,10 @@ function RegisterContent() {
                                                         fontSize: '0.6rem',
                                                         color: '#fff',
                                                     }}>
-                                                        {isSelected && 'Selected'}
+                                                        {isSelected && <Check size={10} strokeWidth={3} />}
                                                     </span>
                                                     <span>{opt.icon}</span>
-                                                    {opt.value}
+                                                    {opt.label || opt.value}
                                                 </div>
                                             )
                                         })}

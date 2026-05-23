@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react'
 import styles from './Toast.module.css'
 
-type ToastType = 'success' | 'error' | 'info'
+type ToastType = 'success' | 'error' | 'info' | 'loading'
 
 interface ToastMessage {
     id: number
@@ -12,7 +12,9 @@ interface ToastMessage {
 }
 
 interface ToastContextType {
-    showToast: (text: string, type?: ToastType) => void
+    showToast: (text: string, type?: ToastType) => number
+    updateToast: (id: number, text: string, type: ToastType) => void
+    removeToast: (id: number) => void
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
@@ -29,8 +31,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<ToastMessage[]>([])
 
     const showToast = useCallback((text: string, type: ToastType = 'info') => {
-        const id = Date.now()
+        const id = Date.now() + Math.random()
         setToasts(prev => [...prev, { id, text, type }])
+        return id
+    }, [])
+
+    const updateToast = useCallback((id: number, text: string, type: ToastType) => {
+        setToasts(prev => prev.map(t => (t.id === id ? { ...t, text, type } : t)))
     }, [])
 
     const removeToast = useCallback((id: number) => {
@@ -38,7 +45,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, [])
 
     return (
-        <ToastContext.Provider value={{ showToast }}>
+        <ToastContext.Provider value={{ showToast, updateToast, removeToast }}>
             {children}
             <div className={styles.toastContainer}>
                 {toasts.map(toast => (
@@ -51,21 +58,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: number) => void }) {
     useEffect(() => {
+        if (toast.type === 'loading') return
         const timer = setTimeout(() => onRemove(toast.id), 4000)
         return () => clearTimeout(timer)
-    }, [toast.id, onRemove])
+    }, [toast.id, toast.type, onRemove])
 
-    const icons: Record<ToastType, string> = {
-        success: '',
-        error: '',
-        info: '',
+    const icons: Record<ToastType, ReactNode> = {
+        success: '✓',
+        error: '✕',
+        info: 'ℹ',
+        loading: <span className={styles.spinner}></span>,
     }
 
     return (
         <div className={`${styles.toast} ${styles[toast.type]}`}>
             <span className={styles.icon}>{icons[toast.type]}</span>
             <span className={styles.text}>{toast.text}</span>
-            <button className={styles.close} onClick={() => onRemove(toast.id)}>✕</button>
+            {toast.type !== 'loading' && (
+                <button className={styles.close} onClick={() => onRemove(toast.id)}>✕</button>
+            )}
         </div>
     )
 }

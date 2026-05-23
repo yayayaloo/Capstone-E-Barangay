@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
+import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 import styles from './login.module.css'
 
@@ -17,6 +18,7 @@ function LoginContent() {
     const [successMessage, setSuccessMessage] = useState('')
     const [loading, setLoading] = useState(false)
     const { signIn } = useAuth()
+    const { showToast, updateToast } = useToast()
     const router = useRouter()
     const searchParams = useSearchParams()
 
@@ -49,36 +51,37 @@ function LoginContent() {
         }
 
         setLoading(true)
+        const toastId = showToast('Signing in...', 'loading')
 
-        const { error } = await signIn(email, password)
+        const { data, error } = await signIn(email, password)
 
         if (error) {
+            let errorMsg = error;
             if (error.includes('Invalid login credentials')) {
-                setError('Incorrect email or password. Please try again.')
+                errorMsg = 'Incorrect email or password. Please try again.'
             } else if (error.includes('Email not confirmed')) {
-                setError('Please verify your email address before logging in. Check your inbox for the confirmation link.')
-            } else {
-                setError(error)
+                errorMsg = 'Please verify your email address before logging in. Check your inbox for the confirmation link.'
             }
+            setError(errorMsg)
+            updateToast(toastId, errorMsg, 'error')
             setLoading(false)
         } else {
-            // After sign-in, verify the email is actually confirmed.
-            // This is a safety net in case Supabase's "Confirm email" setting
-            // is misconfigured or the PKCE flow confirmed without our route catching it.
-            const { data: { user } } = await supabase.auth.getUser()
+            const session = data?.session
 
-            if (!user?.email_confirmed_at) {
+            if (!session?.user?.email_confirmed_at) {
                 // Email not confirmed — block login and sign them out
                 await supabase.auth.signOut()
-                setError('Please verify your email address before logging in. Check your inbox for the confirmation link.')
+                const msg = 'Please verify your email address before logging in. Check your inbox for the confirmation link.'
+                setError(msg)
+                updateToast(toastId, msg, 'error')
                 setLoading(false)
                 return
             }
 
-            // Email confirmed — route by role
-            const { data: { session } } = await supabase.auth.getSession()
-            const role = session?.user?.user_metadata?.role || 'resident'
-            
+            updateToast(toastId, 'Signed in successfully!', 'success')
+
+            // Email confirmed — route by role (JWT claim, already in session)
+            const role = session.user.user_metadata?.role || 'resident'
             const redirectUrl = searchParams.get('redirect')
 
             if (redirectUrl && redirectUrl.startsWith('/')) {

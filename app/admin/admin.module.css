@@ -7,7 +7,8 @@
 .dashboardLayout {
     display: grid;
     grid-template-columns: 260px 1fr;
-    min-height: calc(100vh - 80px);
+    height: 100vh;
+    overflow: hidden;
 }
 
 /* ─── Sidebar ─────────────────────────────────────────────── */
@@ -108,7 +109,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #6366f1;
+    color: #059669;
     margin-bottom: 0.3rem;
 }
 
@@ -224,7 +225,7 @@
 }
 
 .statProcessing::before {
-    background: linear-gradient(90deg, #22c55e, #60a5fa);
+    background: linear-gradient(90deg, #10b981, #60a5fa);
 }
 
 .statCompleted::before {
@@ -232,7 +233,7 @@
 }
 
 .statResidents::before {
-    background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+    background: linear-gradient(90deg, #eab308, #fde047);
 }
 
 .statCard:hover {
@@ -331,6 +332,21 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+}
+
+.dashboardTopRow {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    align-items: stretch;
+}
+
+.dashboardMiddleRow {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
 }
 
 /* ─── Activity List ──────────────────────────────────────── */
@@ -553,7 +569,7 @@
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(135deg, #059669, #10b981);
     color: #fff;
     display: flex;
     align-items: center;
@@ -740,7 +756,7 @@
 
 .progressFill {
     height: 100%;
-    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    background: linear-gradient(90deg, #059669, #10b981);
     border-radius: 99px;
     transition: width 0.5s ease;
     min-width: 4px;
@@ -783,7 +799,9 @@
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .overviewGrid {
+    .overviewGrid,
+    .dashboardTopRow,
+    .dashboardMiddleRow {
         grid-template-columns: 1fr;
     }
 }
@@ -791,10 +809,12 @@
 @media (max-width: 768px) {
     .dashboardLayout {
         grid-template-columns: 1fr;
+        height: auto;
         min-height: calc(100vh - 145px);
         /* Header + BottomNav */
         margin-bottom: 65px;
         /* BottomNav height */
+        overflow: visible;
     }
 
     .sidebar {
