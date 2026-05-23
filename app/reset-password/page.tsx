@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { useToast } from '@/components/Toast'
 import styles from '../forgot-password/forgot-password.module.css'
 import registerStyles from '../register/register.module.css'
@@ -36,7 +37,7 @@ function ResetPasswordContent() {
 
         // Supabase SSR client automatically exchanges the PKCE code in the background
         // We listen for the recovery event to know when it's done and clean up the URL
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
             if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
                 console.log("Auth event triggered:", event)
                 if (code) {
@@ -99,7 +100,7 @@ function ResetPasswordContent() {
             // 1. Get the access token directly from Supabase or Cookies
             let accessToken = null;
             try {
-                const sessionResult = await withTimeout(supabase.auth.getSession(), 3000, 'timeout');
+                const sessionResult: any = await withTimeout(supabase.auth.getSession(), 3000, 'timeout');
                 accessToken = sessionResult?.data?.session?.access_token;
             } catch (e) {
                 // If getSession timed out or failed, try parsing cookies directly
