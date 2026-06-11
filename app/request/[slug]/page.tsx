@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { submitDocumentRequest } from '@/app/actions/requestActions'
 import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
 import styles from './request.module.css'
 
@@ -17,8 +18,8 @@ const DOCUMENTS: Record<string, {
         desc: 'Verification of residency, good moral character, and no derogatory record.',
         fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID',
     },
-    'barangay-certification': {
-        name: 'Barangay Certification', icon: <FileBadge size={24} />,
+    'certificate-of-residency': {
+        name: 'Certificate of Residency', icon: <FileBadge size={24} />,
         desc: 'Official certification for Residency, Loan, or Good Moral Character.',
         fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID',
     },
@@ -195,19 +196,13 @@ export default function RequestPage() {
 
             const attachmentUrl = uploadedPaths.length > 0 ? uploadedPaths.join(',') : null
 
-            const { data, error } = await supabase
-                .from('service_requests')
-                .insert({
-                    resident_id: profile.id,
-                    document_type: doc.name,
-                    purpose: form.purpose.trim(),
-                    attachment_url: attachmentUrl,
-                    status: 'pending'
-                })
-                .select()
-                .single()
-
-            if (error) throw error
+            const data = await submitDocumentRequest({
+                resident_id: profile.id,
+                document_type: doc.name,
+                purpose: form.purpose.trim(),
+                attachment_url: attachmentUrl,
+                status: 'pending'
+            })
 
             setSuccess({ id: data.id, docType: doc.name })
         } catch (err: any) {

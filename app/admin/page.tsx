@@ -14,6 +14,7 @@ import { ServiceRequest, Announcement, Profile, AuditLog, BlotterReport, Blotter
 import { logAdminAction } from '@/lib/audit'
 import { QRCodeCanvas } from 'qrcode.react'
 import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
+import { updateRequestStatus } from '@/app/actions/requestActions'
 const WeeklyPerformanceChart = dynamic(() => import('@/components/WeeklyPerformanceChart'), { ssr: false })
 const SectoralChart = dynamic(() => import('@/components/SectoralChart'), { ssr: false })
 const AgeDemographicChart = dynamic(() => import('@/components/AgeDemographicChart'), { ssr: false })
@@ -76,7 +77,7 @@ function fmtDate(iso: string) {
 
 const DOCUMENTS = [
     { slug: 'barangay-clearance', name: 'Barangay Clearance', fee: 'Php 50.00', reqs: 'Valid ID' },
-    { slug: 'barangay-certification', name: 'Barangay Certification', fee: 'Php 50.00', reqs: 'Valid ID' },
+    { slug: 'certificate-of-residency', name: 'Certificate of Residency', fee: 'Php 50.00', reqs: 'Valid ID' },
     { slug: 'business-clearance', name: 'Business Clearance', fee: 'Free', reqs: 'DTI Certificate' },
     { slug: 'lot-certification', name: 'Lot / Building Certification', fee: 'Php 1.00/sqm', reqs: 'Purok Cert, Tax Dec' },
     { slug: 'first-time-job-seeker', name: 'First Time Job Seeker', fee: 'Free', reqs: 'Valid ID' },
@@ -309,44 +310,25 @@ function AdminDashboardContent() {
             const request = requests.find(r => r.id === requestId)
             if (!request) return
 
-            // Build update payload
-            const updatePayload: Record<string, any> = {
-                status: newStatus,
-                notes: note || null,
-                updated_at: new Date().toISOString()
+            let qrCodeRef = null
+            if (newStatus === 'ready' && !request.qr_code_ref) {
+                qrCodeRef = crypto.randomUUID()
             }
 
-            // Auto-generate QR code ref when marking as 'ready'
-            // This enables the document QR verification flow
-            if (newStatus === 'ready') {
-                if (!request.qr_code_ref) {
-                    updatePayload.qr_code_ref = crypto.randomUUID()
-                }
-
-                // Calculate issuance and expiration dates
-                const now = new Date()
-                updatePayload.issued_at = now.toISOString()
-
-                const type = request.document_type.toLowerCase()
-                const expiry = new Date(now)
-                if (type.includes('job seeker') || type.includes('business clearance')) {
-                    expiry.setFullYear(expiry.getFullYear() + 1)
-                } else {
-                    expiry.setMonth(expiry.getMonth() + 6)
-                }
-                updatePayload.expires_at = expiry.toISOString()
-
-                // Update local state optimistic update
-                request.issued_at = updatePayload.issued_at
-                request.expires_at = updatePayload.expires_at
+            const updatedReq = await updateRequestStatus(
+                requestId,
+                newStatus,
+                qrCodeRef,
+                note ?? null,
+                request.document_type
+            )
+            
+            // Update local state with returned data
+            if (updatedReq && newStatus === 'ready') {
+                request.issued_at = updatedReq.issued_at
+                request.expires_at = updatedReq.expires_at
+                request.qr_code_ref = updatedReq.qr_code_ref
             }
-
-            const { error: reqError } = await supabase
-                .from('service_requests')
-                .update(updatePayload)
-                .eq('id', requestId)
-
-            if (reqError) throw reqError
 
             showToast(
                 newStatus === 'ready'
@@ -422,16 +404,73 @@ function AdminDashboardContent() {
                 }
             }
 
+            // Fetch resident profile for certificate fields
+            let residentProfile: any = null
+            try {
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('address, phone, birthdate, gender, relationship_status')
+                    .eq('id', req.resident_id)
+                    .single()
+                
+                if (profileError) throw profileError
+                residentProfile = profileData
+            } catch (e) {
+                console.warn('Could not fetch resident profile for PDF (missing columns or RLS):', e)
+            }
+
+            // Calculate age from birthdate
+            let residentAge = ''
+            if (residentProfile?.birthdate) {
+                const today = new Date()
+                const born = new Date(residentProfile.birthdate)
+                let a = today.getFullYear() - born.getFullYear()
+                const m = today.getMonth() - born.getMonth()
+                if (m < 0 || (m === 0 && today.getDate() < born.getDate())) a--
+                residentAge = a.toString()
+            }
+
+            // Parse form_data if it's a string
+            let parsedFormData = req.form_data || {}
+            if (typeof parsedFormData === 'string') {
+                try {
+                    parsedFormData = JSON.parse(parsedFormData)
+                } catch (e) {
+                    console.error('Failed to parse form_data', e)
+                }
+            }
+
             setCertData({
                 residentName: req.resident_name || 'Unknown Resident',
                 documentType: req.document_type,
                 purpose: req.purpose || 'General Requirement',
-                dateIssued: issueDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                expirationDate: expDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                dateIssued: issueDateObj.toISOString(),
+                expirationDate: expDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                formData: {
+                    address: parsedFormData?.address || residentProfile?.address || '',
+                    birthdate: parsedFormData?.birthdate || parsedFormData?.birthDate || residentProfile?.birthdate || 'NO_DATA',
+                    age: parsedFormData?.age || residentAge,
+                    civilStatus: parsedFormData?.civilStatus || residentProfile?.relationship_status || '',
+                    gender: parsedFormData?.gender || residentProfile?.gender || '',
+                    // Business fields
+                    businessName: parsedFormData?.businessName || '',
+                    businessLocation: parsedFormData?.businessLocation || '',
+                    operatorName: parsedFormData?.operatorName || req.resident_name || '',
+                    operatorAddress: residentProfile?.address || '',
+                    // Lot fields
+                    lotArea: parsedFormData?.lotArea || '',
+                    taxDecNo: parsedFormData?.taxDecNo || '',
+                    propertyLocation: parsedFormData?.propertyLocation || '',
+                    occupiedSince: parsedFormData?.occupiedSince || '',
+                    // First time job seeker
+                    yearsOfResidency: parsedFormData?.yearsOfResidency || '',
+                    idType: parsedFormData?.idType || '',
+                    idNumber: parsedFormData?.idNumber || '',
+                }
             })
 
-            // Wait brief moment for React to render the hidden component with new data
-            await new Promise(resolve => setTimeout(resolve, 200))
+            // Wait for React to render the hidden component with new data
+            await new Promise(resolve => setTimeout(resolve, 500))
 
             if (!certRef.current) {
                 throw new Error("Certificate template not found")
@@ -445,15 +484,15 @@ function AdminDashboardContent() {
             })
 
             // Setup PDF
-            const imgData = canvas.toDataURL('image/png')
+            const imgData = canvas.toDataURL('image/jpeg', 0.8) // Use JPEG with 80% quality to reduce file size
             const pdf = new jsPDF({
                 orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4' // 210 x 297 mm
+                unit: 'in',
+                format: [8.5, 13] // Long / Folio size
             })
 
-            // Add image to PDF exactly fitting the A4 bounds
-            pdf.addImage(imgData, 'PNG', 0, 0, 210, 297)
+            // Add image to PDF exactly fitting the bounds
+            pdf.addImage(imgData, 'JPEG', 0, 0, 8.5, 13)
 
             // Trigger download
             const fileName = `${req.document_type.replace(/\s+/g, '_')}_${req.resident_name?.replace(/\s+/g, '_')}.pdf`
@@ -1300,7 +1339,10 @@ function AdminDashboardContent() {
 
     return (
         <div className={styles.adminContainer}>
-            <CertificateTemplate ref={certRef} data={certData} />
+            {/* Hidden off-screen certificate template for html2canvas PDF generation */}
+            <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none', zIndex: -1 }}>
+                <CertificateTemplate ref={certRef} data={certData} />
+            </div>
             <Header
                 title="E-Barangay Admin"
                 userName={profile?.full_name || 'Admin'}

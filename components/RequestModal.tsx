@@ -7,21 +7,55 @@ interface RequestModalProps {
     onClose: () => void
     onSubmit: (documentType: string, purpose: string, attachments: File[], formData?: Record<string, any>) => Promise<void>
     initialType?: string
+    profile?: any
 }
 
 const documentTypes = [
     { value: 'Barangay Clearance', label: ' Barangay Clearance', desc: 'Verification of residency, good moral character, no derogatory record.', reqs: 'Valid ID (Php 50.00)' },
-    { value: 'Barangay Certification', label: ' Barangay Certification', desc: 'For Residency, Loan, Good Moral Character.', reqs: 'Valid ID (Php 50.00)' },
+    { value: 'Certificate of Residency', label: ' Certificate of Residency', desc: 'Proof of address and duration of stay in the barangay.', reqs: 'Valid ID (Php 50.00)' },
     { value: 'Business Clearance', label: ' Business Clearance', desc: 'Compliance for business permit within Gordon Heights.', reqs: 'DTI Certificate (Free)' },
     { value: 'Lot Certification', label: ' Lot / Building Certification', desc: 'Issued to actual lot occupants for compliance to government agencies.', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment, etc. (Php 1.00/sqm)' },
     { value: 'First Time Job Seeker', label: ' First Time Job Seeker', desc: 'Waives fees for pre-employment requirements (Ages 18-30).', reqs: 'Valid ID (Free)' },
     { value: 'Indigency', label: ' Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
 ]
 
-export default function RequestModal({ onClose, onSubmit, initialType }: RequestModalProps) {
+export default function RequestModal({ onClose, onSubmit, initialType, profile }: RequestModalProps) {
     const [selectedType, setSelectedType] = useState(initialType || '')
-    const [purpose, setPurpose] = useState('')
-    const [formData, setFormData] = useState<Record<string, any>>({})
+    const [purposeCategory, setPurposeCategory] = useState('')
+    const [purposeOther, setPurposeOther] = useState('')
+    
+    let initialAge = ''
+    if (profile?.birthdate) {
+        const today = new Date()
+        const born = new Date(profile.birthdate)
+        if (!isNaN(born.getTime())) {
+            let a = today.getFullYear() - born.getFullYear()
+            const m = today.getMonth() - born.getMonth()
+            if (m < 0 || (m === 0 && today.getDate() < born.getDate())) a--
+            initialAge = a.toString()
+        }
+    }
+
+    let initialYearsOfResidency = ''
+    if (profile?.resident_since) {
+        if (profile.resident_since === 'Since Birth') {
+            initialYearsOfResidency = initialAge
+        } else {
+            const year = parseInt(profile.resident_since)
+            if (!isNaN(year)) {
+                initialYearsOfResidency = (new Date().getFullYear() - year).toString()
+            }
+        }
+    }
+
+    const [formData, setFormData] = useState<Record<string, any>>({
+        address: profile?.address || '',
+        birthdate: profile?.birthdate || '',
+        civilStatus: profile?.relationship_status || '',
+        age: initialAge,
+        residentSince: profile?.resident_since || '',
+        yearsOfResidency: initialYearsOfResidency
+    })
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
@@ -49,8 +83,10 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
             return
         }
 
-        if (!purpose.trim()) {
-            setError('Please enter the purpose of your request')
+        const finalPurpose = purposeCategory === 'Others' ? purposeOther.trim() : purposeCategory
+
+        if (!finalPurpose) {
+            setError('Please specify the purpose of your request')
             return
         }
 
@@ -61,7 +97,7 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
 
         setSubmitting(true)
         try {
-            await onSubmit(selectedType, purpose.trim(), attachments, formData)
+            await onSubmit(selectedType, finalPurpose, attachments, formData)
             onClose()
         } catch (err: any) {
             setError(err?.message || 'Failed to submit request. Please try again.')
@@ -95,25 +131,41 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                                 >
                                     <span className={styles.typeLabel}>{doc.label}</span>
                                     <span className={styles.typeDesc}>{doc.desc}</span>
-                                    {selectedType === doc.value && (
-                                        <div className={styles.typeReqs}>
-                                            <strong>Requirements:</strong> {doc.reqs}
-                                        </div>
-                                    )}
+                                    <div className={styles.typeReqs}>
+                                        <strong>Requirements:</strong> {doc.reqs}
+                                    </div>
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     <div className={styles.inputGroup}>
-                        <label htmlFor="purpose">Purpose / Reason *</label>
-                        <textarea
-                            id="purpose"
-                            value={purpose}
-                            onChange={(e) => setPurpose(e.target.value)}
-                            placeholder="e.g., Employment requirement, Business registration, School enrollment..."
-                            rows={3}
-                        />
+                        <label>Purpose / Reason *</label>
+                        <select
+                            value={purposeCategory}
+                            onChange={(e) => setPurposeCategory(e.target.value)}
+                            required
+                            style={{ padding: '0.6rem', border: '1px solid var(--border-color)', borderRadius: '6px', width: '100%', marginTop: '0.2rem', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                        >
+                            <option value="">Select Purpose</option>
+                            <option value="Employment Requirement">Employment Requirement</option>
+                            <option value="Business Registration">Business Registration</option>
+                            <option value="School Enrollment">School Enrollment</option>
+                            <option value="Loan Application">Loan Application</option>
+                            <option value="Record Purposes">Record Purposes</option>
+                            <option value="Financial Assistance">Financial Assistance</option>
+                            <option value="Others">Others</option>
+                        </select>
+                        {purposeCategory === 'Others' && (
+                            <textarea
+                                value={purposeOther}
+                                onChange={(e) => setPurposeOther(e.target.value)}
+                                placeholder="Please specify your purpose..."
+                                rows={2}
+                                style={{ padding: '0.6rem', border: '1px solid var(--border-color)', borderRadius: '6px', width: '100%', marginTop: '0.5rem', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                                required
+                            />
+                        )}
                     </div>
 
                     {(() => {
@@ -136,11 +188,11 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                                     <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Additional Information Required</h4>
                                     <div className={styles.inputGroup}>
                                         <label>Complete Address *</label>
-                                        <input type="text" name="address" value={formData.address || ''} onChange={handleFormChange} required placeholder="Block 1, Lot 2, Gordon Heights..." style={inputStyle} />
+                                        <input type="text" name="address" value={formData.address || ''} onChange={handleFormChange} required placeholder="Block 1, Lot 2, Gordon Heights..." style={inputStyle} readOnly={!!profile?.address} />
                                     </div>
                                     <div className={styles.inputGroup}>
                                         <label>Years of Residency *</label>
-                                        <input type="number" name="yearsOfResidency" value={formData.yearsOfResidency || ''} onChange={handleFormChange} required placeholder="e.g. 5" style={inputStyle} />
+                                        <input type="number" name="yearsOfResidency" value={formData.yearsOfResidency || ''} onChange={handleFormChange} required placeholder="e.g. 5" style={inputStyle} readOnly={!!profile?.resident_since} />
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                         <div className={styles.inputGroup}>
@@ -156,18 +208,18 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                             )
                         }
 
-                        if (type.includes('indigency') || type.includes('certification') || type.includes('clearance') && !type.includes('business')) {
+                        if (type.includes('indigency') || type.includes('certification') || type.includes('residency') || (type.includes('clearance') && !type.includes('business'))) {
                             return (
                                 <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
                                     <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Additional Information Required</h4>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                                         <div className={styles.inputGroup}>
                                             <label>Age *</label>
-                                            <input type="number" name="age" value={formData.age || ''} onChange={handleFormChange} required placeholder="Age" style={inputStyle} />
+                                            <input type="number" name="age" value={formData.age || ''} readOnly style={{ ...inputStyle, backgroundColor: 'var(--bg-secondary)' }} />
                                         </div>
                                         <div className={styles.inputGroup}>
                                             <label>Civil Status *</label>
-                                            <select name="civilStatus" value={formData.civilStatus || ''} onChange={handleFormChange} required style={inputStyle}>
+                                            <select name="civilStatus" value={formData.civilStatus || ''} onChange={handleFormChange} required style={inputStyle} disabled={!!profile?.relationship_status}>
                                                 <option value="">Select</option>
                                                 <option value="Single">Single</option>
                                                 <option value="Married">Married</option>
@@ -177,18 +229,48 @@ export default function RequestModal({ onClose, onSubmit, initialType }: Request
                                         </div>
                                         <div className={styles.inputGroup}>
                                             <label>Date of Birth *</label>
-                                            <input type="date" name="birthdate" value={formData.birthdate || ''} onChange={handleFormChange} required style={inputStyle} />
+                                            <input type="date" name="birthdate" value={formData.birthdate || ''} max={new Date().toISOString().split('T')[0]} onChange={(e) => {
+                                                const newBirthdate = e.target.value;
+                                                let newAge = '';
+                                                if (newBirthdate) {
+                                                    const today = new Date();
+                                                    const born = new Date(newBirthdate);
+                                                    let a = today.getFullYear() - born.getFullYear();
+                                                    const m = today.getMonth() - born.getMonth();
+                                                    if (m < 0 || (m === 0 && today.getDate() < born.getDate())) a--;
+                                                    newAge = a.toString();
+                                                }
+                                                setFormData({ ...formData, birthdate: newBirthdate, age: newAge });
+                                            }} required style={inputStyle} readOnly={!!profile?.birthdate} />
                                         </div>
                                     </div>
-                                    {type.includes('residency') && (
+                                    {(type.includes('residency') || type.includes('certification')) && (
                                         <div className={styles.inputGroup}>
-                                            <label>Resident Since (Year) *</label>
-                                            <input type="text" name="residentSince" value={formData.residentSince || ''} onChange={handleFormChange} required placeholder="e.g. 1990 or Birth" style={inputStyle} />
+                                            <label>Resident Since *</label>
+                                            {profile?.resident_since ? (
+                                                <input type="text" name="residentSince" value={formData.residentSince || ''} readOnly style={inputStyle} />
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                    <select
+                                                        value={formData.residentSinceMode || ''}
+                                                        onChange={(e) => setFormData({ ...formData, residentSinceMode: e.target.value, residentSince: e.target.value === 'Since Birth' ? 'Since Birth' : '' })}
+                                                        required
+                                                        style={inputStyle}
+                                                    >
+                                                        <option value="">Select Option</option>
+                                                        <option value="Since Birth">Since Birth</option>
+                                                        <option value="Specify Year">Specify Year</option>
+                                                    </select>
+                                                    {formData.residentSinceMode === 'Specify Year' && (
+                                                        <input type="number" min="1900" max={new Date().getFullYear()} name="residentSince" value={formData.residentSince || ''} onChange={handleFormChange} required placeholder="Year (e.g. 2015)" style={inputStyle} />
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                     <div className={styles.inputGroup}>
                                         <label>Complete Address *</label>
-                                        <input type="text" name="address" value={formData.address || ''} onChange={handleFormChange} required placeholder="Block 1, Lot 2, Gordon Heights..." style={inputStyle} />
+                                        <input type="text" name="address" value={formData.address || ''} onChange={handleFormChange} required placeholder="Block 1, Lot 2, Gordon Heights..." style={inputStyle} readOnly={!!profile?.address} />
                                     </div>
                                 </div>
                             )

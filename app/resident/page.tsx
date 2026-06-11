@@ -740,7 +740,7 @@ function ResidentPortalContent() {
                 <div className="grid grid-3" style={{ gap: '1rem' }}>
                     {[
                         { type: 'Barangay Clearance', desc: 'Verification of residency & good moral character', fee: 'Php 50.00' },
-                        { type: 'Barangay Certification', desc: 'Residency, Loan, Good Moral Character', fee: 'Php 50.00' },
+                        { type: 'Certificate of Residency', desc: 'Residency, Loan, Good Moral Character', fee: 'Php 50.00' },
                         { type: 'Business Clearance', desc: 'Compliance for business permit within Gordon Heights', fee: 'Free' },
                         { type: 'Lot Certification', desc: 'Issued to lot occupants for government agencies', fee: 'Php 1.00/sqm' },
                         { type: 'First Time Job Seeker', desc: 'Waives pre-employment fees (Ages 18–30)', fee: 'Free' },
@@ -790,7 +790,7 @@ function ResidentPortalContent() {
     const getDocIcon = (type: string) => {
         const iconMap: Record<string, React.ReactNode> = {
             'Barangay Clearance': <FileCheck />,
-            'Barangay Certification': <FileBadge />,
+            'Certificate of Residency': <FileBadge />,
             'Business Clearance': <Store />,
             'Lot Certification': <Home />,
             'First Time Job Seeker': <Briefcase />,
@@ -985,6 +985,7 @@ function ResidentPortalContent() {
             {/* Request Document Modal */}
             {showRequestModal && (
                 <RequestModal
+                    profile={profile}
                     initialType={selectedServiceType}
                     onClose={() => { setShowRequestModal(false); setSelectedServiceType(''); }}
                     onSubmit={handleRequestSubmit}

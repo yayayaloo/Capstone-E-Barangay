@@ -22,7 +22,7 @@ const STORAGE_KEY = 'ebarangay_chat_history'
 
 const quickReplies = [
     'Paano makuha ang Barangay Clearance?',
-    'Paano ang Barangay Certification?',
+    'Paano ang Certificate of Residency?',
     'Ano ang Business Clearance?',
     'First Time Job Seeker - paano?',
     'Ano ang Certificate of Indigency?',
@@ -66,8 +66,8 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
         : 'For **Barangay Clearance**, you need:\n• Valid Government ID\n• Fee: ₱50.00\nClick "Request Document" to apply!'
 
     if (lower.includes('certification') || lower.includes('residency') || lower.includes('tirahan') || lower.includes('loan') || lower.includes('good moral')) return tl
-        ? 'Para sa **Barangay Certification**, kailangan mo ng:\n• Valid Government ID\n• Layunin: Residency, Loan, o Good Moral Character\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
-        : 'For **Barangay Certification**, you need:\n• Valid Government ID\n• Purpose: Residency, Loan, or Good Moral Character\n• Fee: ₱50.00\nClick "Request Document" to apply!'
+        ? 'Para sa **Certificate of Residency**, kailangan mo ng:\n• Valid Government ID\n• Layunin: Residency, Loan, o Good Moral Character\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
+        : 'For **Certificate of Residency**, you need:\n• Valid Government ID\n• Purpose: Residency, Loan, or Good Moral Character\n• Fee: ₱50.00\nClick "Request Document" to apply!'
 
     if (lower.includes('business clearance') || lower.includes('negosyo') || lower.includes('business permit')) return tl
         ? 'Para sa **Business Clearance**, kailangan mo ng:\n• DTI Certificate\n• Bayad: **Libre (Free)**\n• Para sa mga negosyante para sa compliance ng business permit.\nI-click ang "Request Document" para mag-apply!'

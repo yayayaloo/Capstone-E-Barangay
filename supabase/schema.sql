@@ -17,11 +17,13 @@ CREATE TABLE IF NOT EXISTS profiles (
     email TEXT NOT NULL,
     address TEXT,
     phone TEXT,
+    birthdate DATE,
     role TEXT NOT NULL DEFAULT 'resident' CHECK (role IN ('resident', 'admin')),
     is_verified BOOLEAN NOT NULL DEFAULT false,
     resident_id_number TEXT UNIQUE,
     resident_qr_id TEXT UNIQUE DEFAULT gen_random_uuid(),
     sectors TEXT[] NOT NULL DEFAULT '{}',
+    resident_since TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

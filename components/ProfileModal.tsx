@@ -34,6 +34,15 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
     const [sectors, setSectors] = useState<string[]>(profile.sectors || [])
     const [profilePicture, setProfilePicture] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState(profile.profile_picture_url ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}` : null)
+    
+    // Residency Information state
+    const [residentSinceMode, setResidentSinceMode] = useState<'birth' | 'year'>(
+        profile.resident_since === 'Since Birth' || !profile.resident_since ? 'birth' : 'year'
+    )
+    const [residentSinceYear, setResidentSinceYear] = useState(
+        profile.resident_since && profile.resident_since !== 'Since Birth' ? profile.resident_since : ''
+    )
+
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
 
@@ -95,7 +104,8 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                 email: email.trim(),
                 phone: phone.trim(),
                 sectors,
-                profile_picture_url
+                profile_picture_url,
+                resident_since: residentSinceMode === 'birth' ? 'Since Birth' : residentSinceYear
             })
 
             if (!photoUploadFailed) {
@@ -214,6 +224,46 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                                 style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
                             />
                         </div>
+                    </div>
+
+                    {/* Residency Information */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Residency Duration in Barangay</label>
+                        <div style={{ display: 'flex', gap: '1.5rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                <input
+                                    type="radio"
+                                    checked={residentSinceMode === 'birth'}
+                                    onChange={() => setResidentSinceMode('birth')}
+                                    style={{ accentColor: 'var(--primary-500)' }}
+                                />
+                                Since Birth
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                <input
+                                    type="radio"
+                                    checked={residentSinceMode === 'year'}
+                                    onChange={() => setResidentSinceMode('year')}
+                                    style={{ accentColor: 'var(--primary-500)' }}
+                                />
+                                Specify Year
+                            </label>
+                        </div>
+                        {residentSinceMode === 'year' && (
+                            <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Year Started Living in the Barangay</label>
+                                <input
+                                    type="number"
+                                    min="1900"
+                                    max={new Date().getFullYear()}
+                                    value={residentSinceYear}
+                                    onChange={(e) => setResidentSinceYear(e.target.value)}
+                                    placeholder="e.g. 2015"
+                                    required={residentSinceMode === 'year'}
+                                    style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', maxWidth: '200px' }}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Sectoral Information */}

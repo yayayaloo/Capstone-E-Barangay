@@ -35,11 +35,11 @@ MGA AVAILABLE NA SERBISYO (lahat ay pwedeng i-request online sa portal):
    - Bayad: ₱50.00
    - Tagalog: "Barangay Clearance" o "Clearance"
 
-2. BARANGAY CERTIFICATION (Iba't ibang sertipikasyon)
+2. CERTIFICATE OF RESIDENCY (Iba't ibang sertipikasyon)
    - Gamit: Residency, Loan, Good moral character
    - Mga Kailangan: Valid I.D.
    - Bayad: ₱50.00
-   - Tagalog: "Barangay Certification" o "Residency"
+   - Tagalog: "Certificate of Residency" o "Residency"
 
 3. BUSINESS CLEARANCE (Para sa mga negosyante)
    - Gamit: Issuance to business owners for compliance of business permit.

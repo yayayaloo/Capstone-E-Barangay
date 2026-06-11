@@ -20,8 +20,8 @@ const DOCUMENTS = [
         validity: '6 months',
     },
     {
-        slug: 'barangay-certification',
-        name: 'Barangay Certification',
+        slug: 'certificate-of-residency',
+        name: 'Certificate of Residency',
         icon: <FileBadge size={24} />,
         desc: 'Official certification for Residency, Loan applications, or Good Moral Character purposes.',
         fee: 'Php 50.00',

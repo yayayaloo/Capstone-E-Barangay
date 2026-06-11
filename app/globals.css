@@ -134,6 +134,12 @@ p {
   line-height: 1.7;
 }
 
+#certificate-template p {
+  color: #000000;
+  line-height: inherit;
+  margin-bottom: inherit;
+}
+
 a {
   color: var(--primary-600);
   text-decoration: none;

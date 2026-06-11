@@ -28,6 +28,7 @@ export interface Profile {
     profile_picture_url: string | null
 
     sectors: string[]
+    resident_since?: string | null
     created_at: string
     updated_at: string
 }
