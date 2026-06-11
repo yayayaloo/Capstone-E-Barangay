@@ -1,4 +1,4 @@
-const CACHE_NAME = 'e-barangay-pwa-v1';
+const CACHE_NAME = 'e-barangay-pwa-v2';
 const OFFLINE_URL = '/~offline';
 
 const CACHED_FILES = [

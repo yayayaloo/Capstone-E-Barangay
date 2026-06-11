@@ -20,6 +20,13 @@ interface ChatBotProps {
 
 const STORAGE_KEY = 'ebarangay_chat_history'
 
+function cleanDocType(type: string | undefined | null) {
+    if (!type) return ''
+    const trimmed = type.trim()
+    if (trimmed.toLowerCase() === 'indigency') return 'Certificate of Indigency'
+    return trimmed
+}
+
 const quickReplies = [
     'Paano makuha ang Barangay Clearance?',
     'Paano ang Certificate of Residency?',
@@ -57,8 +64,8 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
                 ? 'Lahat ng iyong request ay nakumpleto na! Tingnan ang "My Requests" tab para sa detalye.'
                 : "All your requests are completed! Check the 'My Requests' tab for details."
         return tl
-            ? `Mayroon kang ${pending.length} aktibong request:\n${pending.map(r => `• ${r.document_type} (${r.status})`).join('\n')}`
-            : `You have ${pending.length} active request(s):\n${pending.map(r => `• ${r.document_type} (${r.status})`).join('\n')}`
+            ? `Mayroon kang ${pending.length} aktibong request:\n${pending.map(r => `• ${cleanDocType(r.document_type)} (${r.status})`).join('\n')}`
+            : `You have ${pending.length} active request(s):\n${pending.map(r => `• ${cleanDocType(r.document_type)} (${r.status})`).join('\n')}`
     }
 
     if (lower.includes('clearance') && !lower.includes('business')) return tl
@@ -184,7 +191,7 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
             // Build user context for the AI
             const pendingRequests = userRequests
                 ?.filter(r => r.status === 'pending' || r.status === 'processing')
-                .map(r => `${r.document_type} (${r.status})`) || []
+                .map(r => `${cleanDocType(r.document_type)} (${r.status})`) || []
 
             // Send conversation history so AI remembers context
             const historyToSend = messages.slice(-10).map(m => ({

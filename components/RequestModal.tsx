@@ -16,7 +16,7 @@ const documentTypes = [
     { value: 'Business Clearance', label: ' Business Clearance', desc: 'Compliance for business permit within Gordon Heights.', reqs: 'DTI Certificate (Free)' },
     { value: 'Lot Certification', label: ' Lot / Building Certification', desc: 'Issued to actual lot occupants for compliance to government agencies.', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment, etc. (Php 1.00/sqm)' },
     { value: 'First Time Job Seeker', label: ' First Time Job Seeker', desc: 'Waives fees for pre-employment requirements (Ages 18-30).', reqs: 'Valid ID (Free)' },
-    { value: 'Indigency', label: ' Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
+    { value: 'Certificate of Indigency', label: ' Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
 ]
 
 export default function RequestModal({ onClose, onSubmit, initialType, profile }: RequestModalProps) {
@@ -54,7 +54,8 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
         civilStatus: profile?.relationship_status || '',
         age: initialAge,
         residentSince: profile?.resident_since || '',
-        yearsOfResidency: initialYearsOfResidency
+        yearsOfResidency: initialYearsOfResidency,
+        isRenewal: true
     })
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
@@ -208,7 +209,7 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                             )
                         }
 
-                        if (type.includes('indigency') || type.includes('certification') || type.includes('residency') || (type.includes('clearance') && !type.includes('business'))) {
+                        if (type.includes('indigency') || type.includes('residency') || (type.includes('clearance') && !type.includes('business'))) {
                             return (
                                 <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
                                     <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Additional Information Required</h4>
@@ -244,7 +245,7 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                                             }} required style={inputStyle} readOnly={!!profile?.birthdate} />
                                         </div>
                                     </div>
-                                    {(type.includes('residency') || type.includes('certification')) && (
+                                    {type.includes('residency') && (
                                         <div className={styles.inputGroup}>
                                             <label>Resident Since *</label>
                                             {profile?.resident_since ? (
@@ -299,6 +300,27 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                                         <input type="text" name="occupiedSince" value={formData.occupiedSince || ''} onChange={handleFormChange} required placeholder="e.g. 1990" style={inputStyle} />
                                     </div>
                                     
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+                                        <div className={styles.inputGroup}>
+                                            <label>Bounded North *</label>
+                                            <input type="text" name="boundedNorth" value={formData.boundedNorth || ''} onChange={handleFormChange} required placeholder="e.g. Lot 2" style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Bounded South *</label>
+                                            <input type="text" name="boundedSouth" value={formData.boundedSouth || ''} onChange={handleFormChange} required placeholder="e.g. Road" style={inputStyle} />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+                                        <div className={styles.inputGroup}>
+                                            <label>Bounded East *</label>
+                                            <input type="text" name="boundedEast" value={formData.boundedEast || ''} onChange={handleFormChange} required placeholder="e.g. Lot 3" style={inputStyle} />
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label>Bounded West *</label>
+                                            <input type="text" name="boundedWest" value={formData.boundedWest || ''} onChange={handleFormChange} required placeholder="e.g. Lot 4" style={inputStyle} />
+                                        </div>
+                                    </div>
+                                    
                                     <h5 style={{ margin: '1.5rem 0 0.5rem', color: 'var(--text-secondary)' }}>Deed of Sale Details (Optional if N/A)</h5>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem' }}>
                                         <div className={styles.inputGroup}>
@@ -339,6 +361,19 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                                     <div className={styles.inputGroup}>
                                         <label>Business Name / Trade Activity *</label>
                                         <input type="text" name="businessName" value={formData.businessName || ''} onChange={handleFormChange} required placeholder="e.g. Chipai Taiwanese Chicken" style={inputStyle} />
+                                    </div>
+                                    <div className={styles.inputGroup}>
+                                        <label>Application Type *</label>
+                                        <select 
+                                            name="isRenewal" 
+                                            value={formData.isRenewal !== undefined ? String(formData.isRenewal) : 'true'} 
+                                            onChange={(e) => setFormData({ ...formData, isRenewal: e.target.value === 'true' })}
+                                            required 
+                                            style={inputStyle}
+                                        >
+                                            <option value="true">Renewal</option>
+                                            <option value="false">New Business</option>
+                                        </select>
                                     </div>
                                     <div className={styles.inputGroup}>
                                         <label>Business Location *</label>

@@ -88,6 +88,7 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-gutter: stable; /* Prevents layout shaking/shifting when scrollbars toggle during re-renders */
 }
 
 body {
@@ -138,6 +139,7 @@ p {
   color: #000000;
   line-height: inherit;
   margin-bottom: inherit;
+  font-size: inherit;
 }
 
 a {
@@ -383,7 +385,7 @@ a:hover {
 }
 
 /* Input Styles */
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 textarea,
 select {
   width: 100%;
@@ -397,7 +399,7 @@ select {
   transition: all var(--transition-base);
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 textarea:focus,
 select:focus {
   outline: none;

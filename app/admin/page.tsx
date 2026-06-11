@@ -75,6 +75,13 @@ function fmtDate(iso: string) {
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function cleanDocType(type: string | undefined | null) {
+    if (!type) return ''
+    const trimmed = type.trim()
+    if (trimmed.toLowerCase() === 'indigency') return 'Certificate of Indigency'
+    return trimmed
+}
+
 const DOCUMENTS = [
     { slug: 'barangay-clearance', name: 'Barangay Clearance', fee: 'Php 50.00', reqs: 'Valid ID' },
     { slug: 'certificate-of-residency', name: 'Certificate of Residency', fee: 'Php 50.00', reqs: 'Valid ID' },
@@ -123,6 +130,21 @@ function AdminDashboardContent() {
     const certRef = useRef<HTMLDivElement>(null)
     const [certData, setCertData] = useState<CertificateData | null>(null)
     const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null)
+    const [pdfConfigModal, setPdfConfigModal] = useState<{
+        isOpen: boolean;
+        request: any;
+        documentType: string;
+        residentName: string;
+        purpose: string;
+        sequenceNumber?: string;
+        checkCompliant?: boolean;
+        checkNonCompliant?: boolean;
+        checkNoObjection?: boolean;
+        checkNonIssuance?: boolean;
+        checkNewBusiness?: boolean;
+        checkRenewal?: boolean;
+        formData: Record<string, any>;
+    } | null>(null)
 
     const [stats, setStats] = useState({ pending: 0, processing: 0, completed: 0, rejected: 0, totalRequests: 0, totalResidents: 0 })
     const [demographicsData, setDemographicsData] = useState<any[] | null>(null)
@@ -225,7 +247,7 @@ function AdminDashboardContent() {
                 setAnnouncements(annRes.data as Announcement[])
                 if (qrRes.data) {
                     setRecentVerifications(qrRes.data.map((v: any) => ({
-                        name: v.holder_name, doc: v.document_type,
+                        name: v.holder_name, doc: cleanDocType(v.document_type),
                         time: new Date(v.verified_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         result: v.is_valid ? 'Valid' : 'Invalid'
                     })))
@@ -386,6 +408,175 @@ function AdminDashboardContent() {
     }
 
     const handleGeneratePdf = async (req: ServiceRequest) => {
+        const type = req.document_type.toLowerCase()
+        
+        // Parse form_data for defaults
+        let parsed = req.form_data || {}
+        if (typeof parsed === 'string') {
+            try { parsed = JSON.parse(parsed) } catch (e) {}
+        }
+        
+        // Fetch resident profile for default fields
+        let residentProfile: any = null
+        try {
+            const { data: profileData } = await supabase
+                .from('profiles')
+                .select('address, phone, birthdate, gender, relationship_status')
+                .eq('id', req.resident_id)
+                .single()
+            residentProfile = profileData
+        } catch (e) {
+            console.warn('Could not fetch resident profile:', e)
+        }
+        
+        let residentAge = ''
+        if (residentProfile?.birthdate) {
+            const today = new Date()
+            const born = new Date(residentProfile.birthdate)
+            let a = today.getFullYear() - born.getFullYear()
+            const m = today.getMonth() - born.getMonth()
+            if (m < 0 || (m === 0 && today.getDate() < born.getDate())) a--
+            residentAge = a.toString()
+        }
+
+        const residentNameLower = (req.resident_name || '').toLowerCase()
+        const hasActiveBlotter = blotterReports.some(rep => {
+            const isRespondent = (rep.respondent || '').toLowerCase().includes(residentNameLower)
+            const isUnresolved = rep.status !== 'Resolved'
+            return isRespondent && isUnresolved
+        })
+
+        // Standard fields defaults
+        const addressDefault = parsed.address || residentProfile?.address || ''
+        const birthdateDefault = parsed.birthdate || parsed.birthDate || residentProfile?.birthdate || ''
+        const ageDefault = parsed.age || residentAge
+        const civilStatusDefault = parsed.civilStatus || residentProfile?.relationship_status || ''
+        const genderDefault = parsed.gender || residentProfile?.gender || ''
+
+        // Initialize formData based on document type
+        const modalFormData: Record<string, any> = {
+            address: addressDefault,
+            birthdate: birthdateDefault,
+            age: ageDefault,
+            civilStatus: civilStatusDefault,
+            gender: genderDefault,
+        }
+
+        let seqNum = ''
+        let checkCompliant = false
+        let checkNonCompliant = false
+        let checkNoObjection = false
+        let checkNonIssuance = false
+        let checkNewBusiness = false
+        let checkRenewal = false
+
+        if (type.includes('business') || type.includes('endorsement')) {
+            const isRenewalDefault = parsed.isRenewal !== undefined ? parsed.isRenewal : true
+            checkNewBusiness = parsed.checkNewBusiness !== undefined ? parsed.checkNewBusiness : !isRenewalDefault
+            checkRenewal = parsed.checkRenewal !== undefined ? parsed.checkRenewal : isRenewalDefault
+
+            const isCompliantDefault = parsed.isCompliant !== undefined ? parsed.isCompliant : !hasActiveBlotter
+            const noObjectionDefault = parsed.noObjection !== undefined ? parsed.noObjection : !hasActiveBlotter
+
+            checkCompliant = parsed.checkCompliant !== undefined ? parsed.checkCompliant : isCompliantDefault
+            checkNonCompliant = parsed.checkNonCompliant !== undefined ? parsed.checkNonCompliant : !isCompliantDefault
+            checkNoObjection = parsed.checkNoObjection !== undefined ? parsed.checkNoObjection : noObjectionDefault
+            checkNonIssuance = parsed.checkNonIssuance !== undefined ? parsed.checkNonIssuance : !noObjectionDefault
+
+            // Auto sequence number resolution
+            try {
+                const { data: bRequests } = await supabase
+                    .from('service_requests')
+                    .select('form_data')
+                    .ilike('document_type', '%business%')
+                
+                let maxNum = 0
+                if (bRequests && bRequests.length > 0) {
+                    bRequests.forEach((r: any) => {
+                        let fdParsed = r.form_data
+                        if (typeof fdParsed === 'string') {
+                            try { fdParsed = JSON.parse(fdParsed) } catch (e) {}
+                        }
+                        const num = parseInt(fdParsed?.sequenceNumber, 10)
+                        if (!isNaN(num) && num > maxNum) {
+                            maxNum = num
+                        }
+                    })
+                }
+                
+                if (maxNum > 0) {
+                    seqNum = String(maxNum + 1).padStart(3, '0')
+                } else {
+                    seqNum = String((bRequests?.length || 0) + 1).padStart(3, '0')
+                }
+            } catch (e) {
+                console.error('Failed to compute auto sequence number:', e)
+                seqNum = req.id.slice(0, 4).toUpperCase()
+            }
+
+            modalFormData.businessName = parsed.businessName || ''
+            modalFormData.businessLocation = parsed.businessLocation || ''
+            modalFormData.operatorName = parsed.operatorName || req.resident_name || ''
+            modalFormData.operatorAddress = parsed.operatorAddress || residentProfile?.address || ''
+        } else if (type.includes('lot') || type.includes('occupancy') || type.includes('building')) {
+            modalFormData.lotArea = parsed.lotArea || ''
+            modalFormData.taxDecNo = parsed.taxDecNo || ''
+            modalFormData.propertyLocation = parsed.propertyLocation || ''
+            modalFormData.occupiedSince = parsed.occupiedSince || ''
+            modalFormData.docNo = parsed.docNo || ''
+            modalFormData.pageNo = parsed.pageNo || ''
+            modalFormData.bookNo = parsed.bookNo || ''
+            modalFormData.seriesOf = parsed.seriesOf || ''
+            modalFormData.notarizedBy = parsed.notarizedBy || ''
+            modalFormData.notarizedOn = parsed.notarizedOn || ''
+            modalFormData.orNo = parsed.orNo || ''
+            modalFormData.amount = parsed.amount || ''
+            modalFormData.orIssuedOn = parsed.orIssuedOn || ''
+            modalFormData.proofType = parsed.proofType || 'Deed of Sale'
+            modalFormData.boundedNorth = parsed.boundedNorth || 'OCCUPIED LOT'
+            modalFormData.boundedSouth = parsed.boundedSouth || 'OCCUPIED LOT'
+            modalFormData.boundedEast = parsed.boundedEast || 'OCCUPIED LOT'
+            modalFormData.boundedWest = parsed.boundedWest || 'OCCUPIED LOT'
+        } else if (type.includes('job seeker') || type.includes('first time')) {
+            modalFormData.yearsOfResidency = parsed.yearsOfResidency || ''
+            modalFormData.idType = parsed.idType || ''
+            modalFormData.idNumber = parsed.idNumber || ''
+        } else if (type.includes('residency') || (type.includes('certification') && !type.includes('lot'))) {
+            modalFormData.residentSince = parsed.residentSince || ''
+        }
+
+        const residentNameDefault = parsed.customResidentName || req.resident_name || ''
+        const purposeDefault = parsed.customPurpose || req.purpose || ''
+
+        setPdfConfigModal({
+            isOpen: true,
+            request: req,
+            documentType: req.document_type,
+            residentName: residentNameDefault,
+            purpose: purposeDefault,
+            sequenceNumber: seqNum,
+            checkCompliant,
+            checkNonCompliant,
+            checkNoObjection,
+            checkNonIssuance,
+            checkNewBusiness,
+            checkRenewal,
+            formData: modalFormData
+        })
+    }
+
+    const generatePDFDirect = async (req: ServiceRequest, customFields?: {
+        residentName: string;
+        purpose: string;
+        checkCompliant?: boolean;
+        checkNonCompliant?: boolean;
+        checkNoObjection?: boolean;
+        checkNonIssuance?: boolean;
+        checkNewBusiness?: boolean;
+        checkRenewal?: boolean;
+        sequenceNumber?: string;
+        formData: Record<string, any>;
+    }) => {
         const jsPDF = (await import('jspdf')).default;
         const html2canvas = (await import('html2canvas')).default;
         try {
@@ -440,32 +631,80 @@ function AdminDashboardContent() {
                 }
             }
 
+            // Smart check: Resident has unresolved blotters in the barangay records
+            const residentNameLower = (req.resident_name || '').toLowerCase()
+            const hasActiveBlotter = blotterReports.some(rep => {
+                const isRespondent = (rep.respondent || '').toLowerCase().includes(residentNameLower)
+                const isUnresolved = rep.status !== 'Resolved'
+                return isRespondent && isUnresolved
+            })
+
+            // Resolve defaults based on legacy/new fields
+            const isRenewalDefault = parsedFormData?.isRenewal !== undefined ? parsedFormData.isRenewal : true
+            const isCompliantDefault = parsedFormData?.isCompliant !== undefined ? parsedFormData.isCompliant : !hasActiveBlotter
+            const noObjectionDefault = parsedFormData?.noObjection !== undefined ? parsedFormData.noObjection : !hasActiveBlotter
+
+            // Override defaults with custom configuration values if provided by admin in the modal (Application type is read directly from request data)
+            const checkNewBusiness = customFields && customFields.checkNewBusiness !== undefined ? customFields.checkNewBusiness : (parsedFormData?.checkNewBusiness !== undefined ? parsedFormData.checkNewBusiness : !isRenewalDefault)
+            const checkRenewal = customFields && customFields.checkRenewal !== undefined ? customFields.checkRenewal : (parsedFormData?.checkRenewal !== undefined ? parsedFormData.checkRenewal : isRenewalDefault)
+            const checkCompliant = customFields && customFields.checkCompliant !== undefined ? customFields.checkCompliant : (parsedFormData?.checkCompliant !== undefined ? parsedFormData.checkCompliant : isCompliantDefault)
+            const checkNonCompliant = customFields && customFields.checkNonCompliant !== undefined ? customFields.checkNonCompliant : (parsedFormData?.checkNonCompliant !== undefined ? parsedFormData.checkNonCompliant : !isCompliantDefault)
+            const checkNoObjection = customFields && customFields.checkNoObjection !== undefined ? customFields.checkNoObjection : (parsedFormData?.checkNoObjection !== undefined ? parsedFormData.checkNoObjection : noObjectionDefault)
+            const checkNonIssuance = customFields && customFields.checkNonIssuance !== undefined ? customFields.checkNonIssuance : (parsedFormData?.checkNonIssuance !== undefined ? parsedFormData.checkNonIssuance : !noObjectionDefault)
+            const sequenceNumber = customFields && customFields.sequenceNumber !== undefined ? customFields.sequenceNumber : (parsedFormData?.sequenceNumber || req.id.slice(0, 4).toUpperCase())
+
+            const finalResidentName = customFields ? customFields.residentName : (parsedFormData?.customResidentName || req.resident_name || 'Unknown Resident')
+            const finalPurpose = customFields ? customFields.purpose : (parsedFormData?.customPurpose || req.purpose || 'General Requirement')
+
             setCertData({
-                residentName: req.resident_name || 'Unknown Resident',
+                residentName: finalResidentName,
                 documentType: req.document_type,
-                purpose: req.purpose || 'General Requirement',
+                purpose: finalPurpose,
                 dateIssued: issueDateObj.toISOString(),
                 expirationDate: expDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
                 formData: {
-                    address: parsedFormData?.address || residentProfile?.address || '',
-                    birthdate: parsedFormData?.birthdate || parsedFormData?.birthDate || residentProfile?.birthdate || 'NO_DATA',
-                    age: parsedFormData?.age || residentAge,
-                    civilStatus: parsedFormData?.civilStatus || residentProfile?.relationship_status || '',
-                    gender: parsedFormData?.gender || residentProfile?.gender || '',
+                    address: customFields ? customFields.formData.address : (parsedFormData?.address || residentProfile?.address || ''),
+                    birthdate: customFields ? customFields.formData.birthdate : (parsedFormData?.birthdate || parsedFormData?.birthDate || residentProfile?.birthdate || 'NO_DATA'),
+                    age: customFields ? customFields.formData.age : (parsedFormData?.age || residentAge),
+                    civilStatus: customFields ? customFields.formData.civilStatus : (parsedFormData?.civilStatus || residentProfile?.relationship_status || ''),
+                    gender: customFields ? customFields.formData.gender : (parsedFormData?.gender || residentProfile?.gender || ''),
                     // Business fields
-                    businessName: parsedFormData?.businessName || '',
-                    businessLocation: parsedFormData?.businessLocation || '',
-                    operatorName: parsedFormData?.operatorName || req.resident_name || '',
-                    operatorAddress: residentProfile?.address || '',
+                    businessName: customFields ? customFields.formData.businessName : (parsedFormData?.businessName || ''),
+                    businessLocation: customFields ? customFields.formData.businessLocation : (parsedFormData?.businessLocation || ''),
+                    operatorName: customFields ? customFields.formData.operatorName : (parsedFormData?.operatorName || req.resident_name || ''),
+                    operatorAddress: customFields ? customFields.formData.operatorAddress : (parsedFormData?.operatorAddress || residentProfile?.address || ''),
+                    checkNewBusiness,
+                    checkRenewal,
+                    checkCompliant,
+                    checkNonCompliant,
+                    checkNoObjection,
+                    checkNonIssuance,
+                    sequenceNumber,
                     // Lot fields
-                    lotArea: parsedFormData?.lotArea || '',
-                    taxDecNo: parsedFormData?.taxDecNo || '',
-                    propertyLocation: parsedFormData?.propertyLocation || '',
-                    occupiedSince: parsedFormData?.occupiedSince || '',
+                    lotArea: customFields ? customFields.formData.lotArea : (parsedFormData?.lotArea || ''),
+                    taxDecNo: customFields ? customFields.formData.taxDecNo : (parsedFormData?.taxDecNo || ''),
+                    propertyLocation: customFields ? customFields.formData.propertyLocation : (parsedFormData?.propertyLocation || ''),
+                    occupiedSince: customFields ? customFields.formData.occupiedSince : (parsedFormData?.occupiedSince || ''),
+                    docNo: customFields ? customFields.formData.docNo : (parsedFormData?.docNo || ''),
+                    pageNo: customFields ? customFields.formData.pageNo : (parsedFormData?.pageNo || ''),
+                    bookNo: customFields ? customFields.formData.bookNo : (parsedFormData?.bookNo || ''),
+                    seriesOf: customFields ? customFields.formData.seriesOf : (parsedFormData?.seriesOf || ''),
+                    notarizedBy: customFields ? customFields.formData.notarizedBy : (parsedFormData?.notarizedBy || ''),
+                    notarizedOn: customFields ? customFields.formData.notarizedOn : (parsedFormData?.notarizedOn || ''),
+                    orNo: customFields ? customFields.formData.orNo : (parsedFormData?.orNo || ''),
+                    amount: customFields ? customFields.formData.amount : (parsedFormData?.amount || ''),
+                    orIssuedOn: customFields ? customFields.formData.orIssuedOn : (parsedFormData?.orIssuedOn || ''),
+                    proofType: customFields ? customFields.formData.proofType : (parsedFormData?.proofType || 'Deed of Sale'),
+                    boundedNorth: customFields ? customFields.formData.boundedNorth : (parsedFormData?.boundedNorth || 'OCCUPIED LOT'),
+                    boundedSouth: customFields ? customFields.formData.boundedSouth : (parsedFormData?.boundedSouth || 'OCCUPIED LOT'),
+                    boundedEast: customFields ? customFields.formData.boundedEast : (parsedFormData?.boundedEast || 'OCCUPIED LOT'),
+                    boundedWest: customFields ? customFields.formData.boundedWest : (parsedFormData?.boundedWest || 'OCCUPIED LOT'),
                     // First time job seeker
-                    yearsOfResidency: parsedFormData?.yearsOfResidency || '',
-                    idType: parsedFormData?.idType || '',
-                    idNumber: parsedFormData?.idNumber || '',
+                    yearsOfResidency: customFields ? customFields.formData.yearsOfResidency : (parsedFormData?.yearsOfResidency || ''),
+                    idType: customFields ? customFields.formData.idType : (parsedFormData?.idType || ''),
+                    idNumber: customFields ? customFields.formData.idNumber : (parsedFormData?.idNumber || ''),
+                    // Residency
+                    residentSince: customFields ? customFields.formData.residentSince : (parsedFormData?.residentSince || ''),
                 }
             })
 
@@ -497,6 +736,37 @@ function AdminDashboardContent() {
             // Trigger download
             const fileName = `${req.document_type.replace(/\s+/g, '_')}_${req.resident_name?.replace(/\s+/g, '_')}.pdf`
             pdf.save(fileName)
+
+            // Persist settings in the database for auto-sequence increment and future prints
+            const updatedFormData = {
+                ...parsedFormData,
+                ...(customFields ? customFields.formData : {}),
+                checkCompliant,
+                checkNonCompliant,
+                checkNoObjection,
+                checkNonIssuance,
+                checkNewBusiness,
+                checkRenewal,
+                sequenceNumber,
+                customResidentName: customFields ? customFields.residentName : (parsedFormData?.customResidentName || ''),
+                customPurpose: customFields ? customFields.purpose : (parsedFormData?.customPurpose || '')
+            }
+            try {
+                await supabase
+                    .from('service_requests')
+                    .update({ 
+                        form_data: updatedFormData,
+                        purpose: customFields ? customFields.purpose : req.purpose
+                    })
+                    .eq('id', req.id)
+                setRequests(prev => prev.map(r => r.id === req.id ? { 
+                    ...r, 
+                    form_data: updatedFormData,
+                    purpose: customFields ? customFields.purpose : r.purpose
+                } : r))
+            } catch (e) {
+                console.error('Failed to auto-save generated settings:', e)
+            }
 
             showToast('PDF Generated successfully!', 'success')
 
@@ -786,7 +1056,7 @@ function AdminDashboardContent() {
             const reqData = [
                 req.id?.split('-')[0].toUpperCase() || 'N/A',
                 req.resident_name || 'N/A',
-                req.document_type || 'N/A',
+                cleanDocType(req.document_type) || 'N/A',
                 req.purpose || 'N/A',
                 req.status.charAt(0).toUpperCase() + req.status.slice(1),
                 new Date(req.created_at).toLocaleDateString()
@@ -1206,25 +1476,25 @@ function AdminDashboardContent() {
                         valid: false,
                         message: `Document is still in ${docData.status} status.`,
                         holder: holderName,
-                        docType: docData.document_type
+                        docType: cleanDocType(docData.document_type)
                     })
                 } else {
                     setScanResult({
                         valid: true,
                         isResident: false,
-                        docType: docData.document_type,
+                        docType: cleanDocType(docData.document_type),
                         holder: holderName,
                         date: docData.updated_at
                     })
 
-                    const log = { name: holderName, doc: docData.document_type, time: new Date().toLocaleTimeString(), result: 'Valid Doc' }
+                    const log = { name: holderName, doc: cleanDocType(docData.document_type), time: new Date().toLocaleTimeString(), result: 'Valid Doc' }
                     setRecentVerifications(prev => [log, ...prev].slice(0, 5))
                 }
 
                 // Save to verification logs
                 await supabase.from('qr_verifications').insert({
                     document_ref: scannedValue,
-                    document_type: docData.document_type,
+                    document_type: cleanDocType(docData.document_type),
                     holder_name: holderName,
                     is_valid: isValid,
                     verified_by: profile?.id
@@ -1303,7 +1573,7 @@ function AdminDashboardContent() {
         const reqName = r.resident_name || ''
         const matchSearch =
             reqName.toLowerCase().includes(requestSearch.toLowerCase()) ||
-            r.document_type.toLowerCase().includes(requestSearch.toLowerCase()) ||
+            cleanDocType(r.document_type).toLowerCase().includes(requestSearch.toLowerCase()) ||
             (r.qr_code_ref || '').toLowerCase().includes(requestSearch.toLowerCase()) ||
             r.id.toLowerCase().includes(requestSearch.toLowerCase())
         const matchStatus = statusFilter === 'all' || r.status === statusFilter
@@ -1506,7 +1776,7 @@ function AdminDashboardContent() {
                                                         <div className={styles.activityItem} key={req.id}>
 
                                                             <div className={styles.activityDetails}>
-                                                                <strong>{req.document_type}</strong>
+                                                                <strong>{cleanDocType(req.document_type)}</strong>
                                                                 <p>{req.resident_name}</p>
                                                                 <span className={styles.activityTime}>{fmtDate(req.created_at)}</span>
                                                             </div>
@@ -1671,7 +1941,7 @@ function AdminDashboardContent() {
                                                             {req.id.slice(0, 7).toUpperCase()}
                                                         </td>
                                                         <td><strong>{req.resident_name}</strong></td>
-                                                        <td>{req.document_type}</td>
+                                                        <td>{cleanDocType(req.document_type)}</td>
                                                         <td>
                                                             {req.attachment_url ? (
                                                                 <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
@@ -2022,7 +2292,7 @@ function AdminDashboardContent() {
                                                     {resRequests.map(req => (
                                                         <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                                                             <div>
-                                                                <strong style={{ fontSize: '0.85rem' }}>{req.document_type}</strong>
+                                                                <strong style={{ fontSize: '0.85rem' }}>{cleanDocType(req.document_type)}</strong>
                                                                 <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{fmtDate(req.created_at)}</p>
                                                             </div>
                                                             <span className={statusBadge(req.status)} style={{ fontSize: '0.7rem' }}>
@@ -2233,7 +2503,7 @@ function AdminDashboardContent() {
                                                     {scanResult.valid ? (scanResult.isResident ? ' VERIFIED RESIDENT' : ' VERIFIED DOCUMENT') : ' INVALID / WARNING'}
                                                 </h4>
                                                 {scanResult.holder && <p><strong>{scanResult.isResident ? 'Name' : 'Holder'}:</strong> {scanResult.holder}</p>}
-                                                {scanResult.docType && <p><strong>Type:</strong> {scanResult.docType}</p>}
+                                                {scanResult.docType && <p><strong>Type:</strong> {cleanDocType(scanResult.docType)}</p>}
                                                 {scanResult.isResident && (
                                                     <div style={{ marginTop: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.35rem' }}>
                                                         {scanResult.address && <p style={{ fontSize: '0.85rem' }}> {scanResult.address}</p>}
@@ -2255,7 +2525,7 @@ function AdminDashboardContent() {
                                                 <div key={i} className={styles.activityItem} style={{ padding: '1rem' }}>
                                                     <div className={styles.activityDetails}>
                                                         <strong>{v.name}</strong>
-                                                        <p>{v.doc}</p>
+                                                        <p>{cleanDocType(v.doc)}</p>
                                                         <span className={styles.activityTime}>{v.time}</span>
                                                     </div>
                                                     <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>{v.result}</span>
@@ -2338,7 +2608,7 @@ function AdminDashboardContent() {
                                                     <div className="glass-card">
                                                         <h3>Document Type Breakdown</h3>
                                                         {(['Barangay Clearance', 'Business Permit', 'Barangay ID', 'Certificate of Indigency', 'Certificate of Residency'] as const).map(type => {
-                                                            const count = requests.filter(r => r.document_type === type).length
+                                                            const count = requests.filter(r => cleanDocType(r.document_type) === type).length
                                                             const pct = requests.length > 0 ? Math.round(count / requests.length * 100) : 0
                                                             return (
                                                                 <div key={type} className={styles.analyticsRow}>
@@ -2620,6 +2890,557 @@ function AdminDashboardContent() {
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setNoteModal(null)}>Cancel</button>
                             <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateStatus(noteModal.id, noteModal.status, adminNote)}>Confirm Rejection</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Certificate Config & Preview Modal */}
+            {pdfConfigModal && pdfConfigModal.isOpen && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setPdfConfigModal(null)}>
+                    <div style={{ maxWidth: '550px', width: '100%', padding: '2rem', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-primary, #111827)', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: 'var(--radius-lg, 0.75rem)', boxShadow: 'var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.1))', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: '0.5rem', color: 'var(--text-primary, #111827)' }}>Generate {pdfConfigModal.documentType}</h3>
+                        <p style={{ color: 'var(--text-secondary, #4b5563)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>Review and verify the certificate details below before printing or generating the PDF.</p>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '2rem' }}>
+                            {/* General Fields: Name & Purpose */}
+                            <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                <div>
+                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Applicant Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={pdfConfigModal.residentName} 
+                                        onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, residentName: e.target.value })}
+                                        style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Purpose</label>
+                                    <input 
+                                        type="text" 
+                                        value={pdfConfigModal.purpose} 
+                                        onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, purpose: e.target.value })}
+                                        style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <hr style={{ border: '0', borderTop: '1px solid var(--border-color, #e5e7eb)', margin: '0.5rem 0' }} />
+
+                            {/* Document-Specific Form Fields */}
+                            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary, #111827)', margin: '0 0 -0.25rem 0' }}>Form Details</h4>
+                            
+                            {/* Business Fields */}
+                            {(pdfConfigModal.documentType.toLowerCase().includes('business') || pdfConfigModal.documentType.toLowerCase().includes('endorsement')) && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Business Name</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.businessName || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, businessName: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Business Location</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.businessLocation || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, businessLocation: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Operator / Owner Name</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.operatorName || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, operatorName: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Operator Address</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.operatorAddress || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, operatorAddress: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Application Type Checkboxes */}
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.5rem' }}>Application Type</label>
+                                        <div style={{ display: 'flex', gap: '1.5rem', background: 'var(--bg-secondary, #f9fafb)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color, #e5e7eb)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                <input 
+                                                    type="checkbox"
+                                                    id="check-new-business"
+                                                    checked={pdfConfigModal.checkNewBusiness || false}
+                                                    onChange={(e) => setPdfConfigModal({ 
+                                                        ...pdfConfigModal, 
+                                                        checkNewBusiness: e.target.checked, 
+                                                        checkRenewal: e.target.checked ? false : pdfConfigModal.checkRenewal 
+                                                    })}
+                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', accentColor: '#10b981' }}
+                                                />
+                                                <label htmlFor="check-new-business" style={{ fontSize: '0.85rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-primary, #111827)' }}>New Business</label>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                <input 
+                                                    type="checkbox"
+                                                    id="check-renewal"
+                                                    checked={pdfConfigModal.checkRenewal || false}
+                                                    onChange={(e) => setPdfConfigModal({ 
+                                                        ...pdfConfigModal, 
+                                                        checkRenewal: e.target.checked, 
+                                                        checkNewBusiness: e.target.checked ? false : pdfConfigModal.checkNewBusiness 
+                                                    })}
+                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', accentColor: '#10b981' }}
+                                                />
+                                                <label htmlFor="check-renewal" style={{ fontSize: '0.85rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-primary, #111827)' }}>Renewal</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Compliance Status Checkboxes */}
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.5rem' }}>Barangay Ordinance Compliance Checkboxes</label>
+                                        <div style={{ display: 'flex', gap: '1.5rem', background: 'var(--bg-secondary, #f9fafb)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color, #e5e7eb)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                <input 
+                                                    type="checkbox"
+                                                    id="check-compliant"
+                                                    checked={pdfConfigModal.checkCompliant || false}
+                                                    onChange={(e) => setPdfConfigModal({ 
+                                                        ...pdfConfigModal, 
+                                                        checkCompliant: e.target.checked, 
+                                                        checkNonCompliant: e.target.checked ? false : pdfConfigModal.checkNonCompliant 
+                                                    })}
+                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', accentColor: '#10b981' }}
+                                                />
+                                                <label htmlFor="check-compliant" style={{ fontSize: '0.85rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-primary, #111827)' }}>Compliant</label>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                <input 
+                                                    type="checkbox"
+                                                    id="check-non-compliant"
+                                                    checked={pdfConfigModal.checkNonCompliant || false}
+                                                    onChange={(e) => setPdfConfigModal({ 
+                                                        ...pdfConfigModal, 
+                                                        checkNonCompliant: e.target.checked, 
+                                                        checkCompliant: e.target.checked ? false : pdfConfigModal.checkCompliant 
+                                                    })}
+                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', accentColor: '#10b981' }}
+                                                />
+                                                <label htmlFor="check-non-compliant" style={{ fontSize: '0.85rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-primary, #111827)' }}>Non-Compliant</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Barangay Recommendation Checkboxes */}
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.5rem' }}>Barangay Recommendation Checkboxes</label>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'var(--bg-secondary, #f9fafb)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color, #e5e7eb)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                <input 
+                                                    type="checkbox"
+                                                    id="check-no-objection"
+                                                    checked={pdfConfigModal.checkNoObjection || false}
+                                                    onChange={(e) => setPdfConfigModal({ 
+                                                        ...pdfConfigModal, 
+                                                        checkNoObjection: e.target.checked, 
+                                                        checkNonIssuance: e.target.checked ? false : pdfConfigModal.checkNonIssuance 
+                                                    })}
+                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', accentColor: '#10b981' }}
+                                                />
+                                                <label htmlFor="check-no-objection" style={{ fontSize: '0.85rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-primary, #111827)' }}>Interposes No Objection</label>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                <input 
+                                                    type="checkbox"
+                                                    id="check-non-issuance"
+                                                    checked={pdfConfigModal.checkNonIssuance || false}
+                                                    onChange={(e) => setPdfConfigModal({ 
+                                                        ...pdfConfigModal, 
+                                                        checkNonIssuance: e.target.checked, 
+                                                        checkNoObjection: e.target.checked ? false : pdfConfigModal.checkNoObjection 
+                                                    })}
+                                                    style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', accentColor: '#10b981' }}
+                                                />
+                                                <label htmlFor="check-non-issuance" style={{ fontSize: '0.85rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-primary, #111827)' }}>Recommends Non-Issuance</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Sequence Number */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)' }}>Certificate Sequence No.</label>
+                                        <div style={{ padding: '0.75rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', background: 'var(--bg-secondary, #f9fafb)', color: 'var(--text-primary, #111827)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                            GDH-BPI-{new Date(pdfConfigModal.request.issued_at || Date.now()).getFullYear()}-{pdfConfigModal.sequenceNumber}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Lot Fields */}
+                            {(pdfConfigModal.documentType.toLowerCase().includes('lot') || pdfConfigModal.documentType.toLowerCase().includes('occupancy') || pdfConfigModal.documentType.toLowerCase().includes('building')) && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Property Location</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.propertyLocation || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, propertyLocation: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Lot Area (sqm)</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.lotArea || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, lotArea: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Tax Declaration No.</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.taxDecNo || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, taxDecNo: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Occupied Since</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.occupiedSince || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, occupiedSince: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, borderBottom: '1px solid var(--border-color, #e5e7eb)', paddingBottom: '0.25rem', marginTop: '0.25rem' }}>Lot Boundaries Information</div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Bounded On North by</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.boundedNorth || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, boundedNorth: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Bounded On South by</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.boundedSouth || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, boundedSouth: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Bounded On East by</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.boundedEast || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, boundedEast: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Bounded On West by</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.boundedWest || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, boundedWest: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, borderBottom: '1px solid var(--border-color, #e5e7eb)', paddingBottom: '0.25rem', marginTop: '0.25rem' }}>Proof of Ownership Information</div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Document Type</label>
+                                            <select 
+                                                value={pdfConfigModal.formData.proofType || 'Deed of Sale'} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, proofType: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            >
+                                                <option value="Deed of Sale">Deed of Sale</option>
+                                                <option value="Deed of Donation">Deed of Donation</option>
+                                                <option value="Waiver of Rights">Waiver of Rights</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', marginTop: '0.5rem' }}>Document Registry Details</div>
+                                    <div className="grid grid-4" style={{ gap: '0.5rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #4b5563)' }}>Doc No.</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.docNo || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, docNo: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '4px', fontSize: '0.8rem' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #4b5563)' }}>Page No.</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.pageNo || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, pageNo: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '4px', fontSize: '0.8rem' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #4b5563)' }}>Book No.</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.bookNo || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, bookNo: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '4px', fontSize: '0.8rem' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #4b5563)' }}>Series Of</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.seriesOf || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, seriesOf: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '4px', fontSize: '0.8rem' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Notarized By</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.notarizedBy || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, notarizedBy: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Notarized On</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.notarizedOn || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, notarizedOn: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, borderBottom: '1px solid var(--border-color, #e5e7eb)', paddingBottom: '0.25rem', marginTop: '0.25rem' }}>Official Receipt (O.R.) Info</div>
+                                    <div className="grid grid-3" style={{ gap: '0.5rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #4b5563)' }}>O.R. No.</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.orNo || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, orNo: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '4px', fontSize: '0.8rem' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #4b5563)' }}>Amount</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.amount || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, amount: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '4px', fontSize: '0.8rem' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #4b5563)' }}>Issued On</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.orIssuedOn || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, orIssuedOn: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '4px', fontSize: '0.8rem' }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* First Time Job Seeker Fields */}
+                            {(pdfConfigModal.documentType.toLowerCase().includes('job seeker') || pdfConfigModal.documentType.toLowerCase().includes('first time')) && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Resident Address</label>
+                                        <input 
+                                            type="text" 
+                                            value={pdfConfigModal.formData.address || ''} 
+                                            onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, address: e.target.value } })}
+                                            style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                        />
+                                    </div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Years of Residency</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.yearsOfResidency || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, yearsOfResidency: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Gender</label>
+                                            <select 
+                                                value={pdfConfigModal.formData.gender || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, gender: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            >
+                                                <option value="male">Male</option>
+                                                <option value="female">Female</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Type of ID Presented</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.idType || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, idType: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>ID Number</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.idNumber || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, idNumber: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Standard Residency/Clearance/Indigency Fields */}
+                            {!pdfConfigModal.documentType.toLowerCase().includes('business') && 
+                             !pdfConfigModal.documentType.toLowerCase().includes('endorsement') && 
+                             !pdfConfigModal.documentType.toLowerCase().includes('lot') && 
+                             !pdfConfigModal.documentType.toLowerCase().includes('occupancy') && 
+                             !pdfConfigModal.documentType.toLowerCase().includes('building') && 
+                             !pdfConfigModal.documentType.toLowerCase().includes('job seeker') && 
+                             !pdfConfigModal.documentType.toLowerCase().includes('first time') && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Resident Address</label>
+                                        <input 
+                                            type="text" 
+                                            value={pdfConfigModal.formData.address || ''} 
+                                            onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, address: e.target.value } })}
+                                            style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                        />
+                                    </div>
+                                    <div className="grid grid-3" style={{ gap: '0.75rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Birth Date</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="YYYY-MM-DD"
+                                                value={pdfConfigModal.formData.birthdate || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, birthdate: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Age</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.age || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, age: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Gender</label>
+                                            <select 
+                                                value={pdfConfigModal.formData.gender || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, gender: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                            >
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Civil Status</label>
+                                            <input 
+                                                type="text" 
+                                                value={pdfConfigModal.formData.civilStatus || ''} 
+                                                onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, civilStatus: e.target.value } })}
+                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                        />
+                                        </div>
+                                        {pdfConfigModal.documentType.toLowerCase().includes('residency') && (
+                                            <div>
+                                                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary, #4b5563)', display: 'block', marginBottom: '0.25rem' }}>Resident Since</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={pdfConfigModal.formData.residentSince || ''} 
+                                                    onChange={(e) => setPdfConfigModal({ ...pdfConfigModal, formData: { ...pdfConfigModal.formData, residentSince: e.target.value } })}
+                                                    style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', color: '#111827', outline: 'none' }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setPdfConfigModal(null)}>Cancel</button>
+                            <button 
+                                className="btn btn-primary" 
+                                style={{ flex: 1 }} 
+                                onClick={async () => {
+                                    const fields = {
+                                        residentName: pdfConfigModal.residentName,
+                                        purpose: pdfConfigModal.purpose,
+                                        checkCompliant: pdfConfigModal.checkCompliant,
+                                        checkNonCompliant: pdfConfigModal.checkNonCompliant,
+                                        checkNoObjection: pdfConfigModal.checkNoObjection,
+                                        checkNonIssuance: pdfConfigModal.checkNonIssuance,
+                                        checkNewBusiness: pdfConfigModal.checkNewBusiness,
+                                        checkRenewal: pdfConfigModal.checkRenewal,
+                                        sequenceNumber: pdfConfigModal.sequenceNumber,
+                                        formData: pdfConfigModal.formData
+                                    }
+                                    const req = pdfConfigModal.request
+                                    setPdfConfigModal(null)
+                                    await generatePDFDirect(req, fields)
+                                }}
+                            >
+                                Generate PDF
+                            </button>
                         </div>
                     </div>
                 </div>

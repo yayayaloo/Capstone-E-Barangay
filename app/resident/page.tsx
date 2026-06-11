@@ -22,6 +22,13 @@ import { QRCodeSVG } from 'qrcode.react'
 import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
 import styles from './resident.module.css'
 
+function cleanDocType(type: string | undefined | null) {
+    if (!type) return ''
+    const trimmed = type.trim()
+    if (trimmed.toLowerCase() === 'indigency') return 'Certificate of Indigency'
+    return trimmed
+}
+
 function ResidentPortalContent() {
     const { user, profile, signOut, refreshProfile } = useAuth()
     const { showToast } = useToast()
@@ -697,12 +704,12 @@ function ResidentPortalContent() {
                             <div className={styles.appInfo}>
                                 <div>
                                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        {req.document_type}
+                                        {cleanDocType(req.document_type)}
                                         {req.qr_code_ref && (
                                             <button
                                                 className="btn btn-outline"
                                                 style={{ padding: '0.15rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
-                                                onClick={() => setSelectedQR({ ref: req.qr_code_ref as string, title: req.document_type })}
+                                                onClick={() => setSelectedQR({ ref: req.qr_code_ref as string, title: cleanDocType(req.document_type) })}
                                             >
                                                 View QR
                                             </button>
@@ -744,7 +751,7 @@ function ResidentPortalContent() {
                         { type: 'Business Clearance', desc: 'Compliance for business permit within Gordon Heights', fee: 'Free' },
                         { type: 'Lot Certification', desc: 'Issued to lot occupants for government agencies', fee: 'Php 1.00/sqm' },
                         { type: 'First Time Job Seeker', desc: 'Waives pre-employment fees (Ages 18–30)', fee: 'Free' },
-                        { type: 'Indigency', desc: 'Certification of financial status for assistance', fee: 'Free' },
+                        { type: 'Certificate of Indigency', desc: 'Certification of financial status for assistance', fee: 'Free' },
                     ].map(s => (
                         <div
                             className="glass-card"
@@ -794,7 +801,7 @@ function ResidentPortalContent() {
             'Business Clearance': <Store />,
             'Lot Certification': <Home />,
             'First Time Job Seeker': <Briefcase />,
-            'Indigency': <HeartHandshake />,
+            'Certificate of Indigency': <HeartHandshake />,
         }
         return iconMap[type] || <FileCheck />
     }
