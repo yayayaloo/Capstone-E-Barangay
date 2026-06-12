@@ -16,7 +16,7 @@
 }
 
 /* Background Gradient Decorations */
-.bgGradient1_disabled {
+.bgGradient1 {
     position: absolute;
     top: -100px;
     right: -100px;
@@ -28,7 +28,7 @@
     z-index: 0;
 }
 
-.bgGradient2_disabled {
+.bgGradient2 {
     position: absolute;
     bottom: -150px;
     left: -100px;
@@ -156,12 +156,49 @@
 .serviceCard {
     display: flex;
     gap: 1.5rem;
-    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    text-align: left;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.serviceCard:hover {
+    transform: translateY(-4px);
+    border-color: var(--primary-400);
+    box-shadow: var(--shadow-lg);
 }
 
 .serviceCardIcon {
-    font-size: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border-radius: var(--radius-md);
+    background: var(--primary-50);
+    color: var(--primary-600);
     flex-shrink: 0;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.serviceCard:hover .serviceCardIcon {
+    background: var(--primary-600);
+    color: white;
+}
+
+.serviceCardContent {
+    flex-grow: 1;
+}
+
+.serviceCardContent h3 {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.serviceCardContent p {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
 }
 
 .serviceFeatures {
@@ -268,10 +305,17 @@
     font-size: 0.875rem;
 }
 
-/* Responsive */
+/* Responsive Styles */
+.navToggle {
+    display: none;
+}
+
+.navMenuButton {
+    display: none;
+    cursor: pointer;
+}
+
 @media (max-width: 1024px) {
-
-
     .heroContent {
         display: flex;
         flex-direction: column;
@@ -282,8 +326,101 @@
         justify-content: center;
     }
 
+    /* Responsive Mobile Menu styling */
+    .navMenuButton {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        position: relative;
+        z-index: 1001;
+    }
+
+    .navIcon {
+        display: block;
+        width: 20px;
+        height: 2px;
+        background: var(--text-primary);
+        position: relative;
+        transition: background 0.2s ease-out;
+    }
+
+    .navIcon::before,
+    .navIcon::after {
+        content: '';
+        display: block;
+        width: 20px;
+        height: 2px;
+        background: var(--text-primary);
+        position: absolute;
+        transition: all 0.2s ease-out;
+    }
+
+    .navIcon::before {
+        top: -6px;
+    }
+
+    .navIcon::after {
+        bottom: -6px;
+    }
+
+    /* Transform hamburger into 'X' when checked */
+    .navToggle:checked ~ .navMenuButton .navIcon {
+        background: transparent;
+    }
+
+    .navToggle:checked ~ .navMenuButton .navIcon::before {
+        transform: rotate(45deg);
+        top: 0;
+    }
+
+    .navToggle:checked ~ .navMenuButton .navIcon::after {
+        transform: rotate(-45deg);
+        bottom: 0;
+    }
+
+    /* Mobile Drawer */
+    .navLinks {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-primary);
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md);
+        flex-direction: column;
+        align-items: stretch;
+        padding: 1.5rem;
+        gap: 1rem;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 999;
+    }
+
+    .navToggle:checked ~ .navLinks {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    .navLinks a {
+        display: flex !important;
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        justify-content: center;
+    }
+
     .navLinks a:not(.btn) {
-        display: none;
+        color: var(--text-primary);
+    }
+
+    .navLinks a:not(.btn):hover {
+        background: var(--bg-secondary);
+        color: var(--primary-600);
     }
 }
 

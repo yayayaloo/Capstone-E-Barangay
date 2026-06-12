@@ -412,6 +412,15 @@ textarea::placeholder {
   color: var(--text-muted);
 }
 
+/* Focus Indicators for Keyboard Accessibility */
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.glass-card:focus-within {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
+}
+
 /* Badge */
 .badge {
   display: inline-flex;
@@ -435,8 +444,8 @@ textarea::placeholder {
 }
 
 .badge-info {
-  background: #dcfce7;
-  color: #1e40af;
+  background: #dbeafe; /* Semantic light blue for info status */
+  color: #1e40af;      /* Dark blue text */
 }
 
 .badge-error {

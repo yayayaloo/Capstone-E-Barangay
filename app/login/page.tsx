@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Info } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
@@ -17,10 +17,13 @@ function LoginContent() {
     const [error, setError] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
     const [loading, setLoading] = useState(false)
-    const { signIn } = useAuth()
+    const [unconfirmedEmail, setUnconfirmedEmail] = useState('')
+    const [resending, setResending] = useState(false)
+    const { signIn, resendOtp } = useAuth()
     const { showToast, updateToast } = useToast()
     const router = useRouter()
     const searchParams = useSearchParams()
+    const redirectUrl = searchParams ? searchParams.get('redirect') : null
 
     useEffect(() => {
         // Handle email confirmation success
@@ -34,18 +37,37 @@ function LoginContent() {
         }
     }, [searchParams])
 
+    const handleResendVerification = async () => {
+        if (!unconfirmedEmail) return
+        setResending(true)
+        const toastId = showToast('Resending verification link...', 'loading')
+        const { error: resendError } = await resendOtp(unconfirmedEmail)
+        if (resendError) {
+            setError(resendError)
+            updateToast(toastId, resendError, 'error')
+        } else {
+            setSuccessMessage('Verification email has been resent successfully! Please check your inbox.')
+            setUnconfirmedEmail('')
+            setError('')
+            updateToast(toastId, 'Verification email resent!', 'success')
+        }
+        setResending(false)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
         setSuccessMessage('')
+        setUnconfirmedEmail('')
 
-        if (!email.trim() || !password.trim()) {
+        const trimmedEmail = email.trim()
+        if (!trimmedEmail || !password.trim()) {
             setError('Please enter both email and password.')
             return
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(email)) {
+        if (!emailRegex.test(trimmedEmail)) {
             setError('Please enter a valid email address.')
             return
         }
@@ -53,14 +75,15 @@ function LoginContent() {
         setLoading(true)
         const toastId = showToast('Signing in...', 'loading')
 
-        const { data, error } = await signIn(email, password)
+        const { data, error: signInError } = await signIn(trimmedEmail, password)
 
-        if (error) {
-            let errorMsg = error;
-            if (error.includes('Invalid login credentials')) {
+        if (signInError) {
+            let errorMsg = signInError;
+            if (signInError.includes('Invalid login credentials')) {
                 errorMsg = 'Incorrect email or password. Please try again.'
-            } else if (error.includes('Email not confirmed')) {
+            } else if (signInError.includes('Email not confirmed')) {
                 errorMsg = 'Please verify your email address before logging in. Check your inbox for the confirmation link.'
+                setUnconfirmedEmail(trimmedEmail)
             }
             setError(errorMsg)
             updateToast(toastId, errorMsg, 'error')
@@ -72,6 +95,7 @@ function LoginContent() {
                 // Email not confirmed — block login and sign them out
                 await supabase.auth.signOut()
                 const msg = 'Please verify your email address before logging in. Check your inbox for the confirmation link.'
+                setUnconfirmedEmail(trimmedEmail)
                 setError(msg)
                 updateToast(toastId, msg, 'error')
                 setLoading(false)
@@ -80,11 +104,28 @@ function LoginContent() {
 
             updateToast(toastId, 'Signed in successfully!', 'success')
 
-            // Email confirmed — route by role (JWT claim, already in session)
-            const role = session.user.user_metadata?.role || 'resident'
-            const redirectUrl = searchParams.get('redirect')
+            // Secure: Fetch true role from database profiles table rather than relying solely on user_metadata JWT claim
+            let role = 'resident'
+            try {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single()
+                if (profileData?.role) {
+                    role = profileData.role
+                } else {
+                    role = session.user.user_metadata?.role || 'resident'
+                }
+            } catch (err) {
+                role = session.user.user_metadata?.role || 'resident'
+            }
 
-            if (redirectUrl && redirectUrl.startsWith('/')) {
+            const isValidLocalRedirect = (url: string) => {
+                return url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\')
+            }
+
+            if (redirectUrl && isValidLocalRedirect(redirectUrl)) {
                 router.push(redirectUrl)
             } else if (role === 'admin') {
                 router.push('/admin')
@@ -93,6 +134,7 @@ function LoginContent() {
             }
         }
     }
+
 
     return (
         <div className={styles.loginContainer}>
@@ -162,6 +204,24 @@ function LoginContent() {
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
+                        {redirectUrl && redirectUrl.startsWith('/request/') && (
+                            <div style={{
+                                padding: '0.875rem 1rem',
+                                borderRadius: '12px',
+                                backgroundColor: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                color: '#1e3a8a',
+                                fontSize: '0.85rem',
+                                fontWeight: 500,
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                            }}>
+                                <Info size={16} style={{ flexShrink: 0 }} />
+                                <span>Please sign in to complete your document request. You will be redirected back to the form immediately after.</span>
+                            </div>
+                        )}
                         {successMessage && (
                             <div style={{
                                 padding: '0.875rem 1rem',
@@ -179,8 +239,18 @@ function LoginContent() {
                             </div>
                         )}
                         {error && (
-                            <div className={styles.errorMessage}>
-                                {error}
+                            <div className={styles.errorMessage} role="alert">
+                                <div>{error}</div>
+                                {unconfirmedEmail && email.trim() === unconfirmedEmail && (
+                                    <button
+                                        type="button"
+                                        className={styles.resendButton}
+                                        onClick={handleResendVerification}
+                                        disabled={resending}
+                                    >
+                                        {resending ? 'Resending verification link...' : 'Resend verification email'}
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -190,9 +260,13 @@ function LoginContent() {
                                 id="email"
                                 type="email"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={(e) => {
+                                    setEmail(e.target.value)
+                                    if (error) setError('')
+                                }}
                                 placeholder="you@example.com"
                                 required
+                                disabled={loading}
                             />
                         </div>
 
@@ -203,15 +277,21 @@ function LoginContent() {
                                     id="password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={(e) => {
+                                        setPassword(e.target.value)
+                                        if (error) setError('')
+                                    }}
                                     placeholder="••••••••"
                                     required
+                                    disabled={loading}
                                 />
                                 <button
                                     type="button"
                                     className={styles.passwordToggle}
                                     onClick={() => setShowPassword(!showPassword)}
-                                    tabIndex={-1}
+                                    disabled={loading}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    aria-pressed={showPassword}
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
@@ -256,9 +336,16 @@ export default function LoginPage() {
     return (
         <Suspense fallback={
             <div className={styles.loginContainer}>
+                <div className={styles.brandingPanel}>
+                    <div className={styles.brandingBackground} />
+                    <div className={styles.brandingContent}>
+                        {/* Static visual layout structure placeholder to prevent layout shifts */}
+                    </div>
+                </div>
                 <div className={styles.formPanel}>
-                    <div className={styles.loginCard}>
-                        <p>Loading...</p>
+                    <div className={styles.loginCard} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
+                        <span className={styles.spinner} style={{ width: '2.5rem', height: '2.5rem', borderWidth: '3px', borderTopColor: '#059669', borderColor: 'rgba(5, 150, 105, 0.15)' }}></span>
+                        <p style={{ marginTop: '1.25rem', color: '#6b7280', fontSize: '0.9rem', fontWeight: 500 }}>Loading E-Barangay portal...</p>
                     </div>
                 </div>
             </div>

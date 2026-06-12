@@ -1,18 +1,11 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
-import { Inter, Poppins } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import ClientLayout from '@/components/ClientLayout'
 
 const inter = Inter({
     subsets: ['latin'],
     variable: '--font-inter',
-    display: 'swap',
-})
-
-const poppins = Poppins({
-    weight: ['400', '600', '700'],
-    subsets: ['latin'],
-    variable: '--font-poppins',
     display: 'swap',
 })
 
@@ -39,7 +32,7 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
+        <html lang="en" className={inter.variable}>
             <body>
                 <ClientLayout>{children}</ClientLayout>
             </body>

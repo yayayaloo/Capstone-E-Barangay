@@ -82,11 +82,18 @@ function cleanDocType(type: string | undefined | null) {
     return trimmed
 }
 
+function toLocalISOString(dateString?: string) {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    const tzOffset = date.getTimezoneOffset() * 60000
+    return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16)
+}
+
 const DOCUMENTS = [
     { slug: 'barangay-clearance', name: 'Barangay Clearance', fee: 'Php 50.00', reqs: 'Valid ID' },
     { slug: 'certificate-of-residency', name: 'Certificate of Residency', fee: 'Php 50.00', reqs: 'Valid ID' },
     { slug: 'business-clearance', name: 'Business Clearance', fee: 'Free', reqs: 'DTI Certificate' },
-    { slug: 'lot-certification', name: 'Lot / Building Certification', fee: 'Php 1.00/sqm', reqs: 'Purok Cert, Tax Dec' },
+    { slug: 'lot-certification', name: 'Lot / Building Certification', fee: 'Php 1.00/sqm', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment' },
     { slug: 'first-time-job-seeker', name: 'First Time Job Seeker', fee: 'Free', reqs: 'Valid ID' },
     { slug: 'indigency', name: 'Certificate of Indigency', fee: 'Free', reqs: 'Valid ID' },
 ]
@@ -100,6 +107,7 @@ function AdminDashboardContent() {
     const [analyticsView, setAnalyticsView] = useState<'overview' | 'trends' | 'demographics'>('overview')
     const [loading, setLoading] = useState(true)
     const loadedTabs = useRef<Record<string, boolean>>({})
+    const commentTimelineEndRef = useRef<HTMLDivElement | null>(null)
 
     const [requests, setRequests] = useState<ServiceRequest[]>([])
     const [residents, setResidents] = useState<Profile[]>([])
@@ -152,6 +160,9 @@ function AdminDashboardContent() {
 
     // Resident detail modal
     const [selectedResident, setSelectedResident] = useState<Profile | null>(null)
+    // Request detail modal
+    const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null)
+    const [manualQrInput, setManualQrInput] = useState('')
 
     // Blotter Reports state
     const [blotterReports, setBlotterReports] = useState<BlotterReport[]>([])
@@ -169,6 +180,13 @@ function AdminDashboardContent() {
     const [complaintNotes, setComplaintNotes] = useState('')
     const [complaintNewStatus, setComplaintNewStatus] = useState<ComplaintStatus>('Received')
     const [savingComplaint, setSavingComplaint] = useState(false)
+    const [complaintComments, setComplaintComments] = useState<ComplaintComment[]>([])
+    const [loadingComplaintComments, setLoadingComplaintComments] = useState(false)
+    const [newComplaintComment, setNewComplaintComment] = useState('')
+    const [blotterLimit, setBlotterLimit] = useState(100)
+    const [complaintsLimit, setComplaintsLimit] = useState(100)
+    const [showArchivedBlotters, setShowArchivedBlotters] = useState(false)
+    const [showArchivedComplaints, setShowArchivedComplaints] = useState(false)
 
     // ─── Custom Confirm Dialog ───────────────────────────────────────────────────
     const [confirmDialog, setConfirmDialog] = useState<{
@@ -195,6 +213,12 @@ function AdminDashboardContent() {
     useEffect(() => {
         fetchDataForTab(activeTab, true)
     }, [activeTab])
+
+    useEffect(() => {
+        if (activeTab === 'blotter') {
+            fetchDataForTab('blotter', true)
+        }
+    }, [blotterLimit, complaintsLimit, showArchivedBlotters, showArchivedComplaints])
 
     const fetchOverviewStats = async () => {
         try {
@@ -275,8 +299,8 @@ function AdminDashboardContent() {
                 setAuditLogs(mappedAudit as AuditLog[])
             } else if (tab === 'blotter') {
                 const [blotterRes, complaintsRes] = await Promise.all([
-                    supabase.from('blotter_reports').select('*').order('created_at', { ascending: false }).limit(100),
-                    supabase.from('complaints').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(100)
+                    supabase.from('blotter_reports').select('*').eq('is_archived', showArchivedBlotters).order('created_at', { ascending: false }).limit(blotterLimit),
+                    supabase.from('complaints').select('*, profiles!inner(full_name)').eq('is_archived', showArchivedComplaints).order('created_at', { ascending: false }).limit(complaintsLimit)
                 ])
                 if (blotterRes.error) throw blotterRes.error
                 setBlotterReports(blotterRes.data as BlotterReport[])
@@ -318,6 +342,102 @@ function AdminDashboardContent() {
             setLoadingDemographics(false);
         }
     }
+
+    useEffect(() => {
+        if (complaintModal.isOpen && complaintModal.complaint?.id) {
+            fetchComplaintComments(complaintModal.complaint.id)
+        } else {
+            setComplaintComments([])
+            setNewComplaintComment('')
+        }
+    }, [complaintModal.isOpen, complaintModal.complaint?.id])
+
+    useEffect(() => {
+        if (commentTimelineEndRef.current) {
+            commentTimelineEndRef.current.scrollIntoView({ behavior: 'smooth' })
+        }
+    }, [complaintComments])
+
+
+    const fetchComplaintComments = async (complaintId: string) => {
+        setLoadingComplaintComments(true)
+        try {
+            const { data, error } = await supabase
+                .from('complaint_comments')
+                .select(`
+                    id,
+                    complaint_id,
+                    sender_id,
+                    comment,
+                    created_at,
+                    profiles:sender_id (full_name, role)
+                `)
+                .eq('complaint_id', complaintId)
+                .order('created_at', { ascending: true })
+
+            if (error) throw error
+
+            const formatted = (data || []).map((c: any) => ({
+                id: c.id,
+                complaint_id: c.complaint_id,
+                sender_id: c.sender_id,
+                comment: c.comment,
+                created_at: c.created_at,
+                sender_name: c.profiles?.full_name || 'Resident',
+                sender_role: c.profiles?.role || 'resident'
+            }))
+            setComplaintComments(formatted)
+        } catch (err: any) {
+            console.error('Error fetching comments:', err)
+            showToast(err.message || 'Failed to load comments', 'error')
+        } finally {
+            setLoadingComplaintComments(false)
+        }
+    }
+
+    const postComplaintComment = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!complaintModal.complaint?.id || !newComplaintComment.trim() || !profile?.id) return
+
+        const commentText = newComplaintComment.trim()
+        try {
+            const { data, error } = await supabase
+                .from('complaint_comments')
+                .insert({
+                    complaint_id: complaintModal.complaint.id,
+                    sender_id: profile.id,
+                    comment: commentText
+                })
+                .select(`
+                    id,
+                    complaint_id,
+                    sender_id,
+                    comment,
+                    created_at,
+                    profiles:sender_id (full_name, role)
+                `)
+                .single()
+
+            if (error) throw error
+
+            const formatted = {
+                id: data.id,
+                complaint_id: data.complaint_id,
+                sender_id: data.sender_id,
+                comment: data.comment,
+                created_at: data.created_at,
+                sender_name: data.profiles?.full_name || profile.full_name,
+                sender_role: data.profiles?.role || 'admin'
+            }
+
+            setComplaintComments(prev => [...prev, formatted])
+            setNewComplaintComment('')
+        } catch (err: any) {
+            console.error('Error posting comment:', err)
+            showToast(err.message || 'Failed to send message', 'error')
+        }
+    }
+
 
     const pendingCount = stats.pending
     const processingCount = stats.processing
@@ -439,12 +559,14 @@ function AdminDashboardContent() {
             residentAge = a.toString()
         }
 
-        const residentNameLower = (req.resident_name || '').toLowerCase()
-        const hasActiveBlotter = blotterReports.some(rep => {
-            const isRespondent = (rep.respondent || '').toLowerCase().includes(residentNameLower)
-            const isUnresolved = rep.status !== 'Resolved'
-            return isRespondent && isUnresolved
-        })
+        const residentNameLower = (req.resident_name || '').trim().toLowerCase();
+        const hasActiveBlotter = residentNameLower.length > 0 && blotterReports.some(rep => {
+            const respondentLower = (rep.respondent || '').trim().toLowerCase();
+            if (respondentLower === residentNameLower) return rep.status !== 'Resolved';
+            
+            const words = residentNameLower.split(/\s+/).filter(w => w.length > 2);
+            return words.length > 0 && words.every(word => new RegExp('\\b' + word + '\\b', 'i').test(respondentLower)) && rep.status !== 'Resolved';
+        });
 
         // Standard fields defaults
         const addressDefault = parsed.address || residentProfile?.address || ''
@@ -632,12 +754,14 @@ function AdminDashboardContent() {
             }
 
             // Smart check: Resident has unresolved blotters in the barangay records
-            const residentNameLower = (req.resident_name || '').toLowerCase()
-            const hasActiveBlotter = blotterReports.some(rep => {
-                const isRespondent = (rep.respondent || '').toLowerCase().includes(residentNameLower)
-                const isUnresolved = rep.status !== 'Resolved'
-                return isRespondent && isUnresolved
-            })
+            const residentNameLower = (req.resident_name || '').trim().toLowerCase();
+            const hasActiveBlotter = residentNameLower.length > 0 && blotterReports.some(rep => {
+                const respondentLower = (rep.respondent || '').trim().toLowerCase();
+                if (respondentLower === residentNameLower) return rep.status !== 'Resolved';
+                
+                const words = residentNameLower.split(/\s+/).filter(w => w.length > 2);
+                return words.length > 0 && words.every(word => new RegExp('\\b' + word + '\\b', 'i').test(respondentLower)) && rep.status !== 'Resolved';
+            });
 
             // Resolve defaults based on legacy/new fields
             const isRenewalDefault = parsedFormData?.isRenewal !== undefined ? parsedFormData.isRenewal : true
@@ -1246,21 +1370,21 @@ function AdminDashboardContent() {
     const deleteBlotterReport = (id: string) => {
         setConfirmDialog({
             isOpen: true,
-            title: 'Delete Blotter Report',
-            message: 'Are you sure you want to delete this blotter report? This action cannot be undone.',
-            confirmLabel: 'Delete',
-            variant: 'danger',
+            title: 'Archive Blotter Report',
+            message: 'Are you sure you want to archive this blotter report? It will be removed from active lists but kept in historical records.',
+            confirmLabel: 'Archive',
+            variant: 'warning',
             onConfirm: async () => {
                 closeConfirmDialog()
                 try {
-                    const { error } = await supabase.from('blotter_reports').delete().eq('id', id)
+                    const { error } = await supabase.from('blotter_reports').update({ is_archived: true }).eq('id', id)
                     if (error) throw error
-                    showToast('Blotter report deleted', 'success')
-                    if (profile?.id) await logAdminAction('DELETE_BLOTTER', `Deleted blotter report ID: ${id.slice(0, 8)}`, profile.id)
+                    showToast('Blotter report archived successfully', 'success')
+                    if (profile?.id) await logAdminAction('ARCHIVE_BLOTTER', `Archived blotter report ID: ${id.slice(0, 8)}`, profile.id)
                     fetchDataForTab('blotter')
                 } catch (error: any) {
-                    console.error('Error deleting blotter report:', error)
-                    showToast('Failed to delete blotter report', 'error')
+                    console.error('Error archiving blotter report:', error)
+                    showToast('Failed to archive blotter report', 'error')
                 }
             }
         })
@@ -1271,18 +1395,18 @@ function AdminDashboardContent() {
         try {
             const { error } = await supabase
                 .from('blotter_reports')
-                .delete()
+                .update({ is_archived: true })
                 .eq('id', id)
 
             if (error) throw error
-            showToast('Blotter report deleted', 'success')
+            showToast('Blotter report archived successfully', 'success')
             if (profile?.id) {
-                await logAdminAction('DELETE_BLOTTER', `Deleted blotter report ID: ${id.slice(0, 8)}`, profile.id)
+                await logAdminAction('ARCHIVE_BLOTTER', `Archived blotter report ID: ${id.slice(0, 8)}`, profile.id)
             }
             fetchDataForTab('blotter')
         } catch (error: any) {
-            console.error('Error deleting blotter report:', error)
-            showToast('Failed to delete blotter report', 'error')
+            console.error('Error archiving blotter report:', error)
+            showToast('Failed to archive blotter report', 'error')
         }
     }
 
@@ -1363,21 +1487,21 @@ function AdminDashboardContent() {
     const deleteComplaint = (id: string) => {
         setConfirmDialog({
             isOpen: true,
-            title: 'Delete Complaint',
-            message: 'Are you sure you want to delete this complaint? This action cannot be undone.',
-            confirmLabel: 'Delete',
-            variant: 'danger',
+            title: 'Archive Complaint',
+            message: 'Are you sure you want to archive this complaint? It will be removed from active lists but kept in historical records.',
+            confirmLabel: 'Archive',
+            variant: 'warning',
             onConfirm: async () => {
                 closeConfirmDialog()
                 try {
-                    const { error } = await supabase.from('complaints').delete().eq('id', id)
+                    const { error } = await supabase.from('complaints').update({ is_archived: true }).eq('id', id)
                     if (error) throw error
-                    showToast('Complaint deleted', 'success')
-                    if (profile?.id) await logAdminAction('DELETE_COMPLAINT', `Deleted complaint ID: ${id.slice(0, 8)}`, profile.id)
+                    showToast('Complaint archived successfully', 'success')
+                    if (profile?.id) await logAdminAction('ARCHIVE_COMPLAINT', `Archived complaint ID: ${id.slice(0, 8)}`, profile.id)
                     fetchDataForTab('blotter')
                 } catch (error: any) {
-                    console.error('Error deleting complaint:', error)
-                    showToast('Failed to delete complaint', 'error')
+                    console.error('Error archiving complaint:', error)
+                    showToast('Failed to archive complaint', 'error')
                 }
             }
         })
@@ -1386,16 +1510,42 @@ function AdminDashboardContent() {
     const _deleteComplaintLegacy = async (id: string) => {
         if (!true) return
         try {
-            const { error } = await supabase.from('complaints').delete().eq('id', id)
+            const { error } = await supabase.from('complaints').update({ is_archived: true }).eq('id', id)
             if (error) throw error
-            showToast('Complaint deleted', 'success')
+            showToast('Complaint archived successfully', 'success')
             if (profile?.id) {
-                await logAdminAction('DELETE_COMPLAINT', `Deleted complaint ID: ${id.slice(0, 8)}`, profile.id)
+                await logAdminAction('ARCHIVE_COMPLAINT', `Archived complaint ID: ${id.slice(0, 8)}`, profile.id)
             }
             fetchDataForTab('blotter')
         } catch (error: any) {
-            console.error('Error deleting complaint:', error)
-            showToast('Failed to delete complaint', 'error')
+            console.error('Error archiving complaint:', error)
+            showToast('Failed to archive complaint', 'error')
+        }
+    }
+
+    const restoreBlotterReport = async (id: string) => {
+        try {
+            const { error } = await supabase.from('blotter_reports').update({ is_archived: false }).eq('id', id)
+            if (error) throw error
+            showToast('Blotter report restored successfully', 'success')
+            if (profile?.id) await logAdminAction('RESTORE_BLOTTER', `Restored blotter report ID: ${id.slice(0, 8)}`, profile.id)
+            fetchDataForTab('blotter')
+        } catch (error: any) {
+            console.error('Error restoring blotter report:', error)
+            showToast('Failed to restore blotter report', 'error')
+        }
+    }
+
+    const restoreComplaint = async (id: string) => {
+        try {
+            const { error } = await supabase.from('complaints').update({ is_archived: false }).eq('id', id)
+            if (error) throw error
+            showToast('Complaint restored successfully', 'success')
+            if (profile?.id) await logAdminAction('RESTORE_COMPLAINT', `Restored complaint ID: ${id.slice(0, 8)}`, profile.id)
+            fetchDataForTab('blotter')
+        } catch (error: any) {
+            console.error('Error restoring complaint:', error)
+            showToast('Failed to restore complaint', 'error')
         }
     }
 
@@ -1451,11 +1601,8 @@ function AdminDashboardContent() {
         showToast('Complaints PDF exported successfully', 'success')
     }
 
-    const handleScan = async (results: any[]) => {
-        if (!results || results.length === 0) return;
-        const scannedValue = results[0].rawValue?.trim();
-        if (!scannedValue || verifying) return;
-
+    const verifyQrCode = async (scannedValue: string) => {
+        if (!scannedValue) return;
         setVerifying(true)
         setScanResult(null)
 
@@ -1468,13 +1615,17 @@ function AdminDashboardContent() {
                 .maybeSingle()
 
             if (docData) {
-                const isValid = docData.status === 'ready' || docData.status === 'completed'
+                const isStatusValid = docData.status === 'ready' || docData.status === 'completed'
+                const isExpired = isStatusValid && docData.expires_at && new Date(docData.expires_at) < new Date()
+                const isValid = isStatusValid && !isExpired
                 const holderName = (docData.profiles as any)?.full_name || 'Unknown'
 
                 if (!isValid) {
                     setScanResult({
                         valid: false,
-                        message: `Document is still in ${docData.status} status.`,
+                        message: isExpired
+                            ? `Document has expired (${new Date(docData.expires_at).toLocaleDateString()}).`
+                            : `Document is still in ${docData.status} status.`,
                         holder: holderName,
                         docType: cleanDocType(docData.document_type)
                     })
@@ -1504,7 +1655,6 @@ function AdminDashboardContent() {
             }
 
             // 2. Try to find if it's a Resident ID
-            // Use separate safe queries instead of string interpolation to avoid injection
             let resData = null
             const { data: byId } = await supabase
                 .from('profiles')
@@ -1569,6 +1719,13 @@ function AdminDashboardContent() {
         }
     }
 
+    const handleScan = async (results: any[]) => {
+        if (!results || results.length === 0) return;
+        const scannedValue = results[0].rawValue?.trim();
+        if (!scannedValue || verifying) return;
+        await verifyQrCode(scannedValue);
+    }
+
     const filteredRequests = requests.filter(r => {
         const reqName = r.resident_name || ''
         const matchSearch =
@@ -1593,6 +1750,14 @@ function AdminDashboardContent() {
             c.respondent_name.toLowerCase().includes(complaintSearch.toLowerCase()) ||
             (c.resident_name || '').toLowerCase().includes(complaintSearch.toLowerCase())
         const matchStatus = complaintStatusFilter === 'all' || c.status === complaintStatusFilter
+        return matchSearch && matchStatus
+    })
+
+    const filteredBlotterReports = blotterReports.filter(rep => {
+        const matchSearch = rep.complainant.toLowerCase().includes(blotterSearch.toLowerCase()) ||
+            rep.respondent.toLowerCase().includes(blotterSearch.toLowerCase()) ||
+            (rep.location || '').toLowerCase().includes(blotterSearch.toLowerCase())
+        const matchStatus = blotterStatusFilter === 'all' || rep.status === blotterStatusFilter
         return matchSearch && matchStatus
     })
 
@@ -1965,6 +2130,13 @@ function AdminDashboardContent() {
                                                         <td><span className={statusBadge(req.status)}>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</span></td>
                                                         <td>
                                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                <button 
+                                                                    className="btn btn-outline" 
+                                                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} 
+                                                                    onClick={() => setSelectedRequest(req)}
+                                                                >
+                                                                    Details
+                                                                </button>
                                                                 {req.status === 'pending' && (
                                                                     <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'processing')}>Process</button>
                                                                 )}
@@ -2116,6 +2288,145 @@ function AdminDashboardContent() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Request Detail Modal */}
+                        {selectedRequest && (() => {
+                            const req = selectedRequest;
+                            let parsedFormData = req.form_data || {}
+                            if (typeof parsedFormData === 'string') {
+                                try {
+                                    parsedFormData = JSON.parse(parsedFormData)
+                                } catch (e) {}
+                            }
+
+                            const formatFieldName = (key: string) => {
+                                const result = key.replace(/([A-Z])/g, " $1");
+                                return result.charAt(0).toUpperCase() + result.slice(1);
+                            }
+
+                            const viewAttachment = async (path: string) => {
+                                try {
+                                    const { data, error } = await supabase.storage
+                                        .from('resident-requirements')
+                                        .createSignedUrl(path.trim(), 3600);
+                                    if (error) throw error;
+                                    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                                } catch (err: any) {
+                                    showToast(`Could not open attachment: ${err.message || 'Unknown error'}`, 'error');
+                                }
+                            }
+
+                            return (
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setSelectedRequest(null)}>
+                                    <div className="glass-card" style={{ maxWidth: '640px', width: '100%', padding: '2.5rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.1))', paddingBottom: '1rem' }}>
+                                            <div>
+                                                <h2 style={{ margin: 0 }}>Request Details</h2>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>ID: {req.id.toUpperCase()}</span>
+                                            </div>
+                                            <button style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '1.5rem', cursor: 'pointer' }} onClick={() => setSelectedRequest(null)}>X</button>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                                <div>
+                                                    <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Resident Name</span>
+                                                    <strong>{req.resident_name}</strong>
+                                                </div>
+                                                <div>
+                                                    <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Document Type</span>
+                                                    <strong>{cleanDocType(req.document_type)}</strong>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                                <div>
+                                                    <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Date Filed</span>
+                                                    <strong>{new Date(req.created_at).toLocaleString()}</strong>
+                                                </div>
+                                                <div>
+                                                    <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Current Status</span>
+                                                    <span className={statusBadge(req.status)} style={{ display: 'inline-block', marginTop: '0.2rem' }}>
+                                                        {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Purpose</span>
+                                                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.9rem', color: 'var(--text-primary)' }}>{req.purpose}</p>
+                                            </div>
+
+                                            {Object.keys(parsedFormData).length > 0 && (
+                                                <div style={{ marginTop: '0.5rem', padding: '1rem', background: 'var(--bg-primary, rgba(255,255,255,0.03))', borderRadius: '12px', border: '1px solid var(--border-color, rgba(255,255,255,0.08))' }}>
+                                                    <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: 'var(--primary-400, #34d399)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Form Metadata</h3>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1rem' }}>
+                                                        {Object.entries(parsedFormData).map(([key, val]) => {
+                                                            if (key === 'isRenewal' || key === 'isCompliant' || key === 'noObjection') return null;
+                                                            if (typeof val === 'object' && val !== null) return null;
+                                                            return (
+                                                                <div key={key}>
+                                                                    <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatFieldName(key)}</span>
+                                                                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                                                                        {typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val || 'N/A')}
+                                                                    </span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Requirements Attachment</span>
+                                                {req.attachment_url ? (
+                                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                        {req.attachment_url.split(',').map((path, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                className="btn btn-outline"
+                                                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}
+                                                                onClick={() => viewAttachment(path.trim())}
+                                                            >
+                                                                View Attachment File {req.attachment_url!.includes(',') ? idx + 1 : ''}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No requirement files uploaded.</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))', paddingTop: '1.25rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                                            {req.status === 'pending' && (
+                                                <button className="btn btn-primary" onClick={() => { updateStatus(req.id, 'processing'); setSelectedRequest(null); }}>Process Request</button>
+                                            )}
+                                            {req.status === 'processing' && (
+                                                <button className="btn btn-primary" onClick={() => { updateStatus(req.id, 'ready'); setSelectedRequest(null); }}>Mark as Ready</button>
+                                            )}
+                                            {req.status === 'ready' && (
+                                                <button className="btn btn-secondary" onClick={() => { updateStatus(req.id, 'completed'); setSelectedRequest(null); }}>Complete Request</button>
+                                            )}
+                                            {(req.status === 'ready' || req.status === 'completed') && (
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}
+                                                    onClick={() => { handleGeneratePdf(req); setSelectedRequest(null); }}
+                                                    disabled={generatingPdfId === req.id}
+                                                >
+                                                    {generatingPdfId === req.id ? 'Generating...' : 'Generate PDF'}
+                                                </button>
+                                            )}
+                                            {(req.status === 'pending' || req.status === 'processing') && (
+                                                <button className="btn btn-outline" onClick={() => { setNoteModal({ id: req.id, status: 'rejected' }); setSelectedRequest(null); }}>Reject Request</button>
+                                            )}
+                                            <button className="btn btn-outline" style={{ borderColor: 'var(--border-color)' }} onClick={() => setSelectedRequest(null)}>Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })()}
 
                         {/* Resident Detail Modal */}
                         {selectedResident && (() => {
@@ -2515,6 +2826,37 @@ function AdminDashboardContent() {
                                                 </p>
                                             </div>
                                         )}
+
+                                        <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))', paddingTop: '1.5rem' }}>
+                                            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Manual Verification Lookup</h4>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '0.75rem', lineHeight: 1.4 }}>
+                                                If the camera is not working, enter the QR reference code, document UUID, or resident ID below to verify authenticity manually.
+                                            </p>
+                                            <form onSubmit={(e) => {
+                                                e.preventDefault();
+                                                if (manualQrInput.trim()) {
+                                                    verifyQrCode(manualQrInput.trim());
+                                                }
+                                            }} style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <input
+                                                    type="text"
+                                                    className={styles.searchInput}
+                                                    placeholder="Enter QR Reference / ID..."
+                                                    value={manualQrInput}
+                                                    onChange={e => setManualQrInput(e.target.value)}
+                                                    disabled={verifying}
+                                                    style={{ flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    className="btn btn-primary"
+                                                    disabled={verifying || !manualQrInput.trim()}
+                                                    style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                                                >
+                                                    Verify
+                                                </button>
+                                            </form>
+                                        </div>
                                     </div>
                                     <div className="glass-card">
                                         <h3>Recent Verifications</h3>
@@ -2716,7 +3058,7 @@ function AdminDashboardContent() {
                                         <button className="btn btn-secondary" onClick={() => setBlotterModal({ isOpen: true, report: { incident_date: new Date().toISOString().slice(0, 16) } })}>
                                             + New Report
                                         </button>
-                                        <button className="btn btn-primary" onClick={() => exportBlotterToPDF(blotterReports, 'Blotter_Reports')}>
+                                        <button className="btn btn-primary" onClick={() => exportBlotterToPDF(filteredBlotterReports, 'Blotter_Reports')}>
                                             Export PDF
                                         </button>
                                     </div>
@@ -2730,7 +3072,11 @@ function AdminDashboardContent() {
                                             <option value="Resolved">Resolved</option>
                                             <option value="Referred">Referred</option>
                                         </select>
-                                        <span className={styles.searchCount}>{blotterReports.length} report{blotterReports.length !== 1 ? 's' : ''}</span>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', marginLeft: '0.5rem' }}>
+                                            <input type="checkbox" checked={showArchivedBlotters} onChange={e => { setShowArchivedBlotters(e.target.checked); setBlotterLimit(100); }} style={{ width: '1rem', height: '1rem', accentColor: 'var(--primary-600)' }} />
+                                            <span>Show Archived</span>
+                                        </label>
+                                        <span className={styles.searchCount}>{filteredBlotterReports.length} report{filteredBlotterReports.length !== 1 ? 's' : ''}</span>
                                     </div>
 
                                     <div className={`${styles.tableContainer} ${styles.glassTable}`}>
@@ -2738,11 +3084,7 @@ function AdminDashboardContent() {
                                             <table className={styles.table}>
                                                 <thead><tr><th>ID</th><th>Complainant</th><th>Incident Details</th><th>Respondent</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
                                                 <tbody>
-                                                    {blotterReports.filter(rep => {
-                                                        const matchSearch = rep.complainant.toLowerCase().includes(blotterSearch.toLowerCase()) || rep.respondent.toLowerCase().includes(blotterSearch.toLowerCase());
-                                                        const matchStatus = blotterStatusFilter === 'all' || rep.status === blotterStatusFilter;
-                                                        return matchSearch && matchStatus;
-                                                    }).map(rep => (
+                                                    {filteredBlotterReports.map(rep => (
                                                         <tr key={rep.id}>
                                                             <td style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{rep.id.slice(0, 6).toUpperCase()}</td>
                                                             <td><strong>{rep.complainant}</strong></td>
@@ -2752,8 +3094,14 @@ function AdminDashboardContent() {
                                                             <td><span className={rep.status === 'Resolved' ? 'badge badge-success' : rep.status === 'Ongoing' ? 'badge badge-info' : rep.status === 'Pending' ? 'badge badge-warning' : 'badge badge-error'}>{rep.status}</span></td>
                                                             <td>
                                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setBlotterModal({ isOpen: true, report: rep })}>Review</button>
-                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteBlotterReport(rep.id)}>Delete</button>
+                                                                    {showArchivedBlotters ? (
+                                                                        <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: 'var(--success-500)', color: 'var(--success-500)' }} onClick={() => restoreBlotterReport(rep.id)}>Restore</button>
+                                                                    ) : (
+                                                                        <>
+                                                                            <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setBlotterModal({ isOpen: true, report: rep })}>Review</button>
+                                                                            <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteBlotterReport(rep.id)}>Archive</button>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -2763,12 +3111,19 @@ function AdminDashboardContent() {
                                             </table>
                                         )}
                                     </div>
+                                    {blotterReports.length >= blotterLimit && (
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', marginBottom: '1rem' }}>
+                                            <button className="btn btn-outline" onClick={() => setBlotterLimit(prev => prev + 100)}>
+                                                Load More Reports
+                                            </button>
+                                        </div>
+                                    )}
                                 </>)}
 
                                 {/* ── RESIDENT COMPLAINTS SUB-VIEW ── */}
                                 {blotterView === 'complaints' && (<>
                                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', justifyContent: 'flex-end' }}>
-                                        <button className="btn btn-primary" onClick={() => exportComplaintsToPDF(complaints, 'Complaints_Report')}>Export PDF</button>
+                                        <button className="btn btn-primary" onClick={() => exportComplaintsToPDF(filteredComplaints, 'Complaints_Report')}>Export PDF</button>
                                     </div>
 
                                     <div className={styles.filterBar}>
@@ -2780,6 +3135,10 @@ function AdminDashboardContent() {
                                             <option value="Resolved">Resolved</option>
                                             <option value="Dismissed">Dismissed</option>
                                         </select>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', marginLeft: '0.5rem' }}>
+                                            <input type="checkbox" checked={showArchivedComplaints} onChange={e => { setShowArchivedComplaints(e.target.checked); setComplaintsLimit(100); }} style={{ width: '1rem', height: '1rem', accentColor: 'var(--primary-600)' }} />
+                                            <span>Show Archived</span>
+                                        </label>
                                         <span className={styles.searchCount}>{filteredComplaints.length} complaint{filteredComplaints.length !== 1 ? 's' : ''}</span>
                                     </div>
 
@@ -2803,11 +3162,17 @@ function AdminDashboardContent() {
                                                             <td><span className={c.status === 'Resolved' ? 'badge badge-success' : c.status === 'Under Investigation' ? 'badge badge-info' : c.status === 'Dismissed' ? 'badge badge-error' : 'badge badge-warning'}>{c.status}</span></td>
                                                             <td>
                                                                 <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }} onClick={() => { setComplaintModal({ isOpen: true, complaint: c }); setComplaintNotes(c.admin_notes || ''); setComplaintNewStatus(c.status); }}>Review</button>
-                                                                    {c.status !== 'Resolved' && c.status !== 'Dismissed' && (
-                                                                        <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderColor: 'var(--warning-500)', color: 'var(--warning-500)' }} onClick={() => escalateToBlotter(c)}>Escalate</button>
+                                                                    {showArchivedComplaints ? (
+                                                                        <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderColor: 'var(--success-500)', color: 'var(--success-500)' }} onClick={() => restoreComplaint(c.id)}>Restore</button>
+                                                                    ) : (
+                                                                        <>
+                                                                            <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }} onClick={() => { setComplaintModal({ isOpen: true, complaint: c }); setComplaintNotes(c.admin_notes || ''); setComplaintNewStatus(c.status); }}>Review</button>
+                                                                            {c.status !== 'Resolved' && c.status !== 'Dismissed' && c.status !== 'Under Investigation' && (
+                                                                                <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderColor: 'var(--warning-500)', color: 'var(--warning-500)' }} onClick={() => escalateToBlotter(c)}>Escalate</button>
+                                                                            )}
+                                                                            <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteComplaint(c.id)}>Archive</button>
+                                                                        </>
                                                                     )}
-                                                                    <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderColor: 'var(--error-500)', color: 'var(--error-500)' }} onClick={() => deleteComplaint(c.id)}>Delete</button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -2817,6 +3182,13 @@ function AdminDashboardContent() {
                                             </table>
                                         )}
                                     </div>
+                                    {complaints.length >= complaintsLimit && (
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', marginBottom: '1rem' }}>
+                                            <button className="btn btn-outline" onClick={() => setComplaintsLimit(prev => prev + 100)}>
+                                                Load More Complaints
+                                            </button>
+                                        </div>
+                                    )}
                                 </>)}
                             </div>
                         )}
@@ -3487,7 +3859,7 @@ function AdminDashboardContent() {
                                         disabled={!!blotterModal.report.id}
                                         className={styles.searchInput}
                                         style={{ width: '100%', opacity: blotterModal.report.id ? 0.6 : 1, cursor: blotterModal.report.id ? 'not-allowed' : 'auto' }}
-                                        value={blotterModal.report.incident_date ? new Date(blotterModal.report.incident_date).toISOString().slice(0, 16) : ''}
+                                        value={blotterModal.report.incident_date ? toLocalISOString(blotterModal.report.incident_date) : ''}
                                         onChange={e => setBlotterModal({ ...blotterModal, report: { ...blotterModal.report, incident_date: new Date(e.target.value).toISOString() } })}
                                     />
                                 </div>
@@ -3547,75 +3919,189 @@ function AdminDashboardContent() {
             {/* Complaint Detail Modal */}
             {complaintModal.isOpen && complaintModal.complaint && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setComplaintModal({ isOpen: false, complaint: null })}>
-                    <div className="glass-card" style={{ maxWidth: '600px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                        <h3 style={{ marginBottom: '1.5rem' }}>Complaint Details</h3>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Complaint ID</label>
-                                <strong style={{ fontFamily: 'monospace' }}>{complaintModal.complaint.id.slice(0, 8).toUpperCase()}</strong>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Filed By</label>
-                                <strong>{complaintModal.complaint.resident_name}</strong>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Type</label>
-                                <span className="badge badge-info">{complaintModal.complaint.complaint_type}</span>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Date Filed</label>
-                                <span>{new Date(complaintModal.complaint.created_at).toLocaleString()}</span>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Respondent</label>
-                                <strong>{complaintModal.complaint.respondent_name}</strong>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Location</label>
-                                <span>{complaintModal.complaint.location}</span>
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Subject</label>
-                            <strong>{complaintModal.complaint.subject}</strong>
-                        </div>
-
-                        <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Description</label>
-                            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{complaintModal.complaint.description}</p>
-                        </div>
-
-                        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>Update Status</label>
-                            <select
-                                className={styles.filterSelect}
-                                style={{ width: '100%', marginBottom: '1rem' }}
-                                value={complaintNewStatus}
-                                onChange={e => setComplaintNewStatus(e.target.value as any)}
+                    <div className="glass-card" style={{ maxWidth: '950px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                            <h3 style={{ margin: 0 }}>Complaint Details &amp; Discussion</h3>
+                            <button 
+                                type="button" 
+                                onClick={() => setComplaintModal({ isOpen: false, complaint: null })}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                             >
-                                <option value="Received">Received</option>
-                                <option value="Under Investigation">Under Investigation</option>
-                                <option value="Resolved">Resolved</option>
-                                <option value="Dismissed">Dismissed</option>
-                            </select>
+                                <X size={20} />
+                            </button>
+                        </div>
 
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>Admin Notes</label>
-                            <textarea
-                                rows={3}
-                                className={styles.searchInput}
-                                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.5rem', resize: 'vertical' }}
-                                placeholder="Add notes for this complaint..."
-                                value={complaintNotes}
-                                onChange={e => setComplaintNotes(e.target.value)}
-                            />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+                            {/* Left Column: Complaint details & Status actions */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Complaint ID</label>
+                                        <strong style={{ fontFamily: 'monospace' }}>{complaintModal.complaint.id.slice(0, 8).toUpperCase()}</strong>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Filed By</label>
+                                        <strong>{complaintModal.complaint.resident_name}</strong>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Type</label>
+                                        <span className="badge badge-info">{complaintModal.complaint.complaint_type}</span>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Date Filed</label>
+                                        <span>{new Date(complaintModal.complaint.created_at).toLocaleString()}</span>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Respondent</label>
+                                        <strong>{complaintModal.complaint.respondent_name}</strong>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Location</label>
+                                        <span>{complaintModal.complaint.location}</span>
+                                    </div>
+                                </div>
 
-                            <div style={{ display: 'flex', gap: '1rem' }}>
-                                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setComplaintModal({ isOpen: false, complaint: null })}>Cancel</button>
-                                <button className="btn btn-primary" style={{ flex: 1 }} disabled={savingComplaint} onClick={() => updateComplaintStatus(complaintModal.complaint!.id, complaintNewStatus, complaintNotes)}>
-                                    {savingComplaint ? 'Saving...' : 'Save Changes'}
-                                </button>
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Subject</label>
+                                    <strong>{complaintModal.complaint.subject}</strong>
+                                </div>
+
+                                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Description</label>
+                                    <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.9rem' }}>{complaintModal.complaint.description}</p>
+                                </div>
+
+                                {complaintModal.complaint.attachment_url && (
+                                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Attached Evidence</label>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.5rem 1rem', fontSize: '0.85rem', alignSelf: 'flex-start' }}
+                                            onClick={() => viewAttachment(complaintModal.complaint!.attachment_url!)}
+                                        >
+                                            <FileText size={16} />
+                                            View Attached Evidence
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem', marginTop: 'auto' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>Update Status</label>
+                                    <select
+                                        className={styles.filterSelect}
+                                        style={{ width: '100%', marginBottom: '1rem' }}
+                                        value={complaintNewStatus}
+                                        onChange={e => setComplaintNewStatus(e.target.value as any)}
+                                    >
+                                        <option value="Received">Received</option>
+                                        <option value="Under Investigation">Under Investigation</option>
+                                        <option value="Resolved">Resolved</option>
+                                        <option value="Dismissed">Dismissed</option>
+                                    </select>
+
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600 }}>Admin Notes</label>
+                                    <textarea
+                                        rows={2}
+                                        className={styles.searchInput}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1rem', resize: 'vertical' }}
+                                        placeholder="Add notes for this complaint..."
+                                        value={complaintNotes}
+                                        onChange={e => setComplaintNotes(e.target.value)}
+                                    />
+
+                                    <div style={{ display: 'flex', gap: '1rem' }}>
+                                        <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setComplaintModal({ isOpen: false, complaint: null })}>Cancel</button>
+                                        <button className="btn btn-primary" style={{ flex: 1 }} disabled={savingComplaint} onClick={() => updateComplaintStatus(complaintModal.complaint!.id, complaintNewStatus, complaintNotes)}>
+                                            {savingComplaint ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Discussion / Chat interface */}
+                            <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.5rem', height: '100%', minHeight: '400px' }}>
+                                <h4 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem', fontWeight: 600 }}>
+                                    <MessageSquare size={18} style={{ color: 'var(--primary-400)' }} />
+                                    Interactive Discussion
+                                </h4>
+
+                                <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', background: 'rgba(0,0,0,0.12)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px' }}>
+                                    {loadingComplaintComments ? (
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                                            <LoadingSpinner text="Loading discussion..." size="sm" />
+                                        </div>
+                                    ) : complaintComments.length === 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center' }}>
+                                            <MessageSquare size={32} style={{ marginBottom: '0.5rem', opacity: 0.3 }} />
+                                            <p style={{ margin: 0, fontSize: '0.85rem' }}>No messages in this discussion yet.</p>
+                                            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', opacity: 0.7 }}>Send a message to request details or update the resident.</p>
+                                        </div>
+                                    ) : (
+                                        complaintComments.map(c => {
+                                            const isAdmin = c.sender_role === 'admin'
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    style={{ 
+                                                        alignSelf: isAdmin ? 'flex-end' : 'flex-start',
+                                                        maxWidth: '85%',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: isAdmin ? 'flex-end' : 'flex-start'
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.15rem', padding: '0 0.2rem' }}>
+                                                        <strong>{c.sender_name}</strong>
+                                                        <span className={isAdmin ? 'badge badge-info' : 'badge-warning'} style={{ fontSize: '0.55rem', padding: '0.05rem 0.25rem', borderRadius: '4px' }}>
+                                                            {isAdmin ? 'Admin' : 'Resident'}
+                                                        </span>
+                                                    </div>
+                                                    <div 
+                                                        style={{ 
+                                                            padding: '0.6rem 0.85rem', 
+                                                            borderRadius: '12px', 
+                                                            borderBottomRightRadius: isAdmin ? '0' : '12px',
+                                                            borderBottomLeftRadius: !isAdmin ? '0' : '12px',
+                                                            background: isAdmin ? 'var(--primary-600, #4f46e5)' : 'rgba(255,255,255,0.06)',
+                                                            color: isAdmin ? '#ffffff' : 'var(--text-primary)',
+                                                            fontSize: '0.85rem',
+                                                            lineHeight: 1.4,
+                                                            wordBreak: 'break-word',
+                                                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                            border: isAdmin ? 'none' : '1px solid var(--border-color)'
+                                                        }}
+                                                    >
+                                                        {c.comment}
+                                                    </div>
+                                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem', padding: '0 0.2rem' }}>
+                                                        {new Date(c.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })
+                                    )}
+                                    <div ref={commentTimelineEndRef} />
+                                </div>
+
+                                <form onSubmit={postComplaintComment} style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                                    <input 
+                                        type="text" 
+                                        className={styles.searchInput}
+                                        style={{ flex: 1, padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}
+                                        placeholder="Type your response to the resident..."
+                                        value={newComplaintComment}
+                                        onChange={e => setNewComplaintComment(e.target.value)}
+                                    />
+                                    <button 
+                                        type="submit" 
+                                        className="btn btn-primary" 
+                                        style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem' }}
+                                        disabled={!newComplaintComment.trim()}
+                                    >
+                                        Send
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>

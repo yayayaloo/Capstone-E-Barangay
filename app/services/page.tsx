@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
-import jsPDF from 'jspdf'
 import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
 import styles from './services.module.css'
 
@@ -73,7 +72,8 @@ const DOCUMENTS = [
 
 export default function ServicesPage() {
     const [zoomedDoc, setZoomedDoc] = useState<typeof DOCUMENTS[0] | null>(null)
-    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    // H1 FIX: Use env-based base URL with client-side fallback to ensure QR codes always encode absolute URLs
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://ebarangay.app')
 
     return (
         <div className={styles.pageWrapper}>

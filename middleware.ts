@@ -39,9 +39,11 @@ export async function middleware(request: NextRequest) {
     }
 
     // For protected routes with no auth cookie, redirect immediately
+    // C1 FIX: Preserve the original path as ?redirect= so users return after login
     if (!hasAuthCookie && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.set('redirect', pathname)
         return NextResponse.redirect(redirectUrl)
     }
 
@@ -85,31 +87,41 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
-
+    // Secure user verification - cryptographically verifies the signature on the JWT against the server
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+ 
     // Redirect unauthenticated users trying to access protected routes
-    if (!session && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
+    // C1 FIX: Preserve the original path as ?redirect= so users return after login
+    if ((!user || userError) && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.set('redirect', pathname)
         return NextResponse.redirect(redirectUrl)
     }
-
-    if (session) {
-        const role = session.user.user_metadata?.role || 'resident';
-
+ 
+    if (user) {
+        // Query the profile role directly from the database table (our source of truth)
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+ 
+        const role = profile?.role || 'resident';
+ 
         // Enforce Role-Based Access Control (RBAC)
         if (pathname.startsWith('/admin') && role !== 'admin') {
             const redirectUrl = request.nextUrl.clone()
             redirectUrl.pathname = '/resident'
             return NextResponse.redirect(redirectUrl)
         }
-
+ 
         if (pathname.startsWith('/resident') && role === 'admin') {
             const redirectUrl = request.nextUrl.clone()
             redirectUrl.pathname = '/admin'
             return NextResponse.redirect(redirectUrl)
         }
-
+ 
         // Redirect authenticated users away from landing, login, and register pages
         if (pathname === '/' || pathname === '/login' || pathname === '/register') {
             const redirectUrl = request.nextUrl.clone()

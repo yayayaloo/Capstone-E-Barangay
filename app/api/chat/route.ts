@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 const SYSTEM_PROMPT = `Ikaw ay ang opisyal na AI Assistant ng E-Barangay Gordon Heights — isang digital na portal ng gobyerno para sa Barangay Gordon Heights, Olongapo City, Philippines.
 
@@ -137,6 +138,13 @@ S: Makikita sa "My Requests" tab ang status. Kapag "Ready for Pickup" na, pumunt
 
 export async function POST(request: NextRequest) {
     try {
+        const supabase = createSupabaseServerClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (!user || authError) {
+            return NextResponse.json({ error: 'Unauthorized: You must be logged in to chat.' }, { status: 401 })
+        }
+
         const { message, userContext, conversationHistory } = await request.json()
 
         if (!message || typeof message !== 'string') {

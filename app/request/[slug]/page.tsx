@@ -5,43 +5,47 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { submitDocumentRequest } from '@/app/actions/requestActions'
-import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
+import { 
+    FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake,
+    ChevronLeft, Info, ShieldAlert, AlertTriangle, CheckCircle2, 
+    UploadCloud, User, ClipboardList
+} from 'lucide-react'
 import styles from './request.module.css'
 
 /* ── Document Registry ── */
 const DOCUMENTS: Record<string, {
     name: string; icon: React.ReactNode; desc: string; fee: string;
-    feeType: 'free' | 'paid'; reqs: string;
+    feeType: 'free' | 'paid'; reqs: string; validity: string;
 }> = {
     'barangay-clearance': {
         name: 'Barangay Clearance', icon: <FileCheck size={24} />,
-        desc: 'Verification of residency, good moral character, and no derogatory record.',
-        fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID',
+        desc: 'Verification of residency, good moral character, and no derogatory record within the barangay.',
+        fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID', validity: '6 months',
     },
     'certificate-of-residency': {
         name: 'Certificate of Residency', icon: <FileBadge size={24} />,
-        desc: 'Official certification for Residency, Loan, or Good Moral Character.',
-        fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID',
+        desc: 'Official certification for Residency, Loan applications, or Good Moral Character purposes.',
+        fee: 'Php 50.00', feeType: 'paid', reqs: 'Valid ID', validity: '6 months',
     },
     'business-clearance': {
         name: 'Business Clearance', icon: <Store size={24} />,
-        desc: 'Compliance for business permit within Gordon Heights.',
-        fee: 'Free', feeType: 'free', reqs: 'DTI Certificate',
+        desc: 'Compliance document required for business permit applications within Gordon Heights.',
+        fee: 'Free', feeType: 'free', reqs: 'DTI Certificate', validity: 'Renewed annually',
     },
     'lot-certification': {
         name: 'Lot / Building Certification', icon: <Home size={24} />,
-        desc: 'Issued to lot occupants for government compliance.',
-        fee: 'Php 1.00/sqm', feeType: 'paid', reqs: 'Purok Cert, Tax Dec',
+        desc: 'Issued to actual lot occupants for compliance to government agencies.',
+        fee: 'Php 1.00/sqm', feeType: 'paid', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment', validity: '6 months',
     },
     'first-time-job-seeker': {
         name: 'First Time Job Seeker', icon: <Briefcase size={24} />,
-        desc: 'Waives pre-employment fees for ages 18-30.',
-        fee: 'Free', feeType: 'free', reqs: 'Valid ID',
+        desc: 'Waives fees for pre-employment requirements. Available for ages 18–30.',
+        fee: 'Free', feeType: 'free', reqs: 'Valid ID', validity: '1 year',
     },
     'indigency': {
         name: 'Certificate of Indigency', icon: <HeartHandshake size={24} />,
-        desc: 'Certification of financial status for assistance.',
-        fee: 'Free', feeType: 'free', reqs: 'Valid ID',
+        desc: 'Certification of financial status for medical, educational, or social assistance.',
+        fee: 'Free', feeType: 'free', reqs: 'Valid ID', validity: '6 months',
     },
 }
 
@@ -77,27 +81,34 @@ export default function RequestPage() {
     const [form, setForm] = useState<FormData>({
         fullName: '', email: '', phone: '', address: '', purpose: ''
     })
+    const [docSpecificData, setDocSpecificData] = useState<Record<string, any>>({ isRenewal: true })
     const [errors, setErrors] = useState<FormErrors>({})
     const [touched, setTouched] = useState<Record<string, boolean>>({})
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
+    const [isDragging, setIsDragging] = useState(false)
     const [globalError, setGlobalError] = useState('')
     const [success, setSuccess] = useState<{ id: string; docType: string } | null>(null)
+    const [isAdmin, setIsAdmin] = useState(false)
 
-    // Check auth state
+    // Check auth state — C2 FIX: use getUser() for cryptographic verification instead of getSession()
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const { data: { session } } = await supabase.auth.getSession()
-                if (session?.user) {
-                    setUser(session.user)
+                const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+                if (authUser && !authError) {
+                    setUser(authUser)
                     const { data: profileData } = await supabase
                         .from('profiles')
                         .select('*')
-                        .eq('id', session.user.id)
+                        .eq('id', authUser.id)
                         .single()
                     if (profileData) {
                         setProfile(profileData)
+                        // H5 FIX: Detect admin role to show contextual message
+                        if (profileData.role === 'admin') {
+                            setIsAdmin(true)
+                        }
                         setForm(prev => ({
                             ...prev,
                             fullName: profileData.full_name || prev.fullName,
@@ -105,6 +116,40 @@ export default function RequestPage() {
                             phone: profileData.phone || prev.phone,
                             address: profileData.address || prev.address,
                         }))
+
+                        let initialAge = ''
+                        if (profileData.birthdate) {
+                            const today = new Date()
+                            const born = new Date(profileData.birthdate)
+                            if (!isNaN(born.getTime())) {
+                                let a = today.getFullYear() - born.getFullYear()
+                                const m = today.getMonth() - born.getMonth()
+                                if (m < 0 || (m === 0 && today.getDate() < born.getDate())) a--
+                                initialAge = a.toString()
+                            }
+                        }
+
+                        let initialYearsOfResidency = ''
+                        if (profileData.resident_since) {
+                            if (profileData.resident_since === 'Since Birth') {
+                                initialYearsOfResidency = initialAge
+                            } else {
+                                const year = parseInt(profileData.resident_since)
+                                if (!isNaN(year)) {
+                                    initialYearsOfResidency = (new Date().getFullYear() - year).toString()
+                                }
+                            }
+                        }
+
+                        setDocSpecificData({
+                            address: profileData.address || '',
+                            birthdate: profileData.birthdate || '',
+                            civilStatus: profileData.relationship_status || '',
+                            age: initialAge,
+                            residentSince: profileData.resident_since || '',
+                            yearsOfResidency: initialYearsOfResidency,
+                            isRenewal: true
+                        })
                     }
                 }
             } catch (e) {
@@ -117,30 +162,122 @@ export default function RequestPage() {
     }, [])
 
     // Real-time validation
-    const validate = useCallback((data: FormData): FormErrors => {
+    const validate = useCallback((data: FormData, dynamicData: Record<string, any>): FormErrors => {
         const errs: FormErrors = {}
         if (data.fullName.trim().length < 2) errs.fullName = 'Full name must be at least 2 characters'
         if (!validateEmail(data.email)) errs.email = 'Enter a valid email address'
         if (!validatePhone(data.phone)) errs.phone = 'Enter a valid PH number (e.g., 09171234567)'
         if (data.address.trim().length < 5) errs.address = 'Enter your complete address'
         if (data.purpose.trim().length < 10) errs.purpose = 'Purpose must be at least 10 characters'
+
+        // Dynamic fields validation
+        const type = (slug || '').toLowerCase()
+        if (type.includes('job-seeker') || type.includes('first-time')) {
+            if (!dynamicData.yearsOfResidency || parseInt(dynamicData.yearsOfResidency) < 0) {
+                errs.address = 'Years of residency must be specified and non-negative'
+            }
+            if (!dynamicData.idType || !dynamicData.idType.trim()) {
+                errs.fullName = 'Presented ID type is required'
+            }
+            if (!dynamicData.idNumber || !dynamicData.idNumber.trim()) {
+                errs.phone = 'Presented ID Number is required'
+            }
+        } else if (type.includes('lot') || type.includes('occupancy') || type.includes('building')) {
+            if (!dynamicData.lotArea || parseFloat(dynamicData.lotArea) <= 0) {
+                errs.address = 'Valid Lot Area in sqm is required'
+            }
+            if (!dynamicData.taxDecNo || !dynamicData.taxDecNo.trim()) {
+                errs.purpose = 'Tax Declaration No. is required'
+            }
+            if (!dynamicData.propertyLocation || !dynamicData.propertyLocation.trim()) {
+                errs.address = 'Property location is required'
+            }
+            if (!dynamicData.occupiedSince || !dynamicData.occupiedSince.trim()) {
+                errs.purpose = 'Occupied Since Year is required'
+            }
+        } else if (type.includes('business')) {
+            if (!dynamicData.businessName || !dynamicData.businessName.trim()) {
+                errs.fullName = 'Business Name is required'
+            }
+            if (!dynamicData.businessLocation || !dynamicData.businessLocation.trim()) {
+                errs.address = 'Business location is required'
+            }
+            if (!dynamicData.operatorName || !dynamicData.operatorName.trim()) {
+                errs.fullName = 'Operator / Manager Name is required'
+            }
+            if (!dynamicData.operatorAddress || !dynamicData.operatorAddress.trim()) {
+                errs.address = 'Operator home address is required'
+            }
+        } else if (type.includes('indigency') || type.includes('residency') || type.includes('clearance')) {
+            if (!dynamicData.civilStatus || !dynamicData.civilStatus.trim()) {
+                errs.purpose = 'Civil Status is required'
+            }
+            if (!dynamicData.birthdate) {
+                errs.purpose = 'Birthdate is required'
+            }
+            if (type.includes('residency') && (!dynamicData.residentSince || !dynamicData.residentSince.trim())) {
+                errs.address = 'Resident Since year is required'
+            }
+        }
+
         return errs
-    }, [])
+    }, [slug])
 
     useEffect(() => {
         if (Object.keys(touched).length > 0) {
-            setErrors(validate(form))
+            setErrors(validate(form, docSpecificData))
         }
-    }, [form, touched, validate])
+    }, [form, docSpecificData, touched, validate])
 
     const updateField = (field: keyof FormData, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
         setTouched(prev => ({ ...prev, [field]: true }))
     }
 
+    const handleDocSpecificChange = (key: string, value: any) => {
+        setDocSpecificData(prev => ({ ...prev, [key]: value }))
+        setTouched(prev => ({ ...prev, fullName: true }))
+    }
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDragging(true)
+    }
+
+    const handleDragLeave = () => {
+        setIsDragging(false)
+    }
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDragging(false)
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const newFiles = Array.from(e.dataTransfer.files)
+            const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+            const oversized = newFiles.filter(file => file.size > MAX_SIZE)
+
+            if (oversized.length > 0) {
+                setGlobalError(`File too large: ${oversized.map(f => f.name).join(', ')}. Maximum limit per file is 5MB.`)
+                return
+            }
+
+            setAttachments(prev => [...prev, ...newFiles])
+            setGlobalError('')
+        }
+    }
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const newFiles = Array.from(e.target.files)
+            const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+            const oversized = newFiles.filter(file => file.size > MAX_SIZE)
+
+            if (oversized.length > 0) {
+                setGlobalError(`File too large: ${oversized.map(f => f.name).join(', ')}. Maximum limit per file is 5MB.`)
+                e.target.value = ''
+                return
+            }
+
             setAttachments(prev => [...prev, ...newFiles])
             setGlobalError('')
             e.target.value = ''
@@ -158,7 +295,7 @@ export default function RequestPage() {
         // Mark all touched
         setTouched({ fullName: true, email: true, phone: true, address: true, purpose: true })
 
-        const validationErrors = validate(form)
+        const validationErrors = validate(form, docSpecificData)
         setErrors(validationErrors)
 
         if (Object.keys(validationErrors).length > 0) {
@@ -201,7 +338,8 @@ export default function RequestPage() {
                 document_type: doc.name,
                 purpose: form.purpose.trim(),
                 attachment_url: attachmentUrl,
-                status: 'pending'
+                status: 'pending',
+                form_data: docSpecificData
             })
 
             setSuccess({ id: data.id, docType: doc.name })
@@ -218,7 +356,9 @@ export default function RequestPage() {
         return (
             <div className={styles.pageWrapper}>
                 <div className={styles.notFound}>
-                    <div className={styles.notFoundIcon}></div>
+                    <div className={styles.alertIconWrapper} style={{ color: '#ef4444' }}>
+                        <AlertTriangle size={56} />
+                    </div>
                     <h2 className={styles.notFoundTitle}>Document Not Found</h2>
                     <p className={styles.notFoundDesc}>
                         The document type you&apos;re looking for doesn&apos;t exist. Please scan a valid QR code or browse available services.
@@ -235,7 +375,10 @@ export default function RequestPage() {
             <div className={styles.pageWrapper}>
                 <header className={styles.header}>
                     <div className={styles.headerInner}>
-                        <Link href="/services" className={styles.backBtn}>Back</Link>
+                        <Link href="/services" className={styles.backBtn}>
+                            <ChevronLeft size={16} />
+                            <span>Back</span>
+                        </Link>
                         <div className={styles.headerInfo}>
                             <h1 className={styles.headerTitle}>Request Submitted</h1>
                             <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -244,7 +387,9 @@ export default function RequestPage() {
                 </header>
                 <div className={styles.successWrapper}>
                     <div className={styles.successCard}>
-                        <div className={styles.successIcon}>OK</div>
+                        <div className={styles.successIcon}>
+                            <CheckCircle2 size={40} style={{ color: '#059669' }} />
+                        </div>
                         <h2 className={styles.successTitle}>Request Submitted!</h2>
                         <p className={styles.successMsg}>
                             Your {success.docType} request has been received. The Barangay will process it and notify you when it&apos;s ready.
@@ -287,7 +432,10 @@ export default function RequestPage() {
             <div className={styles.pageWrapper}>
                 <header className={styles.header}>
                     <div className={styles.headerInner}>
-                        <Link href="/services" className={styles.backBtn}>Back</Link>
+                        <Link href="/services" className={styles.backBtn}>
+                            <ChevronLeft size={16} />
+                            <span>Back</span>
+                        </Link>
                         <div className={styles.headerInfo}>
                             <h1 className={styles.headerTitle}>{doc.name}</h1>
                             <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -309,7 +457,10 @@ export default function RequestPage() {
             <div className={styles.pageWrapper}>
                 <header className={styles.header}>
                     <div className={styles.headerInner}>
-                        <Link href="/services" className={styles.backBtn}>Back</Link>
+                        <Link href="/services" className={styles.backBtn}>
+                            <ChevronLeft size={16} />
+                            <span>Back</span>
+                        </Link>
                         <div className={styles.headerInfo}>
                             <h1 className={styles.headerTitle}>{doc.name}</h1>
                             <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -326,13 +477,18 @@ export default function RequestPage() {
                                 {doc.fee}
                             </span>
                             <span className={`${styles.metaBadge} ${styles.metaReq}`}> {doc.reqs}</span>
+                            <span className={`${styles.metaBadge} ${styles.metaReq}`}>
+                                Valid: {doc.validity}
+                            </span>
                         </div>
                     </div>
                 </div>
 
                 <div className={styles.authPrompt}>
                     <div className={styles.authCard}>
-                        <div className={styles.authIcon}></div>
+                        <div className={styles.alertIconWrapper} style={{ color: 'var(--primary-600)' }}>
+                            <User size={56} />
+                        </div>
                         <h2 className={styles.authTitle}>Sign In Required</h2>
                         <p className={styles.authDesc}>
                             You need an E-Barangay account to request a {doc.name}. Login or register to continue — it only takes a minute.
@@ -343,6 +499,102 @@ export default function RequestPage() {
                             </Link>
                             <Link href={`/register?redirect=/request/${slug}`} className={styles.authBtnOutline}>
                                 Create an Account
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // ── H5 FIX: Admin Role Detection — redirect admins to their dashboard ──
+    if (isAdmin) {
+        return (
+            <div className={styles.pageWrapper}>
+                <header className={styles.header}>
+                    <div className={styles.headerInner}>
+                        <Link href="/admin" className={styles.backBtn}>
+                            <ChevronLeft size={16} />
+                            <span>Back to Admin</span>
+                        </Link>
+                        <div className={styles.headerInfo}>
+                            <h1 className={styles.headerTitle}>{doc.name}</h1>
+                            <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
+                        </div>
+                    </div>
+                </header>
+
+                <div className={styles.authPrompt}>
+                    <div className={styles.authCard}>
+                        <div className={styles.alertIconWrapper} style={{ color: '#3b82f6' }}>
+                            <ShieldAlert size={56} />
+                        </div>
+                        <h2 className={styles.authTitle}>Admin Account Detected</h2>
+                        <p className={styles.authDesc}>
+                            This page is for resident document requests. As an administrator, you can manage and approve requests from the Admin Dashboard.
+                        </p>
+                        <div className={styles.authButtons}>
+                            <Link href="/admin" className={styles.authBtnPrimary}>
+                                Go to Admin Dashboard
+                            </Link>
+                            <Link href="/services" className={styles.authBtnOutline}>
+                                Back to Services
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // ── Verification Required Prompt ──
+    if (user && !profile?.is_verified) {
+        return (
+            <div className={styles.pageWrapper}>
+                <header className={styles.header}>
+                    <div className={styles.headerInner}>
+                        <Link href="/services" className={styles.backBtn}>
+                            <ChevronLeft size={16} />
+                            <span>Back</span>
+                        </Link>
+                        <div className={styles.headerInfo}>
+                            <h1 className={styles.headerTitle}>{doc.name}</h1>
+                            <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
+                        </div>
+                    </div>
+                </header>
+
+                <div className={styles.docBanner}>
+                    <span className={styles.docBannerIcon}>{doc.icon}</span>
+                    <div className={styles.docBannerInfo}>
+                        <h2 className={styles.docBannerName}>{doc.name}</h2>
+                        <div className={styles.docBannerMeta}>
+                            <span className={`${styles.metaBadge} ${doc.feeType === 'free' ? styles.metaFree : styles.metaPaid}`}>
+                                {doc.fee}
+                            </span>
+                            <span className={`${styles.metaBadge} ${styles.metaReq}`}> {doc.reqs}</span>
+                            <span className={`${styles.metaBadge} ${styles.metaReq}`}>
+                                Valid: {doc.validity}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className={styles.authPrompt}>
+                    <div className={styles.authCard}>
+                        <div className={styles.alertIconWrapper} style={{ color: '#ea580c' }}>
+                            <AlertTriangle size={56} />
+                        </div>
+                        <h2 className={styles.authTitle}>Verification Required</h2>
+                        <p className={styles.authDesc}>
+                            Your account is currently under review by Barangay Administrators. You will be able to request a {doc.name} online once your account is fully verified.
+                        </p>
+                        <div className={styles.authButtons}>
+                            <Link href="/resident" className={styles.authBtnPrimary}>
+                                Go to Resident Dashboard
+                            </Link>
+                            <Link href="/services" className={styles.authBtnOutline}>
+                                Back to Services
                             </Link>
                         </div>
                     </div>
@@ -362,11 +614,258 @@ export default function RequestPage() {
         return cls
     }
 
+    const renderDynamicFields = () => {
+        const type = (slug || '').toLowerCase()
+        if (type.includes('job-seeker') || type.includes('first-time')) {
+            return (
+                <div className={styles.dynamicFieldsCard}>
+                    <h3 className={styles.dynamicHeader}>
+                        <ClipboardList size={18} style={{ color: 'var(--primary-500, #3b82f6)' }} />
+                        <span>Additional Job Seeker Details</span>
+                    </h3>
+                    <div className={styles.dynamicGrid2}>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Years of Residency</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="number"
+                                className={styles.fieldInput}
+                                value={docSpecificData.yearsOfResidency || ''}
+                                onChange={e => handleDocSpecificChange('yearsOfResidency', e.target.value)}
+                                placeholder="e.g. 5"
+                                min="0"
+                            />
+                        </div>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Presented ID Type</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.idType || ''}
+                                onChange={e => handleDocSpecificChange('idType', e.target.value)}
+                                placeholder="e.g. School ID, Birth Certificate"
+                            />
+                        </div>
+                    </div>
+                    <div className={styles.fieldGroup} style={{ marginTop: '0.5rem' }}>
+                        <div className={styles.fieldLabel}>
+                            <span className={styles.fieldLabelText}>Presented ID Number / Reference</span>
+                            <span className={styles.fieldRequired}>Required *</span>
+                        </div>
+                        <input
+                            type="text"
+                            className={styles.fieldInput}
+                            value={docSpecificData.idNumber || ''}
+                            onChange={e => handleDocSpecificChange('idNumber', e.target.value)}
+                            placeholder="e.g. ID No. or Certificate Registry No."
+                        />
+                    </div>
+                </div>
+            )
+        } else if (type.includes('lot') || type.includes('occupancy') || type.includes('building')) {
+            return (
+                <div className={styles.dynamicFieldsCard}>
+                    <h3 className={styles.dynamicHeader}>
+                        <Home size={18} style={{ color: 'var(--primary-500, #3b82f6)' }} />
+                        <span>Property & Lot Information</span>
+                    </h3>
+                    <div className={styles.dynamicGrid2}>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Lot Area (sqm)</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="number"
+                                className={styles.fieldInput}
+                                value={docSpecificData.lotArea || ''}
+                                onChange={e => handleDocSpecificChange('lotArea', e.target.value)}
+                                placeholder="e.g. 150"
+                                min="1"
+                            />
+                        </div>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Tax Declaration No.</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.taxDecNo || ''}
+                                onChange={e => handleDocSpecificChange('taxDecNo', e.target.value)}
+                                placeholder="e.g. G-123-45678"
+                            />
+                        </div>
+                    </div>
+                    <div className={styles.dynamicGrid2}>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Property Location</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.propertyLocation || ''}
+                                onChange={e => handleDocSpecificChange('propertyLocation', e.target.value)}
+                                placeholder="e.g. Purok 1, Gordon Heights"
+                            />
+                        </div>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Occupied Since (Year)</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="number"
+                                className={styles.fieldInput}
+                                value={docSpecificData.occupiedSince || ''}
+                                onChange={e => handleDocSpecificChange('occupiedSince', e.target.value)}
+                                placeholder="e.g. 2015"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )
+        } else if (type.includes('business')) {
+            return (
+                <div className={styles.dynamicFieldsCard}>
+                    <h3 className={styles.dynamicHeader}>
+                        <Store size={18} style={{ color: 'var(--primary-500, #3b82f6)' }} />
+                        <span>Business & Operator Information</span>
+                    </h3>
+                    <div className={styles.dynamicGrid2}>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Business Name</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.businessName || ''}
+                                onChange={e => handleDocSpecificChange('businessName', e.target.value)}
+                                placeholder="e.g. Gordon Heights Sari-Sari Store"
+                            />
+                        </div>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Business Location / Address</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.businessLocation || ''}
+                                onChange={e => handleDocSpecificChange('businessLocation', e.target.value)}
+                                placeholder="e.g. Purok 2, Gordon Heights"
+                            />
+                        </div>
+                    </div>
+                    <div className={styles.dynamicGrid2}>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Operator / Manager Full Name</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.operatorName || ''}
+                                onChange={e => handleDocSpecificChange('operatorName', e.target.value)}
+                                placeholder="e.g. Maria Clara"
+                            />
+                        </div>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Operator Home Address</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.operatorAddress || ''}
+                                onChange={e => handleDocSpecificChange('operatorAddress', e.target.value)}
+                                placeholder="e.g. Purok 3, Gordon Heights"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )
+        } else if (type.includes('indigency') || type.includes('residency') || type.includes('clearance')) {
+            return (
+                <div className={styles.dynamicFieldsCard}>
+                    <h3 className={styles.dynamicHeader}>
+                        <User size={18} style={{ color: 'var(--primary-500, #3b82f6)' }} />
+                        <span>Personal Certification Details</span>
+                    </h3>
+                    <div className={styles.dynamicGrid2}>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Civil Status</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <select
+                                className={styles.fieldInput}
+                                value={docSpecificData.civilStatus || ''}
+                                onChange={e => handleDocSpecificChange('civilStatus', e.target.value)}
+                            >
+                                <option value="">Select Status</option>
+                                <option value="Single">Single</option>
+                                <option value="Married">Married</option>
+                                <option value="Widowed">Widowed</option>
+                                <option value="Divorced">Divorced</option>
+                                <option value="Separated">Separated</option>
+                            </select>
+                        </div>
+                        <div className={styles.fieldGroup}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Birthdate</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="date"
+                                className={styles.fieldInput}
+                                value={docSpecificData.birthdate || ''}
+                                onChange={e => handleDocSpecificChange('birthdate', e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    {type.includes('residency') && (
+                        <div className={styles.fieldGroup} style={{ marginTop: '0.5rem' }}>
+                            <div className={styles.fieldLabel}>
+                                <span className={styles.fieldLabelText}>Resident Since (Year or "Since Birth")</span>
+                                <span className={styles.fieldRequired}>Required *</span>
+                            </div>
+                            <input
+                                type="text"
+                                className={styles.fieldInput}
+                                value={docSpecificData.residentSince || ''}
+                                onChange={e => handleDocSpecificChange('residentSince', e.target.value)}
+                                placeholder='e.g., 2010 or "Since Birth"'
+                            />
+                        </div>
+                    )}
+                </div>
+            )
+        }
+        return null
+    }
+
     return (
         <div className={styles.pageWrapper}>
             <header className={styles.header}>
                 <div className={styles.headerInner}>
-                    <Link href="/services" className={styles.backBtn}>Back</Link>
+                    <Link href="/services" className={styles.backBtn}>
+                        <ChevronLeft size={16} />
+                        <span>Back</span>
+                    </Link>
                     <div className={styles.headerInfo}>
                         <h1 className={styles.headerTitle}>{doc.name}</h1>
                         <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
@@ -384,6 +883,9 @@ export default function RequestPage() {
                             {doc.fee}
                         </span>
                         <span className={`${styles.metaBadge} ${styles.metaReq}`}>{doc.reqs}</span>
+                        <span className={`${styles.metaBadge} ${styles.metaReq}`}>
+                            Valid: {doc.validity}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -469,6 +971,9 @@ export default function RequestPage() {
                             {isFieldValid('address') && <p className={styles.fieldHint}>Address provided</p>}
                         </div>
 
+                        {/* Dynamic Fields */}
+                        {renderDynamicFields()}
+
                         {/* Purpose */}
                         <div className={styles.fieldGroup}>
                             <div className={styles.fieldLabel}>
@@ -492,7 +997,12 @@ export default function RequestPage() {
                                 <span className={styles.fieldLabelText}>Upload Valid ID / Requirements</span>
                                 <span className={styles.fieldRequired}>Required *</span>
                             </div>
-                            <div className={`${styles.fileArea} ${attachments.length > 0 ? styles.fileAreaActive : ''}`}>
+                            <div 
+                                className={`${styles.fileArea} ${attachments.length > 0 ? styles.fileAreaActive : ''} ${isDragging ? styles.fileAreaDragging : ''}`}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                            >
                                 <input
                                     type="file"
                                     className={styles.fileInput}
@@ -501,11 +1011,13 @@ export default function RequestPage() {
                                     id="req-file"
                                     multiple
                                 />
-                                <>
-                                    <div className={styles.fileIcon}></div>
-                                    <p className={styles.fileText}>Tap to upload your requirements</p>
-                                    <p className={styles.fileSmall}>You can select multiple files</p>
-                                </>
+                                <div className={styles.fileIcon} style={{ color: 'var(--text-muted)' }}>
+                                    <UploadCloud size={32} />
+                                </div>
+                                <p className={styles.fileText}>
+                                    {isDragging ? 'Drop your files here' : 'Drag & drop or click to upload requirements'}
+                                </p>
+                                <p className={styles.fileSmall}>Supports images, PDF, and DOCX (Max 5MB per file)</p>
                             </div>
                             {attachments.length > 0 && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>

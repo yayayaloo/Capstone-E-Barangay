@@ -4,8 +4,8 @@
     "description": "Intelligent Cloud-Based PWA for Automated Resident Inquiries and QR-Enabled Services",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#0f0f23",
-    "theme_color": "#6366f1",
+    "background_color": "#01120e",
+    "theme_color": "#059669",
     "orientation": "portrait-primary",
     "icons": [
         {

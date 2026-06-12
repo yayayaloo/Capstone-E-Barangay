@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Eye, EyeOff, Check, CheckCircle2, XCircle, ShieldCheck, ShieldAlert, User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX } from 'lucide-react'
+import { Eye, EyeOff, Check, CheckCircle2, XCircle, ShieldCheck, ShieldAlert, User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX, Info, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import styles from './register.module.css'
@@ -53,13 +53,15 @@ function RegisterContent() {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const [passwordError, setPasswordError] = useState('')
+    const [uploadFailed, setUploadFailed] = useState(false)
     const { signUp } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
+    const redirectUrl = searchParams ? searchParams.get('redirect') : null
 
 
     // Real-time validation logic
-    const hasMinLength = password.length >= 6
+    const hasMinLength = password.length >= 8
     const hasUppercase = /[A-Z]/.test(password)
     const hasLowercase = /[a-z]/.test(password)
     const hasNumber = /\d/.test(password)
@@ -79,13 +81,44 @@ function RegisterContent() {
             return
         }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters')
+        if (password.length < 8) {
+            setError('Password must be at least 8 characters')
             return
         }
 
         if (!allCriteriaMet) {
             setError('Password does not meet all security requirements')
+            return
+        }
+
+        const cleanedPhone = phone.replace(/[\s-]/g, '')
+        const phoneRegex = /^(09|\+639)\d{9}$/
+        if (!phoneRegex.test(cleanedPhone)) {
+            setError('Please enter a valid Philippine mobile number (e.g., 09171234567).')
+            return
+        }
+
+        if (!birthdate) {
+            setError('Please enter your birthdate')
+            return
+        }
+        const birthDateObj = new Date(birthdate)
+        const today = new Date()
+        if (birthDateObj >= today) {
+            setError('Birthdate cannot be in the future')
+            return
+        }
+        let age = today.getFullYear() - birthDateObj.getFullYear()
+        const m = today.getMonth() - birthDateObj.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < birthDateObj.getDate())) {
+            age--
+        }
+        if (age < 15) {
+            setError('You must be at least 15 years old to register.')
+            return
+        }
+        if (age > 120) {
+            setError('Please enter a valid birthdate.')
             return
         }
 
@@ -99,12 +132,10 @@ function RegisterContent() {
             return
         }
 
-        /* Temporarily disabled for testing
         if (!idDocument) {
             setError('Please upload a valid ID to prove residency in Gordon Heights')
             return
         }
-        */
 
         if (!agreedToTerms) {
             setError('Please agree to the Terms and Conditions and Privacy Policy')
@@ -178,6 +209,10 @@ function RegisterContent() {
 
                 const uploadedPath = await uploadPromise
 
+                if (!uploadedPath) {
+                    setUploadFailed(true)
+                }
+
                 // Update profile record with additional details (bypassing RLS via RPC)
                 const { error: updateError } = await supabase.rpc('complete_registration', {
                     p_user_id: userId,
@@ -191,6 +226,7 @@ function RegisterContent() {
 
                 // Sign out if we somehow got a session (email confirmation disabled case)
                 try {
+                    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
                     await supabase.auth.signOut()
                 } catch {
                     // Non-fatal
@@ -264,7 +300,17 @@ function RegisterContent() {
                         <div className={styles.successMessage}>
                             <div style={{ fontSize: '3rem', margin: '0 auto 1.5rem' }}></div>
                             <h2 style={{ color: '#111827', fontSize: '1.75rem', marginBottom: '1rem', fontWeight: 'bold' }}>Registration Successful!</h2>
-                            <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
+                            {uploadFailed ? (
+                                <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', padding: '1rem', borderRadius: '12px', fontSize: '0.85rem', marginBottom: '1.25rem', textAlign: 'left' }}>
+                                    <strong style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.25rem' }}>
+                                        <AlertTriangle size={16} />
+                                        <span>Warning: ID Document Upload Failed</span>
+                                    </strong>
+                                    <span>Your account was created successfully, but your ID verification document failed to upload. Please check your email inbox to confirm your account, and remember to bring a valid physical ID to the Barangay Hall to get your account manually verified.</span>
+                                </div>
+                            ) : (
+                                <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
+                            )}
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
                             <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className={styles.link}>Go to Login</Link>
                         </div>
@@ -343,7 +389,25 @@ function RegisterContent() {
                         <p>Join the E-Barangay system</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className={styles.form}>
+                     <form onSubmit={handleSubmit} className={styles.form}>
+                        {redirectUrl && redirectUrl.startsWith('/request/') && (
+                            <div style={{
+                                padding: '0.875rem 1rem',
+                                borderRadius: '12px',
+                                backgroundColor: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                color: '#1e3a8a',
+                                fontSize: '0.85rem',
+                                fontWeight: 500,
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                            }}>
+                                <Info size={16} style={{ flexShrink: 0 }} />
+                                <span>Please create an account to request this document. You will be redirected back to the form immediately after.</span>
+                            </div>
+                        )}
                         {error && (
                             <div className={styles.errorMessage}>
                                 {error}
@@ -441,7 +505,7 @@ function RegisterContent() {
                                 <div className={styles.requirementList}>
                                     <div className={`${styles.requirementItem} ${hasMinLength ? styles.validRequirement : styles.invalidRequirement}`}>
                                         {hasMinLength ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                        <span>At least 6 characters</span>
+                                        <span>At least 8 characters</span>
                                     </div>
                                     <div className={`${styles.requirementItem} ${hasUppercase ? styles.validRequirement : styles.invalidRequirement}`}>
                                         {hasUppercase ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
@@ -676,7 +740,16 @@ function RegisterContent() {
                                     id="idDocument"
                                     type="file"
                                     accept="image/*,.pdf"
-                                    onChange={(e) => setIdDocument(e.target.files?.[0] || null)}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0] || null
+                                        if (file && file.size > 5 * 1024 * 1024) {
+                                            setError('Identity document exceeds the 5MB limit. Please upload a smaller image or PDF.')
+                                            e.target.value = ''
+                                            setIdDocument(null)
+                                            return
+                                        }
+                                        setIdDocument(file)
+                                    }}
                                     className={styles.fileInput}
                                     required
                                 />

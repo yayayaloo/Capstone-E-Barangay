@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import styles from './RequestModal.module.css'
 
 interface RequestModalProps {
@@ -64,6 +65,15 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const newFiles = Array.from(e.target.files)
+            const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+            const oversized = newFiles.filter(file => file.size > MAX_SIZE)
+
+            if (oversized.length > 0) {
+                setError(`File too large: ${oversized.map(f => f.name).join(', ')}. Maximum limit per file is 5MB.`)
+                e.target.value = ''
+                return
+            }
+
             setAttachments(prev => [...prev, ...newFiles])
             setError('')
             // Reset input so user can select again
@@ -114,11 +124,24 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                     <h2>Request a Document</h2>
                     <button className={styles.closeButton} onClick={onClose}>✕</button>
                 </div>
-
-                <form onSubmit={handleSubmit} className={styles.form}>
-                    {error && (
-                        <div className={styles.errorMessage}> {error}</div>
-                    )}
+                {!profile?.is_verified ? (
+                    <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', color: '#ea580c', marginBottom: '1.2rem' }}>
+                            <AlertTriangle size={56} />
+                        </div>
+                        <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.75rem', fontWeight: 600 }}>Residency Verification Required</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+                            Your account is currently under review by Barangay Administrators. You will be able to request certificates and clearances online once your account is fully verified.
+                        </p>
+                        <button type="button" className="btn btn-primary" style={{ width: '100%', padding: '0.75rem' }} onClick={onClose}>
+                            Close
+                        </button>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className={styles.form}>
+                        {error && (
+                            <div className={styles.errorMessage}> {error}</div>
+                        )}
 
                     <div className={styles.inputGroup}>
                         <label>Document Type *</label>
@@ -442,7 +465,8 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                             {submitting ? 'Submitting...' : ' Submit Request'}
                         </button>
                     </div>
-                </form>
+                    </form>
+                )}
             </div>
         </div>
     )

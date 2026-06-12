@@ -42,11 +42,20 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('resident-requirements', 'resident-requirements', false)
 ON CONFLICT (id) DO NOTHING;
 
--- Drop all existing storage policies for this bucket to avoid duplicates
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('resident-profile-pictures', 'resident-profile-pictures', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Drop all existing storage policies for these buckets to avoid duplicates
 DROP POLICY IF EXISTS "Residents can upload their own requirements" ON storage.objects;
 DROP POLICY IF EXISTS "Residents can view their own requirements" ON storage.objects;
 DROP POLICY IF EXISTS "Admins can view all requirements" ON storage.objects;
 DROP POLICY IF EXISTS "Admins can delete requirements" ON storage.objects;
+
+DROP POLICY IF EXISTS "Anyone can view profile pictures" ON storage.objects;
+DROP POLICY IF EXISTS "Residents can upload own profile picture" ON storage.objects;
+DROP POLICY IF EXISTS "Residents can update own profile picture" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can delete profile pictures" ON storage.objects;
 
 -- 1. Residents can upload files to their own folder
 CREATE POLICY "Residents can upload their own requirements" 
@@ -81,5 +90,31 @@ CREATE POLICY "Admins can delete requirements"
   ON storage.objects FOR DELETE 
   USING (
     bucket_id = 'resident-requirements' 
+    AND public.is_admin()
+  );
+
+-- Policies for resident profile pictures bucket
+CREATE POLICY "Anyone can view profile pictures" 
+  ON storage.objects FOR SELECT 
+  USING (bucket_id = 'resident-profile-pictures');
+
+CREATE POLICY "Residents can upload own profile picture" 
+  ON storage.objects FOR INSERT 
+  WITH CHECK (
+    bucket_id = 'resident-profile-pictures' 
+    AND auth.uid()::text = (string_to_array(name, '/'))[1]
+  );
+
+CREATE POLICY "Residents can update own profile picture" 
+  ON storage.objects FOR UPDATE 
+  USING (
+    bucket_id = 'resident-profile-pictures' 
+    AND auth.uid()::text = (string_to_array(name, '/'))[1]
+  );
+
+CREATE POLICY "Admins can delete profile pictures" 
+  ON storage.objects FOR DELETE 
+  USING (
+    bucket_id = 'resident-profile-pictures' 
     AND public.is_admin()
   );

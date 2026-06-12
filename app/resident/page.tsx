@@ -17,10 +17,11 @@ import ProfileModal from '@/components/ProfileModal'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
-import { ServiceRequest, Announcement, Profile, Complaint, ComplaintType } from '@/lib/types'
+import { ServiceRequest, Announcement, Profile, Complaint, ComplaintType, ComplaintComment } from '@/lib/types'
 import { QRCodeSVG } from 'qrcode.react'
-import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake } from 'lucide-react'
+import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake, MessageSquare, Send, FileText, X } from 'lucide-react'
 import styles from './resident.module.css'
+import { saveOfflineSubmission, getOfflineSubmissions, deleteOfflineSubmission, OfflineSubmission } from '@/lib/offlineQueue'
 
 function cleanDocType(type: string | undefined | null) {
     if (!type) return ''
@@ -31,14 +32,19 @@ function cleanDocType(type: string | undefined | null) {
 
 function ResidentPortalContent() {
     const { user, profile, signOut, refreshProfile } = useAuth()
-    const { showToast } = useToast()
+    const { showToast, updateToast } = useToast()
     const [activeTab, setActiveTab] = useState('overview')
+    const [isOnline, setIsOnline] = useState(true)
+    const [isSyncingOfflineQueue, setIsSyncingOfflineQueue] = useState(false)
     const [showChatBot, setShowChatBot] = useState(false)
     const [showRequestModal, setShowRequestModal] = useState(false)
     const [selectedServiceType, setSelectedServiceType] = useState('')
     const [showProfileModal, setShowProfileModal] = useState(false)
     const [showScanner, setShowScanner] = useState(false)
     const [scanning, setScanning] = useState(false)
+    // M4+H2 FIX: Ref-based debounce to prevent duplicate scans across React re-renders
+    const lastScanTimeRef = useRef<number>(0)
+    const SCAN_COOLDOWN_MS = 3000
     const [scanResult, setScanResult] = useState<{
         isValid: boolean;
         type?: string;
@@ -48,7 +54,6 @@ function ResidentPortalContent() {
     const [requests, setRequests] = useState<ServiceRequest[]>([])
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [loadingRequests, setLoadingRequests] = useState(true)
-    const loadedTabs = useRef<Record<string, boolean>>({})
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
     const [selectedQR, setSelectedQR] = useState<{ ref: string, title: string } | null>(null)
 
@@ -58,8 +63,186 @@ function ResidentPortalContent() {
     const [showComplaintModal, setShowComplaintModal] = useState(false)
     const [submittingComplaint, setSubmittingComplaint] = useState(false)
     const [complaintForm, setComplaintForm] = useState<{
-        type: ComplaintType | '', customType: string, subject: string, description: string, respondent: string, location: string
-    }>({ type: '', customType: '', subject: '', description: '', respondent: '', location: '' })
+        type: ComplaintType | '', customType: string, subject: string, description: string, respondent: string, location: string, attachment: File | null
+    }>({
+        type: '',
+        customType: '',
+        subject: '',
+        description: '',
+        respondent: '',
+        location: '',
+        attachment: null
+    })
+
+    const [complaintModal, setComplaintModal] = useState<{ isOpen: boolean, complaint: Complaint | null }>({ isOpen: false, complaint: null })
+    const [complaintComments, setComplaintComments] = useState<ComplaintComment[]>([])
+    const [loadingComplaintComments, setLoadingComplaintComments] = useState(false)
+    const [newComplaintComment, setNewComplaintComment] = useState('')
+    const commentTimelineEndRef = useRef<HTMLDivElement | null>(null)
+
+    // Offline status detection & Auto-Sync
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setIsOnline(navigator.onLine)
+            
+            const handleOnline = () => {
+                setIsOnline(true)
+                showToast('Back online! Syncing your changes...', 'success')
+                runOfflineSync()
+            }
+            const handleOffline = () => {
+                setIsOnline(false)
+                showToast('You are offline. Showing cached information.', 'info')
+            }
+
+            window.addEventListener('online', handleOnline)
+            window.addEventListener('offline', handleOffline)
+            
+            // Initial run of offline sync if online
+            if (navigator.onLine) {
+                runOfflineSync()
+            }
+
+            // Notification permissions request
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission()
+            }
+
+            return () => {
+                window.removeEventListener('online', handleOnline)
+                window.removeEventListener('offline', handleOffline)
+            }
+        }
+    }, [profile?.id])
+
+    const runOfflineSync = async () => {
+        if (!navigator.onLine || !profile?.id || isSyncingOfflineQueue) return
+        
+        try {
+            const queue = await getOfflineSubmissions()
+            if (queue.length === 0) return
+
+            setIsSyncingOfflineQueue(true)
+            const syncToastId = showToast(`Syncing ${queue.length} offline submission(s)...`, 'loading')
+
+            for (const item of queue) {
+                try {
+                    if (item.type === 'document_request') {
+                        const uploadedPaths: string[] = []
+
+                        for (const file of item.files) {
+                            const fileObj = new File([file.data], file.name, { type: file.type })
+                            const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+                            const filePath = `${profile.id}/${fileName}`
+
+                            const { error: uploadError } = await supabase.storage
+                                .from('resident-requirements')
+                                .upload(filePath, fileObj, {
+                                    cacheControl: '3600',
+                                    upsert: false,
+                                    contentType: file.type
+                                })
+
+                            if (uploadError) throw uploadError
+                            uploadedPaths.push(filePath)
+                        }
+
+                        const attachmentUrl = uploadedPaths.length > 0 ? uploadedPaths.join(',') : null
+
+                        const { error } = await supabase
+                            .from('service_requests')
+                            .insert({
+                                resident_id: profile.id,
+                                document_type: item.payload.documentType!,
+                                purpose: item.payload.purpose!,
+                                attachment_url: attachmentUrl,
+                                status: 'pending',
+                                form_data: item.payload.formData || {}
+                            })
+
+                        if (error) throw error
+
+                    } else if (item.type === 'complaint') {
+                        let attachmentUrl = null
+                        if (item.files.length > 0) {
+                            const file = item.files[0]
+                            const fileObj = new File([file.data], file.name, { type: file.type })
+                            const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+                            const filePath = `${profile.id}/complaints/${fileName}`
+
+                            const { error: uploadError } = await supabase.storage
+                                .from('resident-requirements')
+                                .upload(filePath, fileObj, {
+                                    cacheControl: '3600',
+                                    upsert: false,
+                                    contentType: file.type
+                                })
+
+                            if (uploadError) throw uploadError
+                            attachmentUrl = filePath
+                        }
+
+                        const { error } = await supabase
+                            .from('complaints')
+                            .insert({
+                                resident_id: profile.id,
+                                complaint_type: item.payload.complaintType! as any,
+                                subject: item.payload.subject!,
+                                description: item.payload.description!,
+                                respondent_name: item.payload.respondentName!,
+                                location: item.payload.location!,
+                                attachment_url: attachmentUrl
+                            })
+
+                        if (error) throw error
+                    }
+
+                    // Remove from queue on successful sync
+                    await deleteOfflineSubmission(item.id)
+                } catch (err: any) {
+                    console.error(`Error syncing queue item ${item.id}:`, err)
+                    showToast(`Failed to sync offline item: ${err.message || err}`, 'error')
+                }
+            }
+
+            // Reload data
+            await fetchRequests()
+            await fetchComplaints()
+
+            updateToast(syncToastId, 'Offline submissions synced successfully!', 'success')
+        } catch (syncErr: any) {
+            console.error('Offline sync error:', syncErr)
+        } finally {
+            setIsSyncingOfflineQueue(false)
+        }
+    }
+
+    const triggerStatusChangeNotifications = (newRequests: ServiceRequest[]) => {
+        if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted' || !profile?.id) {
+            return
+        }
+
+        const cacheKey = `e_brgy_requests_${profile.id}`
+        const cachedStr = localStorage.getItem(cacheKey)
+        if (!cachedStr) return;
+
+        try {
+            const oldRequests = JSON.parse(cachedStr) as ServiceRequest[]
+            newRequests.forEach(newReq => {
+                const oldReq = oldRequests.find(r => r.id === newReq.id)
+                if (oldReq && oldReq.status !== newReq.status && (newReq.status === 'ready' || newReq.status === 'completed')) {
+                    const statusText = newReq.status === 'ready' ? 'Ready for Pickup' : 'Completed'
+                    new Notification("E-Barangay Document Update", {
+                        body: `Your request for ${cleanDocType(newReq.document_type)} is now ${statusText}!`,
+                        icon: '/logo.png',
+                        tag: newReq.id
+                    })
+                }
+            })
+        } catch (err) {
+            console.error('Notification trigger error:', err)
+        }
+    }
 
     useEffect(() => {
         if (profile?.id) {
@@ -76,6 +259,20 @@ function ResidentPortalContent() {
     const fetchRequests = async () => {
         if (!profile?.id) return
         setLoadingRequests(true)
+
+        // Read from local cache first for instant layout loading
+        const cacheKey = `e_brgy_requests_${profile.id}`
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(cacheKey)
+            if (cached) {
+                try {
+                    setRequests(JSON.parse(cached))
+                } catch (e) {
+                    console.error('Failed to parse cached requests', e)
+                }
+            }
+        }
+
         try {
             const { data, error } = await supabase
                 .from('service_requests')
@@ -84,10 +281,21 @@ function ResidentPortalContent() {
                 .order('created_at', { ascending: false })
 
             if (error) throw error
-            setRequests(data as ServiceRequest[])
+            const fetched = data as ServiceRequest[]
+            
+            // Check if status changed for notifications
+            triggerStatusChangeNotifications(fetched)
+
+            setRequests(fetched)
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(cacheKey, JSON.stringify(fetched))
+            }
         } catch (error: any) {
             console.error('Error fetching requests:', error)
-            showToast(error.message || 'Failed to load your requests', 'error')
+            if (navigator.onLine) {
+                showToast(error.message || 'Failed to load your requests', 'error')
+            }
         } finally {
             setLoadingRequests(false)
         }
@@ -95,6 +303,18 @@ function ResidentPortalContent() {
 
     const fetchAnnouncements = async () => {
         setLoadingAnnouncements(true)
+
+        // Read from local cache first
+        const cacheKey = 'e_brgy_announcements'
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(cacheKey)
+            if (cached) {
+                try {
+                    setAnnouncements(JSON.parse(cached))
+                } catch {}
+            }
+        }
+
         try {
             const { data, error } = await supabase
                 .from('announcements')
@@ -103,10 +323,17 @@ function ResidentPortalContent() {
                 .limit(5)
 
             if (error) throw error
-            setAnnouncements(data as Announcement[])
+            const fetched = data as Announcement[]
+            setAnnouncements(fetched)
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(cacheKey, JSON.stringify(fetched))
+            }
         } catch (error: any) {
             console.error('Error fetching announcements:', error)
-            showToast(error.message || 'Failed to load announcements', 'error')
+            if (navigator.onLine) {
+                showToast(error.message || 'Failed to load announcements', 'error')
+            }
         } finally {
             setLoadingAnnouncements(false)
         }
@@ -115,6 +342,18 @@ function ResidentPortalContent() {
     const fetchComplaints = async () => {
         if (!profile?.id) return
         setLoadingComplaints(true)
+
+        // Read from local cache first
+        const cacheKey = `e_brgy_complaints_${profile.id}`
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(cacheKey)
+            if (cached) {
+                try {
+                    setComplaints(JSON.parse(cached))
+                } catch {}
+            }
+        }
+
         try {
             const { data, error } = await supabase
                 .from('complaints')
@@ -123,14 +362,165 @@ function ResidentPortalContent() {
                 .order('created_at', { ascending: false })
 
             if (error) throw error
-            setComplaints(data as Complaint[])
+            const fetched = data as Complaint[]
+            setComplaints(fetched)
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(cacheKey, JSON.stringify(fetched))
+            }
         } catch (error: any) {
             console.error('Error fetching complaints:', error)
-            showToast(error.message || 'Failed to load your complaints', 'error')
+            if (navigator.onLine) {
+                showToast(error.message || 'Failed to load your complaints', 'error')
+            }
         } finally {
             setLoadingComplaints(false)
         }
     }
+
+    useEffect(() => {
+        let channel: any = null
+
+        if (complaintModal.isOpen && complaintModal.complaint?.id) {
+            fetchComplaintComments(complaintModal.complaint.id)
+
+            channel = supabase
+                .channel(`complaint_comments_${complaintModal.complaint.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'complaint_comments',
+                        filter: `complaint_id=eq.${complaintModal.complaint.id}`
+                    },
+                    () => {
+                        if (complaintModal.complaint?.id) {
+                            fetchComplaintComments(complaintModal.complaint.id)
+                        }
+                    }
+                )
+                .subscribe()
+        } else {
+            setComplaintComments([])
+            setNewComplaintComment('')
+        }
+
+        return () => {
+            if (channel) {
+                supabase.removeChannel(channel)
+            }
+        }
+    }, [complaintModal.isOpen, complaintModal.complaint?.id])
+
+    useEffect(() => {
+        if (commentTimelineEndRef.current) {
+            commentTimelineEndRef.current.scrollIntoView({ behavior: 'smooth' })
+        }
+    }, [complaintComments])
+
+    const fetchComplaintComments = async (complaintId: string) => {
+        setLoadingComplaintComments(true)
+        try {
+            const { data, error } = await supabase
+                .from('complaint_comments')
+                .select(`
+                    id,
+                    complaint_id,
+                    sender_id,
+                    comment,
+                    created_at,
+                    profiles:sender_id (full_name, role)
+                `)
+                .eq('complaint_id', complaintId)
+                .order('created_at', { ascending: true })
+
+            if (error) throw error
+
+            const formatted = (data || []).map((c: any) => ({
+                id: c.id,
+                complaint_id: c.complaint_id,
+                sender_id: c.sender_id,
+                comment: c.comment,
+                created_at: c.created_at,
+                sender_name: c.profiles?.full_name || 'Resident',
+                sender_role: c.profiles?.role || 'resident'
+            }))
+            setComplaintComments(formatted)
+        } catch (err: any) {
+            console.error('Error fetching comments:', err)
+            showToast(err.message || 'Failed to load comments', 'error')
+        } finally {
+            setLoadingComplaintComments(false)
+        }
+    }
+
+    const postComplaintComment = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!complaintModal.complaint?.id || !newComplaintComment.trim() || !profile?.id) return
+
+        const commentText = newComplaintComment.trim()
+        try {
+            const { data, error } = await supabase
+                .from('complaint_comments')
+                .insert({
+                    complaint_id: complaintModal.complaint.id,
+                    sender_id: profile.id,
+                    comment: commentText
+                })
+                .select(`
+                    id,
+                    complaint_id,
+                    sender_id,
+                    comment,
+                    created_at,
+                    profiles:sender_id (full_name, role)
+                `)
+                .single()
+
+            if (error) throw error
+
+            const formatted = {
+                id: data.id,
+                complaint_id: data.complaint_id,
+                sender_id: data.sender_id,
+                comment: data.comment,
+                created_at: data.created_at,
+                sender_name: data.profiles?.full_name || profile.full_name,
+                sender_role: data.profiles?.role || 'resident'
+            }
+
+            setComplaintComments(prev => [...prev, formatted])
+            setNewComplaintComment('')
+        } catch (err: any) {
+            console.error('Error posting comment:', err)
+            showToast(err.message || 'Failed to send message', 'error')
+        }
+    }
+
+    const viewAttachment = async (path: string) => {
+        if (!path) return
+        try {
+            const { data, error } = await supabase.storage
+                .from('resident-requirements')
+                .createSignedUrl(path, 3600, { download: false })
+
+            if (error) {
+                console.error('Supabase Signed URL Error:', error)
+                throw new Error(`Storage access error: ${error.message}`)
+            }
+
+            if (data?.signedUrl) {
+                window.open(data.signedUrl, '_blank')
+            } else {
+                throw new Error('No signed URL returned from storage.')
+            }
+        } catch (error: any) {
+            console.error('Error opening attachment:', error)
+            showToast(`Failed to open file: ${error.message}`, 'error')
+        }
+    }
+
 
     const handleComplaintSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -148,8 +538,84 @@ function ResidentPortalContent() {
 
         const finalComplaintType = complaintForm.type === 'Others' ? complaintForm.customType.trim() : complaintForm.type;
 
+        // Offline write queue logic
+        if (!navigator.onLine) {
+            try {
+                const offlineFiles = []
+                if (complaintForm.attachment) {
+                    offlineFiles.push({
+                        name: complaintForm.attachment.name,
+                        type: complaintForm.attachment.type,
+                        data: complaintForm.attachment as Blob
+                    })
+                }
+
+                const tempId = `offline-comp-${Date.now()}`
+                const offlineComp: OfflineSubmission = {
+                    id: tempId,
+                    type: 'complaint',
+                    payload: {
+                        complaintType: finalComplaintType,
+                        subject: complaintForm.subject,
+                        description: complaintForm.description,
+                        respondentName: complaintForm.respondent,
+                        location: complaintForm.location
+                    },
+                    files: offlineFiles,
+                    created_at: new Date().toISOString()
+                }
+
+                await saveOfflineSubmission(offlineComp)
+
+                const tempComplaintItem: Complaint = {
+                    id: tempId,
+                    resident_id: profile.id,
+                    complaint_type: finalComplaintType as any,
+                    subject: complaintForm.subject,
+                    description: complaintForm.description,
+                    respondent_name: complaintForm.respondent,
+                    location: complaintForm.location,
+                    status: 'Received',
+                    admin_notes: 'Offline Pending Sync',
+                    attachment_url: complaintForm.attachment ? 'Offline Files' : null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+
+                setComplaints(prev => [tempComplaintItem, ...prev])
+                showToast('Offline Mode: Complaint saved locally and queued for upload.', 'success')
+                setShowComplaintModal(false)
+                setComplaintForm({ type: '', customType: '', subject: '', description: '', respondent: '', location: '', attachment: null })
+                setActiveTab('complaints')
+            } catch (err: any) {
+                console.error('Failed to queue complaint offline:', err)
+                showToast(`Queue Error: ${err.message}`, 'error')
+            }
+            return
+        }
+
         setSubmittingComplaint(true)
         try {
+            let attachmentUrl = null
+            if (complaintForm.attachment) {
+                const fileName = `${Date.now()}_${complaintForm.attachment.name.replace(/\s+/g, '_')}`
+                const filePath = `${profile.id}/complaints/${fileName}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('resident-requirements')
+                    .upload(filePath, complaintForm.attachment, {
+                        cacheControl: '3600',
+                        upsert: false,
+                        contentType: complaintForm.attachment.type
+                    })
+
+                if (uploadError) {
+                    console.error('Complaint upload error:', uploadError)
+                    throw new Error(`Failed to upload evidence file: ${uploadError.message}`)
+                }
+                attachmentUrl = filePath
+            }
+
             const { data, error } = await supabase
                 .from('complaints')
                 .insert({
@@ -158,7 +624,8 @@ function ResidentPortalContent() {
                     subject: complaintForm.subject,
                     description: complaintForm.description,
                     respondent_name: complaintForm.respondent,
-                    location: complaintForm.location
+                    location: complaintForm.location,
+                    attachment_url: attachmentUrl
                 })
                 .select()
                 .single()
@@ -168,8 +635,7 @@ function ResidentPortalContent() {
             setComplaints([data as Complaint, ...complaints])
             showToast('Complaint submitted successfully. It will be reviewed by barangay officials.', 'success')
             setShowComplaintModal(false)
-            setComplaintForm({ type: '', customType: '', subject: '', description: '', respondent: '', location: '' })
-            loadedTabs.current['complaints'] = false;
+            setComplaintForm({ type: '', customType: '', subject: '', description: '', respondent: '', location: '', attachment: null })
             setActiveTab('complaints')
         } catch (error: any) {
             console.error('Error submitting complaint:', error)
@@ -181,6 +647,57 @@ function ResidentPortalContent() {
 
     const handleRequestSubmit = async (documentType: string, purpose: string, attachments: File[], formData?: Record<string, any>) => {
         if (!profile?.id) return
+
+        // Offline write queue logic
+        if (!navigator.onLine) {
+            try {
+                const offlineFiles = await Promise.all(attachments.map(async (file) => {
+                    return {
+                        name: file.name,
+                        type: file.type,
+                        data: file as Blob
+                    }
+                }))
+
+                const tempId = `offline-req-${Date.now()}`
+                const offlineReq: OfflineSubmission = {
+                    id: tempId,
+                    type: 'document_request',
+                    payload: {
+                        documentType,
+                        purpose,
+                        formData: formData || {}
+                    },
+                    files: offlineFiles,
+                    created_at: new Date().toISOString()
+                }
+
+                await saveOfflineSubmission(offlineReq)
+
+                const tempRequestItem: ServiceRequest = {
+                    id: tempId,
+                    resident_id: profile.id,
+                    document_type: documentType,
+                    purpose: purpose,
+                    status: 'pending',
+                    notes: 'Offline Pending Sync',
+                    qr_code_ref: null,
+                    attachment_url: offlineFiles.length > 0 ? 'Offline Files' : null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    form_data: formData || {}
+                }
+
+                setRequests(prev => [tempRequestItem, ...prev])
+                showToast('Offline Mode: Request saved locally and queued for upload.', 'success')
+                setShowRequestModal(false)
+                setActiveTab('requests')
+            } catch (err: any) {
+                console.error('Failed to queue request offline:', err)
+                showToast(`Queue Error: ${err.message}`, 'error')
+            }
+            return
+        }
 
         try {
             const uploadedPaths: string[] = []
@@ -207,7 +724,7 @@ function ResidentPortalContent() {
 
             const attachmentUrl = uploadedPaths.length > 0 ? uploadedPaths.join(',') : null
 
-            const { data, error } = await supabase
+            const { data, error = null } = await supabase
                 .from('service_requests')
                 .insert({
                     resident_id: profile.id,
@@ -225,7 +742,6 @@ function ResidentPortalContent() {
             setRequests([data as ServiceRequest, ...requests])
             showToast(`${documentType} request submitted successfully! ${attachments.length} file(s) uploaded.`, 'success')
             setShowRequestModal(false)
-            loadedTabs.current['requests'] = false;
             setActiveTab('requests')
         } catch (error: any) {
             console.error('Error submitting request:', error)
@@ -255,6 +771,12 @@ function ResidentPortalContent() {
 
     const handleScan = async (result: any) => {
         if (!result || !result[0] || !result[0].rawValue || scanning) return;
+
+        // M4+H2 FIX: Ref-based debounce — reject scans within cooldown window
+        const now = Date.now();
+        if (now - lastScanTimeRef.current < SCAN_COOLDOWN_MS) return;
+        lastScanTimeRef.current = now;
+
         setScanning(true);
         const qrData = result[0].rawValue;
 
@@ -283,7 +805,6 @@ function ResidentPortalContent() {
                         p_document_type: verificationResult.type || 'Unknown',
                         p_holder_name: verificationResult.details?.['Holder Name'] || 'Unknown',
                         p_is_valid: verificationResult.isValid,
-                        p_verified_by: profile?.id || null
                     });
                 } catch (logError) {
                     // Non-critical: don't block the UI if logging fails
@@ -354,10 +875,11 @@ function ResidentPortalContent() {
                             </div>
                         </div>
                         <div className={styles.idCardQR}>
-                            {(profile?.id || user?.id) ? (
-                                <QRCodeSVG value={profile?.id || user?.id || ''} size={60} level="M" />
+                            {/* C5 FIX: Only use resident_qr_id for ID card QR — never expose raw user UUID */}
+                            {profile?.resident_qr_id ? (
+                                <QRCodeSVG value={profile.resident_qr_id} size={60} level="M" />
                             ) : (
-                                <div style={{ width: 60, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc' }}>...</div>
+                                <div style={{ width: 60, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', fontSize: '0.6rem', textAlign: 'center' }}>QR Pending</div>
                             )}
                         </div>
                     </div>
@@ -401,7 +923,7 @@ function ResidentPortalContent() {
                         </div>
                     </button>
 
-                    <button className={`glass-card ${styles.actionCard}`} onClick={() => { loadedTabs.current['requests'] = false;
+                    <button className={`glass-card ${styles.actionCard}`} onClick={() => {
             setActiveTab('requests'); }}>
                         <div>
                             <h3>Track Status</h3>
@@ -718,11 +1240,14 @@ function ResidentPortalContent() {
                                     <p className={styles.appDate}>
                                         Applied: {new Date(req.created_at).toLocaleDateString()}
                                     </p>
-                                    {req.expires_at && (
-                                        <p className={styles.appDate} style={{ color: '#ef4444', fontWeight: 600, marginTop: '0.2rem' }}>
-                                            Valid until: {new Date(req.expires_at).toLocaleDateString()}
-                                        </p>
-                                    )}
+                                    {req.status === 'completed' && req.expires_at && (() => {
+                                        const isExpired = new Date(req.expires_at).getTime() < Date.now();
+                                        return (
+                                            <p className={styles.appDate} style={{ color: isExpired ? '#ef4444' : '#16a34a', fontWeight: isExpired ? 600 : 500, marginTop: '0.2rem' }}>
+                                                {isExpired ? 'Expired: ' : 'Valid until: '}{new Date(req.expires_at).toLocaleDateString()}
+                                            </p>
+                                        );
+                                    })()}
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem', width: '100%' }}>
                                         {req.purpose && (
                                             <p className={styles.appPurpose}>Purpose: {req.purpose}</p>
@@ -889,6 +1414,7 @@ function ResidentPortalContent() {
                                 <th>Date</th>
                                 <th>Status</th>
                                 <th>Admin Notes</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -899,6 +1425,11 @@ function ResidentPortalContent() {
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                                             <span className="badge badge-info" style={{ fontSize: '0.65rem', alignSelf: 'flex-start' }}>{c.complaint_type}</span>
                                             <span style={{ fontSize: '0.85rem' }}>{c.subject}</span>
+                                            {c.attachment_url && (
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--success-600)', display: 'flex', alignItems: 'center', gap: '0.15rem', marginTop: '0.1rem' }}>
+                                                    📎 Evidence Attached
+                                                </span>
+                                            )}
                                         </div>
                                     </td>
                                     <td>{c.respondent_name}</td>
@@ -909,6 +1440,15 @@ function ResidentPortalContent() {
                                         </span>
                                     </td>
                                     <td style={{ maxWidth: '300px', whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{c.admin_notes || <span style={{ color: 'var(--text-muted)' }}>None</span>}</td>
+                                    <td>
+                                        <button 
+                                            className="btn btn-outline" 
+                                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                            onClick={() => setComplaintModal({ isOpen: true, complaint: c })}
+                                        >
+                                            Discuss
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                             {complaints.length === 0 && (
@@ -936,6 +1476,35 @@ function ResidentPortalContent() {
 
     return (
         <div className={styles.portalContainer}>
+            {!isOnline && (
+                <div style={{
+                    background: 'linear-gradient(135deg, #b45309 0%, #d97706 100%)',
+                    color: '#ffffff',
+                    padding: '0.65rem 1rem',
+                    textAlign: 'center',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 99999,
+                    animation: 'fadeInDown 0.3s ease-out'
+                }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
+                        <path d="M5 12.5a10.94 10.94 0 0 1 5.17-2.39"></path>
+                        <path d="M10.71 5.05A16 16 0 0 1 22.5 8"></path>
+                        <path d="M1.5 8a15.91 15.91 0 0 1 7.79-2.95"></path>
+                        <path d="M12 20h.01"></path>
+                    </svg>
+                    <span>Offline Mode: Showing cached information. Unsent requests will be queued locally.</span>
+                </div>
+            )}
             <Header
                 title="E-Barangay"
                 userName={profile?.full_name || 'Resident'}
@@ -948,11 +1517,11 @@ function ResidentPortalContent() {
                     <button className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`} onClick={() => setActiveTab('overview')}>
                         Overview
                     </button>
-                    <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => { loadedTabs.current['requests'] = false;
+                    <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => {
             setActiveTab('requests'); }}>
                         My Requests
                     </button>
-                    <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => { loadedTabs.current['complaints'] = false;
+                    <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => {
             setActiveTab('complaints'); }}>
                         My Complaints
                     </button>
@@ -1087,6 +1656,31 @@ function ResidentPortalContent() {
                                 />
                             </div>
                             
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Attach Evidence (Optional - Image or PDF)</label>
+                                <input
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    className={styles.formInput}
+                                    style={{ width: '100%', padding: '0.5rem' }}
+                                    onChange={e => {
+                                        const file = e.target.files?.[0] || null
+                                        if (file && file.size > 5 * 1024 * 1024) {
+                                            showToast('File size exceeds the 5MB limit. Please upload a smaller file.', 'error')
+                                             e.target.value = ''
+                                             setComplaintForm({ ...complaintForm, attachment: null })
+                                             return
+                                        }
+                                        setComplaintForm({ ...complaintForm, attachment: file })
+                                    }}
+                                />
+                                {complaintForm.attachment && (
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--success-600)', marginTop: '0.25rem' }}>
+                                        Selected: {complaintForm.attachment.name} ({(complaintForm.attachment.size / 1024 / 1024).toFixed(2)} MB)
+                                    </p>
+                                )}
+                            </div>
+                            
                             <div style={{ display: 'flex', gap: '1rem' }}>
                                 <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowComplaintModal(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submittingComplaint}>
@@ -1107,6 +1701,179 @@ function ResidentPortalContent() {
                 />
             )}
 
+            {/* Complaint Detail & Discussion Modal */}
+            {complaintModal.isOpen && complaintModal.complaint && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setComplaintModal({ isOpen: false, complaint: null })}>
+                    <div className="glass-card" style={{ maxWidth: '950px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                            <h3 style={{ margin: 0 }}>Complaint Details &amp; Discussion</h3>
+                            <button 
+                                type="button" 
+                                onClick={() => setComplaintModal({ isOpen: false, complaint: null })}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+                            {/* Left Column: Complaint details & Status */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Complaint ID</label>
+                                        <strong style={{ fontFamily: 'monospace' }}>{complaintModal.complaint.id.slice(0, 8).toUpperCase()}</strong>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Status</label>
+                                        <span className={`badge ${complaintModal.complaint.status === 'Resolved' ? 'badge-success' : complaintModal.complaint.status === 'Under Investigation' ? 'badge-info' : complaintModal.complaint.status === 'Dismissed' ? 'badge-error' : 'badge-warning'}`}>
+                                            {complaintModal.complaint.status}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Type</label>
+                                        <span className="badge badge-info">{complaintModal.complaint.complaint_type}</span>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Date Filed</label>
+                                        <span>{new Date(complaintModal.complaint.created_at).toLocaleString()}</span>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Respondent</label>
+                                        <strong>{complaintModal.complaint.respondent_name}</strong>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Location</label>
+                                        <span>{complaintModal.complaint.location}</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Subject</label>
+                                    <strong>{complaintModal.complaint.subject}</strong>
+                                </div>
+
+                                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Description</label>
+                                    <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.9rem' }}>{complaintModal.complaint.description}</p>
+                                </div>
+
+                                {complaintModal.complaint.attachment_url && (
+                                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Attached Evidence</label>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.5rem 1rem', fontSize: '0.85rem', alignSelf: 'flex-start' }}
+                                            onClick={() => viewAttachment(complaintModal.complaint!.attachment_url!)}
+                                        >
+                                            <FileText size={16} />
+                                            View Attached Evidence
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem', marginTop: 'auto' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Official Admin Notes</label>
+                                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)', minHeight: '60px', display: 'flex', alignItems: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: '0.9rem', color: complaintModal.complaint.admin_notes ? 'var(--text-primary)' : 'var(--text-muted)', fontStyle: complaintModal.complaint.admin_notes ? 'normal' : 'italic' }}>
+                                            {complaintModal.complaint.admin_notes || 'No notes added by administrators yet.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Discussion / Chat interface */}
+                            <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.5rem', height: '100%', minHeight: '400px' }}>
+                                <h4 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem', fontWeight: 600 }}>
+                                    <MessageSquare size={18} style={{ color: 'var(--primary-400)' }} />
+                                    Interactive Discussion
+                                </h4>
+
+                                <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', background: 'rgba(0,0,0,0.12)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px' }}>
+                                    {loadingComplaintComments ? (
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                                            <LoadingSpinner text="Loading discussion..." size="sm" />
+                                        </div>
+                                    ) : complaintComments.length === 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center' }}>
+                                            <MessageSquare size={32} style={{ marginBottom: '0.5rem', opacity: 0.3 }} />
+                                            <p style={{ margin: 0, fontSize: '0.85rem' }}>No messages in this discussion yet.</p>
+                                            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', opacity: 0.7 }}>Send a message to update the admins or add detail.</p>
+                                        </div>
+                                    ) : (
+                                        complaintComments.map(c => {
+                                            const isMe = c.sender_id === profile.id
+                                            const isAdmin = c.sender_role === 'admin'
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    style={{ 
+                                                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                                                        maxWidth: '85%',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: isMe ? 'flex-end' : 'flex-start'
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.15rem', padding: '0 0.2rem' }}>
+                                                        <strong>{c.sender_name}</strong>
+                                                        <span className={isAdmin ? 'badge badge-info' : 'badge-warning'} style={{ fontSize: '0.55rem', padding: '0.05rem 0.25rem', borderRadius: '4px' }}>
+                                                            {isAdmin ? 'Admin' : 'Resident'}
+                                                        </span>
+                                                    </div>
+                                                    <div 
+                                                        style={{ 
+                                                            padding: '0.6rem 0.85rem', 
+                                                            borderRadius: '12px', 
+                                                            borderBottomRightRadius: isMe ? '0' : '12px',
+                                                            borderBottomLeftRadius: !isMe ? '0' : '12px',
+                                                            background: isMe ? 'var(--primary-600, #4f46e5)' : 'rgba(255,255,255,0.06)',
+                                                            color: isMe ? '#ffffff' : 'var(--text-primary)',
+                                                            fontSize: '0.85rem',
+                                                            lineHeight: 1.4,
+                                                            wordBreak: 'break-word',
+                                                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                            border: isMe ? 'none' : '1px solid var(--border-color)'
+                                                        }}
+                                                    >
+                                                        {c.comment}
+                                                    </div>
+                                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem', padding: '0 0.2rem' }}>
+                                                        {new Date(c.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })
+                                    )}
+                                    <div ref={commentTimelineEndRef} />
+                                </div>
+
+                                <form onSubmit={postComplaintComment} style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                                    <input 
+                                        type="text" 
+                                        className={styles.formInput}
+                                        style={{ flex: 1, padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)' }}
+                                        placeholder="Type your message to the admins..."
+                                        value={newComplaintComment}
+                                        onChange={e => setNewComplaintComment(e.target.value)}
+                                    />
+                                    <button 
+                                        type="submit" 
+                                        className="btn btn-primary" 
+                                        style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem' }}
+                                        disabled={!newComplaintComment.trim()}
+                                    >
+                                        Send
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
             {/* QR Code Modal Display */}
             {selectedQR && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setSelectedQR(null)}>
@@ -1118,8 +1885,9 @@ function ResidentPortalContent() {
                             <QRCodeSVG value={selectedQR.ref} size={220} level="H" includeMargin={false} />
                         </div>
 
+                        {/* M1 FIX: Show truncated QR ref instead of full UUID to reduce exposure */}
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace', margin: '0 0 1.5rem 0', wordBreak: 'break-all' }}>
-                            {selectedQR.ref}
+                            REF: {selectedQR.ref.slice(0, 8).toUpperCase()}…{selectedQR.ref.slice(-4).toUpperCase()}
                         </p>
 
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setSelectedQR(null)}>
@@ -1137,14 +1905,22 @@ function ResidentPortalContent() {
 
                         {!scanResult ? (
                             <>
-                                <div style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem', border: '2px solid var(--primary-500)', position: 'relative' }}>
+                                <div className={styles.scannerFrame} style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem', border: '2px solid var(--primary-500, #3b82f6)', position: 'relative' }}>
                                     <Scanner
                                         onScan={handleScan}
                                         onError={(error) => console.error(error)}
                                         styles={{ container: { width: '100%', paddingTop: '100%' } }}
                                     />
+                                    
+                                    <div className={styles.scannerOverlay} />
+                                    <div className={styles.scannerLaser} />
+                                    <div className={`${styles.scannerCorner} ${styles.cornerTL}`} />
+                                    <div className={`${styles.scannerCorner} ${styles.cornerTR}`} />
+                                    <div className={`${styles.scannerCorner} ${styles.cornerBL}`} />
+                                    <div className={`${styles.scannerCorner} ${styles.cornerBR}`} />
+
                                     {scanning && (
-                                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', color: 'white' }}>
+                                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', color: 'white', zIndex: 10 }}>
                                             <LoadingSpinner />
                                         </div>
                                     )}
@@ -1163,10 +1939,11 @@ function ResidentPortalContent() {
 
                                 {scanResult.details && (
                                     <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
+                                        {/* M3 FIX: Coerce all values to string to prevent unexpected React rendering behavior */}
                                         {Object.entries(scanResult.details).map(([key, value]) => (
                                             <div key={key} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
                                                 <span style={{ color: 'var(--text-muted)' }}>{key}:</span>
-                                                <strong style={{ color: 'var(--text-primary)', textAlign: 'right' }}>{value as any}</strong>
+                                                <strong style={{ color: 'var(--text-primary)', textAlign: 'right' }}>{String(value ?? '')}</strong>
                                             </div>
                                         ))}
                                     </div>

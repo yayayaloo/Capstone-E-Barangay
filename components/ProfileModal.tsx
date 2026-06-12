@@ -49,8 +49,14 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                setError('Profile picture size exceeds the 5MB limit. Please upload a smaller image.')
+                e.target.value = ''
+                return
+            }
             setProfilePicture(file)
             setPreviewUrl(URL.createObjectURL(file))
+            setError('')
         }
     }
 

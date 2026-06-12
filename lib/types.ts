@@ -112,8 +112,19 @@ export interface Complaint {
     location: string
     status: ComplaintStatus
     admin_notes: string | null
+    attachment_url?: string | null
     created_at: string
     updated_at: string
     // Joined fields
     resident_name?: string
+}
+
+export interface ComplaintComment {
+    id: string
+    complaint_id: string
+    sender_id: string
+    comment: string
+    created_at: string
+    sender_name?: string
+    sender_role?: 'resident' | 'admin'
 }

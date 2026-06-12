@@ -57,7 +57,7 @@ function ResetPasswordContent() {
     }, [searchParams, router, showToast])
 
     // Real-time validation logic
-    const hasMinLength = password.length >= 6
+    const hasMinLength = password.length >= 8
     const hasUppercase = /[A-Z]/.test(password)
     const hasLowercase = /[a-z]/.test(password)
     const hasNumber = /\d/.test(password)
@@ -239,7 +239,7 @@ function ResetPasswordContent() {
                         <div className={registerStyles.requirementList}>
                             <div className={`${registerStyles.requirementItem} ${hasMinLength ? registerStyles.validRequirement : registerStyles.invalidRequirement}`}>
                                 {hasMinLength ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                <span>At least 6 characters</span>
+                                <span>At least 8 characters</span>
                             </div>
                             <div className={`${registerStyles.requirementItem} ${hasUppercase ? registerStyles.validRequirement : registerStyles.invalidRequirement}`}>
                                 {hasUppercase ? <CheckCircle2 size={14} /> : <XCircle size={14} />}

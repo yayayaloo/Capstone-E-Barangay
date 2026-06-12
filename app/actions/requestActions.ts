@@ -9,8 +9,20 @@ export async function submitDocumentRequest(payload: {
     purpose: string
     attachment_url: string | null
     status: string
+    form_data?: Record<string, any> | null
 }) {
     const supabase = createSupabaseServerClient()
+
+    // 1. Verify user session securely
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (!user || authError) {
+        throw new Error('Unauthorized: You must be logged in to submit a request.')
+    }
+
+    // 2. Enforce ownership: matching logged-in user ID with resident_id
+    if (user.id !== payload.resident_id) {
+        throw new Error('Unauthorized: You cannot submit a request on behalf of another resident.')
+    }
 
     const { data, error } = await supabase
         .from('service_requests')
@@ -19,7 +31,8 @@ export async function submitDocumentRequest(payload: {
             document_type: payload.document_type,
             purpose: payload.purpose,
             attachment_url: payload.attachment_url,
-            status: payload.status
+            status: 'pending', // Force status to 'pending' regardless of client payload
+            form_data: payload.form_data || {}
         })
         .select()
         .single()
@@ -41,6 +54,23 @@ export async function updateRequestStatus(
     documentType: string | null = null
 ) {
     const supabase = createSupabaseServerClient()
+
+    // 1. Verify user session securely
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (!user || authError) {
+        throw new Error('Unauthorized: You must be logged in to perform this action.')
+    }
+
+    // 2. Retrieve role from profiles (source of truth)
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (profile?.role !== 'admin') {
+        throw new Error('Forbidden: Only administrators can update request status.')
+    }
 
     const updateData: Record<string, any> = {
         status: newStatus,

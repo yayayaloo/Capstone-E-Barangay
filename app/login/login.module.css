@@ -375,3 +375,28 @@
     vertical-align: middle;
     margin-right: 0.5rem;
 }
+
+.resendButton {
+    background: none;
+    border: none;
+    color: #059669;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+    font-size: 0.85rem;
+    text-decoration: none;
+    margin-top: 0.75rem;
+    display: inline-block;
+    transition: color 0.15s ease;
+}
+
+.resendButton:hover:not(:disabled) {
+    text-decoration: underline;
+    color: #047857;
+}
+
+.resendButton:disabled {
+    color: #9ca3af;
+    cursor: not-allowed;
+}

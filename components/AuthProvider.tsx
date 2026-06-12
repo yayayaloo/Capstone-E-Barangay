@@ -359,6 +359,28 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
             // Non-fatal — proceed with client-side signout regardless
         }
 
+        // Clear client-side service worker cache and offline data
+        try {
+            if (typeof window !== 'undefined') {
+                if ('caches' in window) {
+                    const cacheKeys = await window.caches.keys()
+                    await Promise.all(cacheKeys.map(key => window.caches.delete(key)))
+                }
+                
+                // Clear local storage data
+                const keysToRemove = []
+                for (let i = 0; i < window.localStorage.length; i++) {
+                    const key = window.localStorage.key(i)
+                    if (key && (key.startsWith('e_brgy_') || key.startsWith('sb-') || key.startsWith('supabase.auth.'))) {
+                        keysToRemove.push(key)
+                    }
+                }
+                keysToRemove.forEach(key => window.localStorage.removeItem(key))
+            }
+        } catch (cacheError) {
+            console.error('Error cleaning PWA caches during signout:', cacheError)
+        }
+
         // 2. Clear client-side session state
         await supabase.auth.signOut()
 
