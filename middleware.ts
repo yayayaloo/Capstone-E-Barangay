@@ -100,14 +100,9 @@ export async function middleware(request: NextRequest) {
     }
  
     if (user) {
-        // Query the profile role directly from the database table (our source of truth)
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
- 
-        const role = profile?.role || 'resident';
+        // Retrieve the role from the cryptographically verified JWT user metadata.
+        // This avoids a slow database query on every single request.
+        const role = user.user_metadata?.role || 'resident';
  
         // Enforce Role-Based Access Control (RBAC)
         if (pathname.startsWith('/admin') && role !== 'admin') {
@@ -134,5 +129,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/', '/admin/:path*', '/resident/:path*', '/login', '/register', '/auth/:path*', '/services', '/request/:path*'],
+    matcher: ['/', '/admin/:path*', '/resident/:path*', '/login', '/register', '/auth/:path*'],
 }

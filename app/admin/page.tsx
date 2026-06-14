@@ -261,7 +261,7 @@ function AdminDashboardContent() {
                     supabase.from('service_requests').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(5),
                     supabase.from('announcements').select('*').order('published_at', { ascending: false }).limit(5),
                     supabase.from('qr_verifications').select('*').order('verified_at', { ascending: false }).limit(5),
-                    demographicsData ? Promise.resolve({ data: demographicsData }) : supabase.from('profiles').select('*').eq('role', 'resident')
+                    demographicsData ? Promise.resolve({ data: demographicsData }) : supabase.from('profiles').select('gender, birthdate, sectors').eq('role', 'resident')
                 ])
 
                 const mappedRequests = (reqRes.data || []).map((req: any) => ({
@@ -1872,7 +1872,7 @@ function AdminDashboardContent() {
                                             </div>
                                             <div className={`glass-card ${styles.statCard} ${styles.statResidents}`}>
                                                 <div className={styles.statIcon}><Users size={24} /></div>
-                                                <div className={styles.statValue}>{residents.length}</div>
+                                                <div className={styles.statValue}>{stats.totalResidents}</div>
                                                 <div className={styles.statLabel}>Residents</div>
                                                 <div className={styles.statTrend}>Total registered</div>
                                             </div>
@@ -2545,9 +2545,9 @@ function AdminDashboardContent() {
                                                             borderRadius: '99px',
                                                             fontSize: '0.72rem',
                                                             fontWeight: 600,
-                                                            background: 'rgba(34, 197, 94, 0.12)',
-                                                            color: '#a5b4fc',
-                                                            border: '1px solid rgba(34, 197, 94, 0.2)',
+                                                            background: 'var(--primary-50)',
+                                                            color: 'var(--primary-700)',
+                                                            border: '1px solid var(--primary-200)',
                                                         }}>{s}</span>
                                                     ))}
                                                 </div>

@@ -99,7 +99,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                     setUser(session?.user ?? null)
 
                     if (session?.user) {
-                        await fetchProfile(session.user.id, mountedRef)
+                        // Kick off profile fetch in background — DO NOT await
+                        // This allows loading to be set to false immediately, mounting the dashboard layout
+                        fetchProfile(session.user.id, mountedRef)
                     } else {
                         setProfile(null)
                     }

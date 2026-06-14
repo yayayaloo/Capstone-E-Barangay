@@ -32,7 +32,7 @@
 .chartTitle {
     font-size: 1.15rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
     margin: 0 0 0.25rem;
     display: flex;
     align-items: center;
@@ -44,7 +44,7 @@
 }
 
 .chartSubtitle {
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-muted);
     font-size: 0.8rem;
     margin: 0;
 }
@@ -65,21 +65,21 @@
 }
 
 .trendBadge[data-trend="upward"] {
-    background: rgba(16, 185, 129, 0.12);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.25);
+    background: rgba(16, 185, 129, 0.1);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .trendBadge[data-trend="downward"] {
-    background: rgba(239, 68, 68, 0.12);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .trendBadge[data-trend="stable"] {
-    background: rgba(34, 197, 94, 0.12);
-    color: #86efac;
-    border: 1px solid rgba(34, 197, 94, 0.25);
+    background: rgba(107, 114, 128, 0.1);
+    color: #4b5563;
+    border: 1px solid rgba(107, 114, 128, 0.2);
 }
 
 .changeBadge {
@@ -91,12 +91,12 @@
 
 .changeUp {
     background: rgba(16, 185, 129, 0.1);
-    color: #34d399;
+    color: #047857;
 }
 
 .changeDown {
     background: rgba(239, 68, 68, 0.1);
-    color: #f87171;
+    color: #b91c1c;
 }
 
 /* ─── Metric Toggles ─────────────────────────────────────── */
