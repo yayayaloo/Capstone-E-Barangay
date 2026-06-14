@@ -19,7 +19,7 @@ import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 import { ServiceRequest, Announcement, Profile, Complaint, ComplaintType, ComplaintComment } from '@/lib/types'
 import { QRCodeSVG } from 'qrcode.react'
-import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake, MessageSquare, Send, FileText, X } from 'lucide-react'
+import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake, MessageSquare, Send, FileText, X, ClipboardList, Bot } from 'lucide-react'
 import styles from './resident.module.css'
 import { saveOfflineSubmission, getOfflineSubmissions, deleteOfflineSubmission, OfflineSubmission } from '@/lib/offlineQueue'
 
@@ -828,8 +828,8 @@ function ResidentPortalContent() {
     };
 
     const renderOverview = () => (
-        <>
-            <section className={styles.welcome} style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="animate-fadeIn">
+            <section className={styles.welcome}>
                 <div>
                     <h1 style={{ fontSize: '1.8rem' }}>Welcome back, {profile?.full_name?.split(' ')[0] || 'Resident'}!</h1>
                     <p>Access barangay services, track your requests, and stay updated</p>
@@ -860,7 +860,7 @@ function ResidentPortalContent() {
                             <div className={styles.idCardSub}>
                                 <span>Gordon Heights Resident</span>
                                 {profile?.is_verified ? (
-                                    <span className={styles.verifiedBadge}>Verified Account</span>
+                                    <span className={styles.verifiedBadge}>Verified Resident</span>
                                 ) : profile?.is_rejected ? (
                                     <span className={styles.rejectedBadge} style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Registration Rejected</span>
                                 ) : (
@@ -917,6 +917,7 @@ function ResidentPortalContent() {
                         className={`glass-card ${styles.actionCard} ${!profile?.is_verified ? styles.actionDisabled : ''}`}
                         onClick={() => profile?.is_verified ? setShowRequestModal(true) : showToast('Verification Required: Please wait for admin approval to request documents.', 'info')}
                     >
+                        <span className={styles.actionIcon}><FileText /></span>
                         <div>
                             <h3>Request Document</h3>
                             <p>Apply for clearances, permits, and certificates</p>
@@ -925,6 +926,7 @@ function ResidentPortalContent() {
 
                     <button className={`glass-card ${styles.actionCard}`} onClick={() => {
             setActiveTab('requests'); }}>
+                        <span className={styles.actionIcon}><ClipboardList /></span>
                         <div>
                             <h3>Track Status</h3>
                             <p>Monitor your pending applications</p>
@@ -935,6 +937,7 @@ function ResidentPortalContent() {
                         className={`glass-card ${styles.actionCard}`}
                         onClick={() => setShowChatBot(true)}
                     >
+                        <span className={styles.actionIcon}><Bot /></span>
                         <div>
                             <h3>Ask AI Assistant</h3>
                             <p>Get instant answers 24/7</p>
@@ -1081,7 +1084,7 @@ function ResidentPortalContent() {
                     </div>
                 )}
             </section>
-        </>
+        </div>
     )
 
     const renderProfile = () => (
@@ -1117,7 +1120,7 @@ function ResidentPortalContent() {
                     </div>
                     <h2 style={{ marginBottom: '0.5rem' }}>{profile?.full_name || 'Barangay Resident'}</h2>
                     <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '1.5rem' }}>
-                        RESIDENT PASS | {profile?.id?.slice(0, 8).toUpperCase() || 'UNLINKED'}
+                        RESIDENT PASS | {profile?.resident_id_number || 'Pending ID'}
                     </p>
 
                     <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
@@ -1132,7 +1135,7 @@ function ResidentPortalContent() {
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Status</span>
                             <strong style={{ color: profile?.is_verified ? 'var(--success-600)' : profile?.is_rejected ? '#ef4444' : 'var(--warning-600)' }}>
-                                {profile?.is_verified ? 'Verified Citizen' : profile?.is_rejected ? 'Rejected' : 'Verification Pending'}
+                                {profile?.is_verified ? 'Verified Resident' : profile?.is_rejected ? 'Rejected' : 'Verification Pending'}
                             </strong>
                         </div>
                     </div>
@@ -1205,7 +1208,7 @@ function ResidentPortalContent() {
     )
 
     const renderRequests = () => (
-        <section className={styles.requestsSection}>
+        <section className={`${styles.requestsSection} animate-fadeIn`}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h2>My Service Requests</h2>
                 <button className="btn btn-primary" onClick={() => setShowRequestModal(true)}>New Request</button>
@@ -1505,31 +1508,33 @@ function ResidentPortalContent() {
                     <span>Offline Mode: Showing cached information. Unsent requests will be queued locally.</span>
                 </div>
             )}
-            <Header
-                title="E-Barangay"
-                userName={profile?.full_name || 'Resident'}
-                onSignOut={signOut}
-                variant="resident"
-            />
+            <div className={styles.stickyHeaderWrapper}>
+                <Header
+                    title="E-Barangay"
+                    userName={profile?.full_name || 'Resident'}
+                    onSignOut={signOut}
+                    variant="resident"
+                />
 
-            <nav className={styles.tabNav}>
-                <div className="container" style={{ display: 'flex', gap: '1rem' }}>
-                    <button className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`} onClick={() => setActiveTab('overview')}>
-                        Overview
-                    </button>
-                    <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => {
-            setActiveTab('requests'); }}>
-                        My Requests
-                    </button>
-                    <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => {
-            setActiveTab('complaints'); }}>
-                        My Complaints
-                    </button>
-                    <button className={`${styles.tabBtn} ${activeTab === 'profile' ? styles.activeTab : ''}`} onClick={() => setActiveTab('profile')}>
-                        My Profile
-                    </button>
-                </div>
-            </nav>
+                <nav className={styles.tabNav}>
+                    <div className={styles.tabInner}>
+                        <button className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`} onClick={() => setActiveTab('overview')}>
+                            Overview
+                        </button>
+                        <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => {
+                setActiveTab('requests'); }}>
+                            My Requests
+                        </button>
+                        <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => {
+                setActiveTab('complaints'); }}>
+                            My Complaints
+                        </button>
+                        <button className={`${styles.tabBtn} ${activeTab === 'profile' ? styles.activeTab : ''}`} onClick={() => setActiveTab('profile')}>
+                            My Profile
+                        </button>
+                    </div>
+                </nav>
+            </div>
 
             <main className={styles.main}>
                 <div className="container">
@@ -1716,7 +1721,7 @@ function ResidentPortalContent() {
                             </button>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+                        <div className={styles.complaintModalGrid}>
                             {/* Left Column: Complaint details & Status */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

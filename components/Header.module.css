@@ -64,3 +64,37 @@
         padding: 0.5rem 0;
     }
 }
+
+.logoText {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.eBrand {
+    color: var(--primary-600);
+    font-weight: 800;
+}
+
+.subBrand {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    border-left: 1px solid var(--border-color);
+    padding-left: 0.4rem;
+    margin-left: 0.1rem;
+    letter-spacing: 0.2px;
+}
+
+.adminBadge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--warning);
+    background: rgba(217, 119, 6, 0.12);
+    border: 1px solid rgba(217, 119, 6, 0.2);
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--radius-full);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 0.25rem;
+}

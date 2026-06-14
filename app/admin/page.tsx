@@ -2130,13 +2130,6 @@ function AdminDashboardContent() {
                                                         <td><span className={statusBadge(req.status)}>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</span></td>
                                                         <td>
                                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                                <button 
-                                                                    className="btn btn-outline" 
-                                                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} 
-                                                                    onClick={() => setSelectedRequest(req)}
-                                                                >
-                                                                    Details
-                                                                </button>
                                                                 {req.status === 'pending' && (
                                                                     <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'processing')}>Process</button>
                                                                 )}
@@ -2146,21 +2139,30 @@ function AdminDashboardContent() {
                                                                 {req.status === 'ready' && (
                                                                     <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
                                                                 )}
-                                                                {(req.status === 'ready' || req.status === 'completed') && (
-                                                                    <button
-                                                                        className="btn btn-primary"
-                                                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#10b981', borderColor: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                                                                        onClick={() => handleGeneratePdf(req)}
-                                                                        disabled={generatingPdfId === req.id}
-                                                                    >
-                                                                        {generatingPdfId === req.id ? 'Generating...' : 'PDF'}
-                                                                    </button>
-                                                                )}
+                                                                <button
+                                                                    className={req.status === 'ready' || req.status === 'completed' ? "btn btn-primary" : "btn btn-outline"}
+                                                                    style={{
+                                                                        padding: '0.35rem 0.75rem',
+                                                                        fontSize: '0.8rem',
+                                                                        ...(req.status === 'ready' || req.status === 'completed' ? {
+                                                                            backgroundColor: '#10b981',
+                                                                            borderColor: '#10b981',
+                                                                            color: '#fff',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '0.25rem'
+                                                                        } : {})
+                                                                    }}
+                                                                    onClick={() => handleGeneratePdf(req)}
+                                                                    disabled={generatingPdfId === req.id}
+                                                                >
+                                                                    {generatingPdfId === req.id 
+                                                                        ? 'Generating...' 
+                                                                        : (req.status === 'ready' || req.status === 'completed' ? 'PDF' : 'Details')
+                                                                    }
+                                                                </button>
                                                                 {(req.status === 'pending' || req.status === 'processing') && (
                                                                     <button className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setNoteModal({ id: req.id, status: 'rejected' })}>Reject</button>
-                                                                )}
-                                                                {req.status === 'rejected' && (
-                                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
                                                                 )}
                                                             </div>
                                                         </td>
@@ -2299,10 +2301,6 @@ function AdminDashboardContent() {
                                 } catch (e) {}
                             }
 
-                            const formatFieldName = (key: string) => {
-                                const result = key.replace(/([A-Z])/g, " $1");
-                                return result.charAt(0).toUpperCase() + result.slice(1);
-                            }
 
                             const viewAttachment = async (path: string) => {
                                 try {
@@ -2356,26 +2354,6 @@ function AdminDashboardContent() {
                                                 <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Purpose</span>
                                                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.9rem', color: 'var(--text-primary)' }}>{req.purpose}</p>
                                             </div>
-
-                                            {Object.keys(parsedFormData).length > 0 && (
-                                                <div style={{ marginTop: '0.5rem', padding: '1rem', background: 'var(--bg-primary, rgba(255,255,255,0.03))', borderRadius: '12px', border: '1px solid var(--border-color, rgba(255,255,255,0.08))' }}>
-                                                    <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: 'var(--primary-400, #34d399)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Form Metadata</h3>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1rem' }}>
-                                                        {Object.entries(parsedFormData).map(([key, val]) => {
-                                                            if (key === 'isRenewal' || key === 'isCompliant' || key === 'noObjection') return null;
-                                                            if (typeof val === 'object' && val !== null) return null;
-                                                            return (
-                                                                <div key={key}>
-                                                                    <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatFieldName(key)}</span>
-                                                                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                                                                        {typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val || 'N/A')}
-                                                                    </span>
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
 
                                             <div>
                                                 <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Requirements Attachment</span>

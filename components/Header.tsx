@@ -17,7 +17,14 @@ export default function Header({ title, userName, onSignOut, variant = 'resident
             <div className="container flex-between">
                 <Link href={variant === 'admin' ? '/admin' : '/resident'} className={styles.logo}>
                     <Image src="/logo.png" alt="Barangay Logo" width={28} height={28} className={styles.logoImage} />
-                    <span>{title}</span>
+                    <span className={styles.logoText}>
+                        <span className={styles.eBrand}>E</span>-Barangay
+                        {variant === 'admin' ? (
+                            <span className={styles.adminBadge}>Admin</span>
+                        ) : (
+                            <span className={styles.subBrand}>Gordon Heights</span>
+                        )}
+                    </span>
                 </Link>
                 <div className={styles.userMenu}>
                     <span className={styles.userName}> {userName}</span>

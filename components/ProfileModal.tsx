@@ -284,7 +284,7 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                         </div>
                         <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(2, 1fr)',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                             gap: '0.5rem',
                         }}>
                             {SECTOR_OPTIONS.map(opt => {
