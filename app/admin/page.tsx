@@ -2368,14 +2368,41 @@ function AdminDashboardContent() {
                             const age = res.birthdate ? Math.floor((Date.now() - new Date(res.birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
                             const idDocBucket = 'resident-requirements';
 
+                            const docPath = res.id_document_url || (res as any).raw_user_meta_data?.id_document_url || (res as any).user_metadata?.id_document_url;
+
                             const viewIdDocument = async () => {
-                                if (!res.id_document_url) return;
+                                if (!docPath) return;
                                 try {
-                                    const { data, error } = await supabase.storage
-                                        .from(idDocBucket)
-                                        .createSignedUrl(res.id_document_url, 3600);
-                                    if (error) throw error;
-                                    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                                    let urlToOpen: string | null = null;
+
+                                    // Try resident-requirements bucket
+                                    const { data: reqData } = await supabase.storage
+                                        .from('resident-requirements')
+                                        .createSignedUrl(docPath, 3600);
+
+                                    if (reqData?.signedUrl) {
+                                        urlToOpen = reqData.signedUrl;
+                                    } else {
+                                        // Fallback to resident-profile-pictures bucket
+                                        const { data: picData } = await supabase.storage
+                                            .from('resident-profile-pictures')
+                                            .createSignedUrl(docPath, 3600);
+
+                                        if (picData?.signedUrl) {
+                                            urlToOpen = picData.signedUrl;
+                                        } else {
+                                            const { data: pubData } = supabase.storage
+                                                .from('resident-profile-pictures')
+                                                .getPublicUrl(docPath);
+                                            if (pubData?.publicUrl) urlToOpen = pubData.publicUrl;
+                                        }
+                                    }
+
+                                    if (urlToOpen) {
+                                        window.open(urlToOpen, '_blank');
+                                    } else {
+                                        showToast('Could not generate URL for ID document', 'error');
+                                    }
                                 } catch (err: any) {
                                     showToast(`Could not open ID document: ${err.message || 'Unknown error'}`, 'error');
                                 }
@@ -2494,7 +2521,7 @@ function AdminDashboardContent() {
                                             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                                 Identity Verification Document
                                             </label>
-                                            {res.id_document_url ? (
+                                            {docPath ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                     <span style={{ fontSize: '0.9rem', color: 'var(--success-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}> Document uploaded</span>
                                                     <button

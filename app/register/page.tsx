@@ -43,7 +43,6 @@ function RegisterContent() {
     const [birthdate, setBirthdate] = useState('')
     const [gender, setGender] = useState<'Male' | 'Female' | ''>('')
     const [relationshipStatus, setRelationshipStatus] = useState('')
-    const [idDocument, setIdDocument] = useState<File | null>(null)
     const [sectors, setSectors] = useState<string[]>([])
     const [showSectors, setShowSectors] = useState(false)
     const [agreedToTerms, setAgreedToTerms] = useState(false)
@@ -53,7 +52,6 @@ function RegisterContent() {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const [passwordError, setPasswordError] = useState('')
-    const [uploadFailed, setUploadFailed] = useState(false)
     const { signUp } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -134,11 +132,6 @@ function RegisterContent() {
             return
         }
 
-        if (!idDocument) {
-            setError('Please upload a valid ID to prove residency in Gordon Heights')
-            return
-        }
-
         if (!agreedToTerms) {
             setError('Please agree to the Terms and Conditions and Privacy Policy')
             return
@@ -163,7 +156,7 @@ function RegisterContent() {
 
         const fullName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}${suffix ? ' ' + suffix : ''}`.trim()
 
-        const { error: signUpError, userId: newUserId } = await signUp(email, password, {
+        const { error: signUpError } = await signUp(email, password, {
             fullName,
             firstName,
             middleName: middleName || undefined,
@@ -173,71 +166,14 @@ function RegisterContent() {
             relationshipStatus,
             address: address || undefined,
             phone: phone || undefined,
-            birthdate: birthdate || undefined
+            birthdate: birthdate || undefined,
+            sectors: sectors
         }, `${window.location.origin}/auth/confirm`)
 
         if (signUpError) {
             setError(signUpError)
             setLoading(false)
             return
-        }
-
-        try {
-            // Use the userId from signUp response (works even without an active session)
-            const userId = newUserId
-
-            if (userId) {
-                let filePath = null;
-
-                // Run file upload and profile update in parallel for speed
-                const uploadPromise = (async () => {
-                    if (idDocument) {
-                        const fileName = `id_verification_${Date.now()}_${idDocument.name.replace(/\s+/g, '_')}`
-                        filePath = `${userId}/${fileName}`
-
-                        const { error: uploadError } = await supabase.storage
-                            .from('resident-requirements')
-                            .upload(filePath, idDocument, {
-                                cacheControl: '3600',
-                                upsert: false,
-                                contentType: idDocument.type
-                            })
-
-                        if (uploadError) {
-                            console.error(`Failed to upload ID document: ${uploadError.message}`)
-                            filePath = null
-                        }
-                    }
-                    return filePath
-                })()
-
-                const uploadedPath = await uploadPromise
-
-                if (!uploadedPath) {
-                    setUploadFailed(true)
-                }
-
-                // Update profile record with additional details (bypassing RLS via RPC)
-                const { error: updateError } = await supabase.rpc('complete_registration', {
-                    p_user_id: userId,
-                    p_id_document_url: uploadedPath,
-                    p_sectors: sectors
-                })
-
-                if (updateError) {
-                    console.error('Failed to update profile record:', updateError.message)
-                }
-
-                // Sign out if we somehow got a session (email confirmation disabled case)
-                try {
-                    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
-                    await supabase.auth.signOut()
-                } catch {
-                    // Non-fatal
-                }
-            }
-        } catch (err) {
-            console.error('Post-signup error:', err)
         }
 
         setSuccess(true)
@@ -304,17 +240,7 @@ function RegisterContent() {
                         <div className={styles.successMessage}>
                             <div style={{ fontSize: '3rem', margin: '0 auto 1.5rem' }}></div>
                             <h2 style={{ color: '#111827', fontSize: '1.75rem', marginBottom: '1rem', fontWeight: 'bold' }}>Registration Successful!</h2>
-                            {uploadFailed ? (
-                                <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', padding: '1rem', borderRadius: '12px', fontSize: '0.85rem', marginBottom: '1.25rem', textAlign: 'left' }}>
-                                    <strong style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.25rem' }}>
-                                        <AlertTriangle size={16} />
-                                        <span>Warning: ID Document Upload Failed</span>
-                                    </strong>
-                                    <span>Your account was created successfully, but your ID verification document failed to upload. Please check your email inbox to confirm your account, and remember to bring a valid physical ID to the Barangay Hall to get your account manually verified.</span>
-                                </div>
-                            ) : (
-                                <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
-                            )}
+                            <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in to your account and upload your ID document in your profile.</p>
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
                             <Link href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className={styles.link}>Go to Login</Link>
                         </div>
@@ -734,33 +660,6 @@ function RegisterContent() {
                                     </div>
                                 </div>
                             )}
-                        </div>
-
-                        <div className={styles.idUploadSection}>
-                            <label>Identity Verification *</label>
-                            <p className={styles.uploadInfo}>Upload a valid ID (e.g., PhilID, Passport, Driver&apos;s License) to prove residency in Gordon Heights, Olongapo City.</p>
-                            <div className={styles.fileInputWrapper}>
-                                <input
-                                    id="idDocument"
-                                    type="file"
-                                    accept="image/*,.pdf"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0] || null
-                                        if (file && file.size > 5 * 1024 * 1024) {
-                                            setError('Identity document exceeds the 5MB limit. Please upload a smaller image or PDF.')
-                                            e.target.value = ''
-                                            setIdDocument(null)
-                                            return
-                                        }
-                                        setIdDocument(file)
-                                    }}
-                                    className={styles.fileInput}
-                                    required
-                                />
-                                <div className={styles.fileInputPlaceholder}>
-                                    {idDocument ? ` ${idDocument.name}` : ' Choose File (Image or PDF)'}
-                                </div>
-                            </div>
                         </div>
 
                         <div className={styles.checkboxGroup}>

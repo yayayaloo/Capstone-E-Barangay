@@ -324,30 +324,26 @@ export default async function Home() {
                 <section id="about" className={`section ${styles.aboutSection}`}>
                     <div className="container" style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto' }}>
                         <div className={styles.aboutContent}>
-                            <h2>Pioneering Smart Governance</h2>
+                            <h2>A Smarter Way to Access Barangay Services</h2>
                             <p>
-                                E-Barangay is a state-of-the-art civic platform built to bring Barangay Gordon Heights 
-                                into the digital age. By integrating cloud services, cryptographic QR verification, 
-                                and AI-powered citizen inquiry systems, we are eliminating manual bureaucracy and 
-                                administrative delays.
+                                E-Barangay makes it easier for residents of Barangay Gordon Heights to access barangay services online. Request documents, manage your resident information, track applications, and get assistance without unnecessary trips to the barangay office.
                             </p>
-                            <p>
-                                Our mission is transparent, secure, and instant service delivery, fostering a faster, 
-                                greener, and more resilient local government for our entire community.
-                            </p>
-                            <div className={styles.aboutStats} style={{ justifyContent: 'center' }}>
-                                <div>
-                                    <strong>100%</strong>
-                                    <span>Paperless Workflow</span>
-                                </div>
-                                <div>
-                                    <strong>Instant</strong>
-                                    <span>QR Code Verification</span>
-                                </div>
-                                <div>
-                                    <strong>24/7</strong>
-                                    <span>Digital Self-Service</span>
-                                </div>
+                            <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                gap: '0.5rem 1rem',
+                                marginTop: '1.5rem',
+                                fontSize: '0.95rem',
+                                fontWeight: 600,
+                                color: 'var(--primary-600, #059669)',
+                            }}>
+                                <span>Digital Document Services</span>
+                                <span>·</span>
+                                <span>QR Code Verification</span>
+                                <span>·</span>
+                                <span>24/7 Online Access</span>
                             </div>
                         </div>
                     </div>
@@ -373,10 +369,11 @@ export default async function Home() {
                             </div>
 
                             <div className={styles.footerSection}>
-                                <h3>Contact</h3>
-                                <p>Barangay Hall, Gordon Heights</p>
-                                <p>(123) 456-7890</p>
-                                <p>info@ebarangay-gh.gov.ph</p>
+                                <h3>Contact Information</h3>
+                                <p><strong>Barangay Hall:</strong> 223-5497</p>
+                                <p><strong>Globe:</strong> 0966-463-2688</p>
+                                <p><strong>Smart:</strong> 0920-827-8618</p>
+                                <p style={{ wordBreak: 'break-all', fontSize: '0.85rem' }}><strong>Email:</strong> barangaygordonheights2018@gmail.com</p>
                             </div>
                         </div>
 

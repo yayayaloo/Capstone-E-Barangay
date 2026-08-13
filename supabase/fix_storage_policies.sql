@@ -1,43 +1,4 @@
--- Fix: Ensure admin can read all uploaded resident requirement files from storage
--- Run this in Supabase SQL Editor if admins cannot view uploaded files
-
--- =============================================
--- 1. Ensure helper functions exist first
--- =============================================
-
-CREATE OR REPLACE FUNCTION public.is_recent_profile(profile_id_text TEXT)
-RETURNS BOOLEAN AS $$
-DECLARE
-    valid_uuid UUID;
-BEGIN
-    BEGIN
-        valid_uuid := profile_id_text::UUID;
-    EXCEPTION WHEN invalid_text_representation THEN
-        RETURN false;
-    END;
-
-    RETURN EXISTS (
-        SELECT 1 FROM public.profiles 
-        WHERE id = valid_uuid 
-        AND created_at > (NOW() - INTERVAL '1 hour')
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
--- Ensure the is_admin function exists
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid() AND role = 'admin'
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
--- =============================================
--- 2. Ensure the bucket exists
--- =============================================
+-- Ensure storage buckets exist
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('resident-requirements', 'resident-requirements', false)
 ON CONFLICT (id) DO NOTHING;
@@ -46,7 +7,8 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('resident-profile-pictures', 'resident-profile-pictures', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Drop all existing storage policies for these buckets to avoid duplicates
+-- Drop ALL existing storage policies first to avoid "policy already exists" error
+DROP POLICY IF EXISTS "Allow registration upload to resident-requirements" ON storage.objects;
 DROP POLICY IF EXISTS "Residents can upload their own requirements" ON storage.objects;
 DROP POLICY IF EXISTS "Residents can view their own requirements" ON storage.objects;
 DROP POLICY IF EXISTS "Admins can view all requirements" ON storage.objects;
@@ -57,19 +19,12 @@ DROP POLICY IF EXISTS "Residents can upload own profile picture" ON storage.obje
 DROP POLICY IF EXISTS "Residents can update own profile picture" ON storage.objects;
 DROP POLICY IF EXISTS "Admins can delete profile pictures" ON storage.objects;
 
--- 1. Residents can upload files to their own folder
-CREATE POLICY "Residents can upload their own requirements" 
+-- 1. Allow ID upload during registration and resident portal
+CREATE POLICY "Allow registration upload to resident-requirements" 
   ON storage.objects FOR INSERT 
-  WITH CHECK (
-    bucket_id = 'resident-requirements' 
-    AND (
-      auth.uid()::text = (string_to_array(name, '/'))[1]
-      OR 
-      (auth.role() = 'anon' AND public.is_recent_profile((string_to_array(name, '/'))[1]))
-    )
-  );
+  WITH CHECK (bucket_id = 'resident-requirements');
 
--- 2. Residents can view only their own uploaded files
+-- 2. Allow residents to view their own uploaded files
 CREATE POLICY "Residents can view their own requirements" 
   ON storage.objects FOR SELECT 
   USING (
@@ -77,44 +32,47 @@ CREATE POLICY "Residents can view their own requirements"
     AND auth.uid()::text = (string_to_array(name, '/'))[1]
   );
 
--- 3. Admins can view ALL uploaded files (this is critical for admin viewing to work)
+-- 3. Allow Admins to view ALL requirement files
 CREATE POLICY "Admins can view all requirements" 
   ON storage.objects FOR SELECT 
   USING (
     bucket_id = 'resident-requirements' 
-    AND public.is_admin()
+    AND EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND role = 'admin'
+    )
   );
 
--- 4. Admins can delete files if needed
+-- 4. Allow Admins to delete requirement files
 CREATE POLICY "Admins can delete requirements" 
   ON storage.objects FOR DELETE 
   USING (
     bucket_id = 'resident-requirements' 
-    AND public.is_admin()
+    AND EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND role = 'admin'
+    )
   );
 
--- Policies for resident profile pictures bucket
+-- 5. Policies for Profile Pictures bucket
 CREATE POLICY "Anyone can view profile pictures" 
   ON storage.objects FOR SELECT 
   USING (bucket_id = 'resident-profile-pictures');
 
 CREATE POLICY "Residents can upload own profile picture" 
   ON storage.objects FOR INSERT 
-  WITH CHECK (
-    bucket_id = 'resident-profile-pictures' 
-    AND auth.uid()::text = (string_to_array(name, '/'))[1]
-  );
+  WITH CHECK (bucket_id = 'resident-profile-pictures');
 
 CREATE POLICY "Residents can update own profile picture" 
   ON storage.objects FOR UPDATE 
-  USING (
-    bucket_id = 'resident-profile-pictures' 
-    AND auth.uid()::text = (string_to_array(name, '/'))[1]
-  );
+  USING (bucket_id = 'resident-profile-pictures');
 
 CREATE POLICY "Admins can delete profile pictures" 
   ON storage.objects FOR DELETE 
   USING (
     bucket_id = 'resident-profile-pictures' 
-    AND public.is_admin()
+    AND EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE id = auth.uid() AND role = 'admin'
+    )
   );

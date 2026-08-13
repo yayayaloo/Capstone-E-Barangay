@@ -217,8 +217,9 @@
     border-bottom: none;
 }
 
-/* About Section */
-.aboutSection {
+/* About & Contact Sections */
+.aboutSection,
+.contactSection {
     background: var(--bg-primary);
     border-top: 1px solid var(--border-color);
     border-bottom: 1px solid var(--border-color);

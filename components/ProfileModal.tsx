@@ -35,6 +35,10 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
     const [profilePicture, setProfilePicture] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState(profile.profile_picture_url ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${profile.profile_picture_url}` : null)
     
+    // ID Document state
+    const [idDocument, setIdDocument] = useState<File | null>(null)
+    const [idDocumentUrl, setIdDocumentUrl] = useState<string | null>(profile.id_document_url || null)
+    
     // Residency Information state
     const [residentSinceMode, setResidentSinceMode] = useState<'birth' | 'year'>(
         profile.resident_since === 'Since Birth' || !profile.resident_since ? 'birth' : 'year'
@@ -60,6 +64,55 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
         }
     }
 
+    const handleIdDocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                setError('ID document size exceeds the 5MB limit. Please upload a smaller file.')
+                e.target.value = ''
+                return
+            }
+            setIdDocument(file)
+            setError('')
+        }
+    }
+
+    const viewCurrentIdDocument = async () => {
+        if (!idDocumentUrl) return;
+        try {
+            let urlToOpen: string | null = null;
+
+            const { data: reqData } = await supabase.storage
+                .from('resident-requirements')
+                .createSignedUrl(idDocumentUrl, 3600);
+
+            if (reqData?.signedUrl) {
+                urlToOpen = reqData.signedUrl;
+            } else {
+                const { data: picData } = await supabase.storage
+                    .from('resident-profile-pictures')
+                    .createSignedUrl(idDocumentUrl, 3600);
+
+                if (picData?.signedUrl) {
+                    urlToOpen = picData.signedUrl;
+                } else {
+                    const { data: pubData } = supabase.storage
+                        .from('resident-profile-pictures')
+                        .getPublicUrl(idDocumentUrl);
+                    if (pubData?.publicUrl) urlToOpen = pubData.publicUrl;
+                }
+            }
+
+            if (urlToOpen) {
+                window.open(urlToOpen, '_blank');
+            } else {
+                setError('Could not open ID document.');
+            }
+        } catch (err: any) {
+            setError(`Could not open ID document: ${err.message || 'Unknown error'}`);
+        }
+    };
+
     const toggleSector = (sector: string) => {
         setSectors(prev =>
             prev.includes(sector)
@@ -77,13 +130,13 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
 
         try {
             let profile_picture_url = profile.profile_picture_url
+            let updated_id_document_url = idDocumentUrl
 
             if (profilePicture) {
                 try {
                     const fileExt = profilePicture.name.split('.').pop()
                     const fileName = `${profile.id}/${Date.now()}.${fileExt}`
 
-                    // Race the upload against a 10-second timeout to prevent infinite loading
                     const uploadTimeout = new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error('Upload timed out. Please check your connection.')), 10000)
                     )
@@ -106,11 +159,33 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                 }
             }
 
+            if (idDocument) {
+                try {
+                    const fileName = `${profile.id}/id_verification_${Date.now()}_${idDocument.name.replace(/\s+/g, '_')}`
+                    const { error: idUploadErr } = await supabase.storage
+                        .from('resident-requirements')
+                        .upload(fileName, idDocument, { upsert: true, contentType: idDocument.type })
+
+                    if (idUploadErr) {
+                        setError(`ID document upload failed: ${idUploadErr.message}`)
+                        setSubmitting(false)
+                        return
+                    } else {
+                        updated_id_document_url = fileName
+                    }
+                } catch (idErr: any) {
+                    setError(`ID document upload failed: ${idErr.message}`)
+                    setSubmitting(false)
+                    return
+                }
+            }
+
             await onSubmit({
                 email: email.trim(),
                 phone: phone.trim(),
                 sectors,
                 profile_picture_url,
+                id_document_url: updated_id_document_url,
                 resident_since: residentSinceMode === 'birth' ? 'Since Birth' : residentSinceYear
             })
 
@@ -329,6 +404,70 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                                     </div>
                                 )
                             })}
+                        </div>
+                    </div>
+
+                    {/* Identity Verification Document Section */}
+                    <div style={{
+                        padding: '1.25rem',
+                        background: 'var(--bg-tertiary)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                Identity Verification Document (Valid ID)
+                            </label>
+                            {idDocumentUrl ? (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--primary-500, #059669)', fontWeight: 600 }}>
+                                    ✓ Document Uploaded
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '0.75rem', color: '#eab308', fontWeight: 600 }}>
+                                    ⚠️ No ID Uploaded
+                                </span>
+                            )}
+                        </div>
+
+                        {idDocumentUrl && (
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={viewCurrentIdDocument}
+                                    className="btn btn-outline"
+                                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                                >
+                                    View Current ID Document
+                                </button>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                            <label htmlFor="modal-id-document" style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {idDocumentUrl ? 'Upload New ID / Update Document (Image or PDF):' : 'Upload Valid ID (Image or PDF):'}
+                            </label>
+                            <input
+                                id="modal-id-document"
+                                type="file"
+                                accept="image/*,.pdf"
+                                onChange={handleIdDocChange}
+                                style={{
+                                    fontSize: '0.8rem',
+                                    padding: '0.5rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-primary)',
+                                    color: 'var(--text-primary)'
+                                }}
+                            />
+                            {idDocument && (
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--primary-500, #059669)' }}>
+                                    Selected: {idDocument.name} ({(idDocument.size / 1024 / 1024).toFixed(2)} MB)
+                                </p>
+                            )}
                         </div>
                     </div>
 

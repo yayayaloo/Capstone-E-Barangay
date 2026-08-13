@@ -30,9 +30,11 @@ interface AuthContextType {
             address?: string
             phone?: string
             birthdate?: string
+            id_document_url?: string
+            sectors?: string[]
         },
         emailRedirectTo?: string
-    ) => Promise<{ error: string | null; userId: string | null }>
+    ) => Promise<{ error: string | null; userId: string | null; session: Session | null }>
     signOut: () => Promise<void>
     refreshProfile: () => Promise<void>
 }
@@ -318,6 +320,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
             address?: string
             phone?: string
             birthdate?: string
+            id_document_url?: string
+            sectors?: string[]
         },
         emailRedirectTo?: string
     ) => {
@@ -338,14 +342,16 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                         address: metadata.address || null,
                         phone: metadata.phone || null,
                         birthdate: metadata.birthdate || null,
+                        id_document_url: metadata.id_document_url || null,
+                        sectors: metadata.sectors || [],
                         role: 'resident', // By default new signups are residents
                     }
                 }
             })
 
-            return { error: error?.message || null, userId: data?.user?.id || null }
+            return { error: error?.message || null, userId: data?.user?.id || null, session: data?.session || null }
         } catch (error: any) {
-            return { error: error.message || 'An error occurred during sign up', userId: null }
+            return { error: error.message || 'An error occurred during sign up', userId: null, session: null }
         }
     }
 
