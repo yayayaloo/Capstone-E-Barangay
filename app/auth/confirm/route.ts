@@ -99,13 +99,30 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Verification failed
+    // Check if the failure is solely due to PKCE code verifier missing across browsers/devices.
+    // When Supabase processes the confirmation link, it confirms the email in the DB *before* redirecting.
+    // Since we require users to sign in manually anyway, a missing PKCE session cookie on a new browser/webview
+    // does not prevent them from signing in. We can safely treat this as a confirmed email!
+    const isPkceError = error.message?.includes('flow_state_not_found') || 
+                        error.message?.includes('PKCE code verifier not found') ||
+                        error.message?.includes('code_verifier')
+
+    if (isPkceError) {
+        await supabase.auth.signOut().catch(() => {})
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.delete('token_hash')
+        redirectUrl.searchParams.delete('type')
+        redirectUrl.searchParams.delete('code')
+        redirectUrl.searchParams.delete('next')
+        redirectUrl.searchParams.set('confirmed', 'true')
+        return NextResponse.redirect(redirectUrl)
+    }
+
+    // Verification failed for another reason (e.g. invalid or expired token)
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/login'
     redirectUrl.searchParams.set('error', 'confirmation_failed')
-    const userFriendlyMessage = error.message?.includes('flow_state_not_found')
-        ? 'Confirmation link was opened in a different browser session. Please log in directly or request a new link.'
-        : (error.message || 'Email confirmation failed. The link may have expired.')
-    redirectUrl.searchParams.set('error_description', userFriendlyMessage)
+    redirectUrl.searchParams.set('error_description', error.message || 'Email confirmation failed. The link may have expired.')
     return NextResponse.redirect(redirectUrl)
 }
