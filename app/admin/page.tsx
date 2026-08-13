@@ -15,6 +15,7 @@ import { logAdminAction } from '@/lib/audit'
 import { QRCodeCanvas } from 'qrcode.react'
 import CertificateTemplate, { CertificateData } from '@/components/CertificateTemplate'
 import { updateRequestStatus } from '@/app/actions/requestActions'
+import { verifyResidentAction, rejectResidentAction, deleteAnnouncementAction, saveBlotterReportAction, updateComplaintStatusAction } from '@/app/actions/adminActions'
 const WeeklyPerformanceChart = dynamic(() => import('@/components/WeeklyPerformanceChart'), { ssr: false })
 const SectoralChart = dynamic(() => import('@/components/SectoralChart'), { ssr: false })
 const AgeDemographicChart = dynamic(() => import('@/components/AgeDemographicChart'), { ssr: false })
@@ -223,25 +224,27 @@ function AdminDashboardContent() {
     const fetchOverviewStats = async () => {
         try {
             const [
-                { data: allStatuses },
+                { count: pending },
+                { count: processing },
+                { count: completed },
+                { count: rejected },
+                { count: totalRequests },
                 { count: totalResidents }
             ] = await Promise.all([
-                supabase.from('service_requests').select('status'),
+                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
+                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
+                supabase.from('service_requests').select('*', { count: 'exact', head: true }),
                 supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'resident')
             ])
 
-            const pending = allStatuses?.filter((r: { status: string }) => r.status === 'pending').length || 0;
-            const processing = allStatuses?.filter((r: { status: string }) => r.status === 'processing').length || 0;
-            const completed = allStatuses?.filter((r: { status: string }) => r.status === 'completed').length || 0;
-            const rejected = allStatuses?.filter((r: { status: string }) => r.status === 'rejected').length || 0;
-            const totalRequests = allStatuses?.length || 0;
-
             setStats({
-                pending,
-                processing,
-                completed,
-                rejected,
-                totalRequests,
+                pending: pending || 0,
+                processing: processing || 0,
+                completed: completed || 0,
+                rejected: rejected || 0,
+                totalRequests: totalRequests || 0,
                 totalResidents: totalResidents || 0
             })
         } catch (error) {
@@ -559,8 +562,16 @@ function AdminDashboardContent() {
             residentAge = a.toString()
         }
 
+        let currentBlotters = blotterReports
+        if (currentBlotters.length === 0) {
+            try {
+                const { data: fetchedBlotters } = await supabase.from('blotter_reports').select('*').neq('status', 'Resolved')
+                if (fetchedBlotters) currentBlotters = fetchedBlotters as BlotterReport[]
+            } catch (e) {}
+        }
+
         const residentNameLower = (req.resident_name || '').trim().toLowerCase();
-        const hasActiveBlotter = residentNameLower.length > 0 && blotterReports.some(rep => {
+        const hasActiveBlotter = residentNameLower.length > 0 && currentBlotters.some(rep => {
             const respondentLower = (rep.respondent || '').trim().toLowerCase();
             if (respondentLower === residentNameLower) return rep.status !== 'Resolved';
             
@@ -753,9 +764,17 @@ function AdminDashboardContent() {
                 }
             }
 
+            let currentBlottersDirect = blotterReports
+            if (currentBlottersDirect.length === 0) {
+                try {
+                    const { data: fetchedBlotters } = await supabase.from('blotter_reports').select('*').neq('status', 'Resolved')
+                    if (fetchedBlotters) currentBlottersDirect = fetchedBlotters as BlotterReport[]
+                } catch (e) {}
+            }
+
             // Smart check: Resident has unresolved blotters in the barangay records
             const residentNameLower = (req.resident_name || '').trim().toLowerCase();
-            const hasActiveBlotter = residentNameLower.length > 0 && blotterReports.some(rep => {
+            const hasActiveBlotter = residentNameLower.length > 0 && currentBlottersDirect.some(rep => {
                 const respondentLower = (rep.respondent || '').trim().toLowerCase();
                 if (respondentLower === residentNameLower) return rep.status !== 'Resolved';
                 
@@ -917,49 +936,19 @@ function AdminDashboardContent() {
                 closeConfirmDialog()
                 try {
                     setAnnouncements(prev => prev.filter(a => a.id !== id))
-                    const { error } = await supabase.from('announcements').delete().eq('id', id)
-                    if (error) {
-                        fetchDataForTab(activeTab, true)
-                        throw error
-                    }
+                    await deleteAnnouncementAction(id)
                     showToast('Announcement deleted', 'success')
                     if (profile?.id) {
                         await logAdminAction('DELETE_ANNOUNCEMENT', `Deleted announcement ID ${id.slice(0, 8)}`, profile.id)
                     }
                 } catch (error) {
+                    fetchDataForTab(activeTab, true)
                     console.error('Error deleting announcement:', error)
                     showToast('Failed to delete announcement', 'error')
                 }
             }
         })
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _deleteAnnouncementLegacy = async (id: string) => {
-        try {
-            // Optimistic deletion
-            setAnnouncements(prev => prev.filter(a => a.id !== id))
-
-            const { error } = await supabase
-                .from('announcements')
-                .delete()
-                .eq('id', id)
-
-            if (error) {
-                fetchDataForTab(activeTab, true)
-                throw error
-            }
-            showToast('Announcement deleted', 'success')
-            if (profile?.id) {
-                await logAdminAction('DELETE_ANNOUNCEMENT', `Deleted announcement ID ${id.slice(0, 8)}`, profile.id);
-            }
-        } catch (error) {
-            console.error('Error deleting announcement:', error)
-            showToast('Failed to delete announcement', 'error')
-        }
-    }
-    // end legacy (unused)
-
-
 
     const verifyResident = (residentId: string) => {
         setConfirmDialog({
@@ -971,51 +960,17 @@ function AdminDashboardContent() {
             onConfirm: async () => {
                 closeConfirmDialog()
                 try {
-                    const idNumber = `GH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`
-                    setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, is_rejected: false, resident_id_number: idNumber } : r))
-                    const { error } = await supabase.from('profiles').update({ is_verified: true, is_rejected: false, resident_id_number: idNumber }).eq('id', residentId)
-                    if (error) { fetchDataForTab(activeTab, true); throw error }
+                    const updatedProfile = await verifyResidentAction(residentId)
+                    setResidents(prev => prev.map(r => r.id === residentId ? { ...r, ...updatedProfile } : r))
                     showToast('Resident verified successfully! Resident ID has been generated.', 'success')
                     if (profile?.id) await logAdminAction('VERIFY_RESIDENT', `Verified resident ID ${residentId.slice(0, 8)}`, profile.id)
                 } catch (error: any) {
+                    fetchDataForTab(activeTab, true)
                     console.error('Error verifying resident:', error)
-                    showToast('Failed to verify resident', 'error')
+                    showToast('Failed to verify resident: ' + (error.message || error), 'error')
                 }
             }
         })
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _verifyResidentLegacy = async (residentId: string) => {
-        const confirmed = true
-        if (!confirmed) return
-        try {
-            const idNumber = `GH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`
-
-            // Optimistic update
-            setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: true, is_rejected: false, resident_id_number: idNumber } : r))
-
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    is_verified: true,
-                    is_rejected: false,
-                    resident_id_number: idNumber
-                })
-                .eq('id', residentId)
-
-            if (error) {
-                fetchDataForTab(activeTab, true) // Revert
-                throw error
-            }
-
-            showToast('Resident verified successfully! Resident ID has been generated.', 'success')
-            if (profile?.id) {
-                await logAdminAction('VERIFY_RESIDENT', `Verified resident ID ${residentId.slice(0, 8)}`, profile.id);
-            }
-        } catch (error: any) {
-            console.error('Error verifying resident:', error)
-            showToast('Failed to verify resident', 'error')
-        }
     }
 
     const rejectResident = (residentId: string) => {
@@ -1028,14 +983,14 @@ function AdminDashboardContent() {
             onConfirm: async () => {
                 closeConfirmDialog()
                 try {
-                    setResidents(prev => prev.map(r => r.id === residentId ? { ...r, is_verified: false, is_rejected: true } : r))
-                    const { error } = await supabase.from('profiles').update({ is_verified: false, is_rejected: true }).eq('id', residentId)
-                    if (error) { fetchDataForTab(activeTab, true); throw error }
+                    const updatedProfile = await rejectResidentAction(residentId)
+                    setResidents(prev => prev.map(r => r.id === residentId ? { ...r, ...updatedProfile } : r))
                     showToast('Resident registration has been rejected.', 'error')
                     if (profile?.id) await logAdminAction('REJECT_RESIDENT', `Rejected resident registration ID ${residentId.slice(0, 8)}`, profile.id)
                 } catch (error: any) {
+                    fetchDataForTab(activeTab, true)
                     console.error('Error rejecting resident:', error)
-                    showToast('Failed to reject resident', 'error')
+                    showToast('Failed to reject resident: ' + (error.message || error), 'error')
                 }
             }
         })

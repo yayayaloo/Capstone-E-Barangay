@@ -22,6 +22,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake, MessageSquare, Send, FileText, X, ClipboardList, Bot } from 'lucide-react'
 import styles from './resident.module.css'
 import { saveOfflineSubmission, getOfflineSubmissions, deleteOfflineSubmission, OfflineSubmission } from '@/lib/offlineQueue'
+import { submitDocumentRequest } from '@/app/actions/requestActions'
 
 function cleanDocType(type: string | undefined | null) {
     if (!type) return ''
@@ -201,7 +202,14 @@ function ResidentPortalContent() {
                     await deleteOfflineSubmission(item.id)
                 } catch (err: any) {
                     console.error(`Error syncing queue item ${item.id}:`, err)
-                    showToast(`Failed to sync offline item: ${err.message || err}`, 'error')
+                    const currentRetries = (item.retry_count || 0) + 1
+                    if (currentRetries >= 3) {
+                        await deleteOfflineSubmission(item.id)
+                        showToast(`Removed un-syncable offline submission after 3 failed attempts: ${err.message || err}`, 'error')
+                    } else {
+                        await saveOfflineSubmission({ ...item, retry_count: currentRetries })
+                        showToast(`Failed to sync offline submission (attempt ${currentRetries}/3): ${err.message || err}`, 'error')
+                    }
                 }
             }
 
@@ -724,20 +732,14 @@ function ResidentPortalContent() {
 
             const attachmentUrl = uploadedPaths.length > 0 ? uploadedPaths.join(',') : null
 
-            const { data, error = null } = await supabase
-                .from('service_requests')
-                .insert({
-                    resident_id: profile.id,
-                    document_type: documentType,
-                    purpose: purpose,
-                    attachment_url: attachmentUrl,
-                    status: 'pending',
-                    form_data: formData || {}
-                })
-                .select()
-                .single()
-
-            if (error) throw error
+            const data = await submitDocumentRequest({
+                resident_id: profile.id,
+                document_type: documentType,
+                purpose: purpose,
+                attachment_url: attachmentUrl,
+                status: 'pending',
+                form_data: formData || {}
+            })
 
             setRequests([data as ServiceRequest, ...requests])
             showToast(`${documentType} request submitted successfully! ${attachments.length} file(s) uploaded.`, 'success')
@@ -819,6 +821,7 @@ function ResidentPortalContent() {
 
         } catch (error) {
             console.error('QR Scan error:', error);
+            lastScanTimeRef.current = 0;
             setScanResult({
                 isValid: false,
                 message: 'Error verifying QR code. It may be invalid or the system is offline.'
@@ -1211,7 +1214,7 @@ function ResidentPortalContent() {
         <section className={`${styles.requestsSection} animate-fadeIn`}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h2>My Service Requests</h2>
-                <button className="btn btn-primary" onClick={() => setShowRequestModal(true)}>New Request</button>
+                <button className="btn btn-primary" onClick={() => profile?.is_verified ? setShowRequestModal(true) : showToast('Verification Required: Please wait for admin approval to request documents.', 'info')}>New Request</button>
             </div>
 
             <div className={`glass-card ${styles.applicationsCard}`}>
@@ -1221,7 +1224,7 @@ function ResidentPortalContent() {
                     <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
                         <h3>No requests yet</h3>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Apply for documents using the button above.</p>
-                        <button className="btn btn-primary" onClick={() => setShowRequestModal(true)}>Request Now</button>
+                        <button className="btn btn-primary" onClick={() => profile?.is_verified ? setShowRequestModal(true) : showToast('Verification Required: Please wait for admin approval to request documents.', 'info')}>Request Now</button>
                     </div>
                 ) : (
                     requests.map((req) => (

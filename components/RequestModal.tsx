@@ -66,6 +66,20 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
         if (e.target.files && e.target.files.length > 0) {
             const newFiles = Array.from(e.target.files)
             const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+            const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']
+            const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf']
+
+            const invalidFile = newFiles.find(file => {
+                const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+                return (!file.type || !ALLOWED_TYPES.includes(file.type)) && !ALLOWED_EXTENSIONS.includes(ext)
+            })
+
+            if (invalidFile) {
+                setError(`Invalid file format: ${invalidFile.name}. Only image files (JPG, PNG, WEBP) and PDF documents are allowed.`)
+                e.target.value = ''
+                return
+            }
+
             const oversized = newFiles.filter(file => file.size > MAX_SIZE)
 
             if (oversized.length > 0) {
@@ -425,7 +439,7 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                                 id="attachment"
                                 onChange={handleFileChange}
                                 className={styles.fileInput}
-                                accept="image/*,.pdf,.doc,.docx"
+                                accept="image/*,.pdf"
                                 multiple
                             />
                             <label htmlFor="attachment" className={styles.fileLabel}>

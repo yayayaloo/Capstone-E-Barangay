@@ -57,7 +57,9 @@ function RegisterContent() {
     const { signUp } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const redirectUrl = searchParams ? searchParams.get('redirect') : null
+    const rawRedirect = searchParams ? searchParams.get('redirect') : null
+    const safeRedirect = (rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')) ? rawRedirect : null
+    const redirectUrl = safeRedirect
 
 
     // Real-time validation logic
@@ -145,16 +147,18 @@ function RegisterContent() {
         setLoading(true)
 
         // Check if email already exists to prevent duplicate accounts
-        // This requires the 'check_email_exists' RPC to be added to the Supabase database
-        const { data: emailExists, error: checkError } = await supabase.rpc('check_email_exists', { p_email: email })
-        
-        if (checkError) {
-            console.error('Error checking email existence:', checkError.message)
-            // If RPC is missing, it will fall through to normal signUp (which might silently fail due to enumeration protection)
-        } else if (emailExists) {
-            setError('This email address is already registered. Please use a different email or log in.')
-            setLoading(false)
-            return
+        try {
+            const { data: emailExists, error: checkError } = await supabase.rpc('check_email_exists', { p_email: email })
+            
+            if (checkError) {
+                console.warn('check_email_exists RPC check failed:', checkError.message)
+            } else if (emailExists) {
+                setError('This email address is already registered. Please use a different email address or log in.')
+                setLoading(false)
+                return
+            }
+        } catch (e) {
+            console.warn('Email check error:', e)
         }
 
         const fullName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}${suffix ? ' ' + suffix : ''}`.trim()
@@ -312,7 +316,7 @@ function RegisterContent() {
                                 <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in.</p>
                             )}
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
-                            <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className={styles.link}>Go to Login</Link>
+                            <Link href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className={styles.link}>Go to Login</Link>
                         </div>
                     </div>
                 </div>
@@ -790,7 +794,7 @@ function RegisterContent() {
 
                     <div className={styles.footer}>
                         <p>Already have an account?{' '}
-                            <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className={styles.link}>Sign in</Link>
+                            <Link href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className={styles.link}>Sign in</Link>
                         </p>
                     </div>
                 </div>

@@ -20,6 +20,18 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const next = searchParams.get('next') ?? '/login'
 
+    // Check if Supabase passed error params directly in the URL
+    const errorParam = searchParams.get('error')
+    const errorDescription = searchParams.get('error_description')
+
+    if (errorParam || errorDescription) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.set('error', errorParam || 'confirmation_failed')
+        redirectUrl.searchParams.set('error_description', errorDescription || 'Email confirmation link is invalid or has expired.')
+        return NextResponse.redirect(redirectUrl)
+    }
+
     const cookieStore = cookies()
 
     const supabase = createServerClient(
@@ -91,6 +103,9 @@ export async function GET(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/login'
     redirectUrl.searchParams.set('error', 'confirmation_failed')
-    redirectUrl.searchParams.set('error_description', error.message || 'Email confirmation failed. The link may have expired.')
+    const userFriendlyMessage = error.message?.includes('flow_state_not_found')
+        ? 'Confirmation link was opened in a different browser session. Please log in directly or request a new link.'
+        : (error.message || 'Email confirmation failed. The link may have expired.')
+    redirectUrl.searchParams.set('error_description', userFriendlyMessage)
     return NextResponse.redirect(redirectUrl)
 }

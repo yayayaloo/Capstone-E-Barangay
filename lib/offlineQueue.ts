@@ -21,6 +21,7 @@ export interface OfflineSubmission {
     };
     files: OfflineFile[];
     created_at: string;
+    retry_count?: number;
 }
 
 const DB_NAME = 'e-barangay-offline-db';

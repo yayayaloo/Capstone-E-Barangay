@@ -24,6 +24,11 @@ export const metadata: Metadata = {
         icon: '/logo.png',
         apple: '/logo.png',
     },
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: 'black-translucent',
+        title: 'E-Barangay',
+    },
 }
 
 export default function RootLayout({

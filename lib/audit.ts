@@ -1,9 +1,15 @@
-import { supabase } from '@/lib/supabase'
+'use server'
 
-export async function logAdminAction(action: string, description: string, performed_by: string) {
-    if (!performed_by) return;
-    
+import { createSupabaseServerClient } from '@/lib/supabase-server'
+
+export async function logAdminAction(action: string, description: string, performedByParam?: string) {
     try {
+        const supabase = createSupabaseServerClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        const performed_by = user?.id || performedByParam
+        if (!performed_by) return;
+
         const { error } = await supabase
             .from('audit_logs')
             .insert({
@@ -19,3 +25,4 @@ export async function logAdminAction(action: string, description: string, perfor
         console.error('Error in logAdminAction:', e);
     }
 }
+

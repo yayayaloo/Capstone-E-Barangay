@@ -100,9 +100,8 @@ export async function middleware(request: NextRequest) {
     }
  
     if (user) {
-        // Retrieve the role from the cryptographically verified JWT user metadata.
-        // This avoids a slow database query on every single request.
-        const role = user.user_metadata?.role || 'resident';
+        // Retrieve role prioritizing app_metadata (server-controlled) over user_metadata
+        const role = user.app_metadata?.role || user.user_metadata?.role || 'resident';
  
         // Enforce Role-Based Access Control (RBAC)
         if (pathname.startsWith('/admin') && role !== 'admin') {
