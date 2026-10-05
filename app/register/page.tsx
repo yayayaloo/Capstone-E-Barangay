@@ -1,31 +1,83 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Eye, EyeOff, Check, CheckCircle2, XCircle, ShieldCheck, ShieldAlert, User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX, Info, AlertTriangle } from 'lucide-react'
+import { 
+    Eye, EyeOff, Check, ArrowLeft, AlertCircle, CheckCircle, ChevronDown, ChevronUp,
+    User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX
+} from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import styles from './register.module.css'
-import loginStyles from '../login/login.module.css'
+
+const SLIDES = [
+    {
+        id: 0,
+        sectionTitle: "MANDATE",
+        description: "Barangay Gordon Heights is responsible for delivering essential services, maintaining peace and order, implementing local governance and facilitating citizen's participation.",
+        features: [
+            "Delivering essential community services",
+            "Maintaining peace and public order",
+            "Implementing transparent local governance",
+            "Facilitating citizen's active participation"
+        ]
+    },
+    {
+        id: 1,
+        sectionTitle: "VISION",
+        description: "Peaceful barangay, God fearing, productive with self-reliance and with law abiding citizens.",
+        features: [
+            "Peaceful, secure, and orderly barangay",
+            "God fearing and values-driven community",
+            "Productive citizens with self-reliance",
+            "Law abiding and empowered residents"
+        ]
+    },
+    {
+        id: 2,
+        sectionTitle: "MISSION",
+        description: "To translate the convention on the rights of every Filipino into local policies, sustainable programs and services, and support the survival, protection, development and participation of the people in community building through the provision of good education, health and other institution with special protection, information, communication by legislating ordinances, formulating strategies, enforcing and implementing the same.",
+        features: [
+            "Translate Filipino rights into local policies",
+            "Sustainable community programs & services",
+            "Support education, health & special protection",
+            "Legislate ordinances & enforce strategies"
+        ]
+    },
+    {
+        id: 3,
+        sectionTitle: "SERVICE PLEDGE",
+        description: "Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:",
+        features: [
+            "Serve with honesty and integrity",
+            "Be polite and courteous at all times",
+            "Demonstrate appropriate behavior and professionalism",
+            "Be prompt and timely",
+            "Provide adequate and reliable information",
+            "Be available during office hours",
+            "Provide feedback mechanism and respond to complaints",
+            "Equal treatment to all"
+        ]
+    }
+]
 
 const SECTOR_OPTIONS = [
-    { value: 'Solo Parent', icon: <User size={16} /> },
-    { value: 'OFW', icon: <Plane size={16} /> },
-    { value: 'PWD', icon: <Accessibility size={16} /> },
-    { value: 'Senior Citizen', icon: <UserPlus size={16} /> },
-    { value: 'LGBTQ+', icon: <Heart size={16} /> },
-    { value: 'Employed', icon: <Briefcase size={16} /> },
-    { value: 'Unemployed', icon: <UserMinus size={16} /> },
-    { value: '4Ps Beneficiary', icon: <HandHeart size={16} /> },
-    { value: 'Pregnant/Lactating', icon: <Baby size={16} /> },
-    { value: 'Youth (15-30)', icon: <Zap size={16} /> },
-    { value: 'Indigenous People', icon: <Users size={16} /> },
-    { value: 'OSC', label: 'OSC (Out-of-School Children)', icon: <BookX size={16} /> },
-    { value: 'OSY', label: 'OSY (Out-of-School Youth)', icon: <BookX size={16} /> },
-    { value: 'OSA', label: 'OSA (Out-of-School Adult)', icon: <BookX size={16} /> },
+    { value: 'Solo Parent', icon: <User size={14} /> },
+    { value: 'OFW', icon: <Plane size={14} /> },
+    { value: 'PWD', icon: <Accessibility size={14} /> },
+    { value: 'Senior Citizen', icon: <UserPlus size={14} /> },
+    { value: 'LGBTQ+', icon: <Heart size={14} /> },
+    { value: 'Employed', icon: <Briefcase size={14} /> },
+    { value: 'Unemployed', icon: <UserMinus size={14} /> },
+    { value: '4Ps Beneficiary', icon: <HandHeart size={14} /> },
+    { value: 'Pregnant/Lactating', icon: <Baby size={14} /> },
+    { value: 'Youth (15-30)', icon: <Zap size={14} /> },
+    { value: 'Indigenous People', icon: <Users size={14} /> },
+    { value: 'OSC', label: 'OSC (Out-of-School Children)', icon: <BookX size={14} /> },
+    { value: 'OSY', label: 'OSY (Out-of-School Youth)', icon: <BookX size={14} /> },
+    { value: 'OSA', label: 'OSA (Out-of-School Adult)', icon: <BookX size={14} /> },
 ]
 
 function RegisterContent() {
@@ -51,7 +103,11 @@ function RegisterContent() {
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
-    const [passwordError, setPasswordError] = useState('')
+
+    // Left Carousel state
+    const [activeSlide, setActiveSlide] = useState(0)
+    const [isPaused, setIsPaused] = useState(false)
+
     const { signUp } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -59,8 +115,16 @@ function RegisterContent() {
     const safeRedirect = (rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')) ? rawRedirect : null
     const redirectUrl = safeRedirect
 
+    // Auto-advance slides
+    useEffect(() => {
+        if (isPaused) return
+        const timer = setInterval(() => {
+            setActiveSlide((prev) => (prev + 1) % SLIDES.length)
+        }, 6000)
+        return () => clearInterval(timer)
+    }, [isPaused])
 
-    // Real-time validation logic
+    // Password criteria validations
     const hasMinLength = password.length >= 8
     const hasUppercase = /[A-Z]/.test(password)
     const hasLowercase = /[a-z]/.test(password)
@@ -68,26 +132,23 @@ function RegisterContent() {
     const hasSpecial = /[@$!%*#?&]/.test(password)
     const allCriteriaMet = hasMinLength && hasUppercase && hasLowercase && hasNumber && hasSpecial
 
-    // Live confirmation logic
-    const passwordsMatch = password === confirmPassword && confirmPassword.length > 0
-    const showMatchStatus = confirmPassword.length > 0
+    const handleSectorToggle = (val: string) => {
+        setSectors(prev => 
+            prev.includes(val) ? prev.filter(s => s !== val) : [...prev, val]
+        )
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
 
         if (password !== confirmPassword) {
-            setError('Passwords do not match')
-            return
-        }
-
-        if (password.length < 8) {
-            setError('Password must be at least 8 characters')
+            setError('Passwords do not match.')
             return
         }
 
         if (!allCriteriaMet) {
-            setError('Password does not meet all security requirements')
+            setError('Please fulfill all password security requirements.')
             return
         }
 
@@ -99,13 +160,13 @@ function RegisterContent() {
         }
 
         if (!birthdate) {
-            setError('Please enter your birthdate')
+            setError('Please enter your birthdate.')
             return
         }
         const birthDateObj = new Date(birthdate)
         const today = new Date()
         if (birthDateObj >= today) {
-            setError('Birthdate cannot be in the future')
+            setError('Birthdate cannot be in the future.')
             return
         }
         let age = today.getFullYear() - birthDateObj.getFullYear()
@@ -117,36 +178,29 @@ function RegisterContent() {
             setError('You must be at least 15 years old to register.')
             return
         }
-        if (age > 120) {
-            setError('Please enter a valid birthdate.')
-            return
-        }
 
         if (!gender) {
-            setError('Please select your gender')
+            setError('Please select your gender.')
             return
         }
 
         if (!relationshipStatus) {
-            setError('Please select your relationship status')
+            setError('Please select your relationship status.')
             return
         }
 
         if (!agreedToTerms) {
-            setError('Please agree to the Terms and Conditions and Privacy Policy')
+            setError('Please agree to the Terms and Conditions and Privacy Policy.')
             return
         }
 
         setLoading(true)
 
-        // Check if email already exists to prevent duplicate accounts
+        // Prevent duplicate accounts
         try {
             const { data: emailExists, error: checkError } = await supabase.rpc('check_email_exists', { p_email: email })
-            
-            if (checkError) {
-                console.warn('check_email_exists RPC check failed:', checkError.message)
-            } else if (emailExists) {
-                setError('This email address is already registered. Please use a different email address or log in.')
+            if (!checkError && emailExists) {
+                setError('This email address is already registered. Please use a different email or log in.')
                 setLoading(false)
                 return
             }
@@ -178,528 +232,500 @@ function RegisterContent() {
 
         setSuccess(true)
         setLoading(false)
-        // Removed auto-redirect so user has time to read the instructions
     }
 
     if (success) {
         return (
-            <div className={loginStyles.loginContainer}>
+            <div className={styles.pageWrapper}>
+                <div className={styles.bgBlob1} />
+                <div className={styles.bgBlob2} />
 
-                {/* Left Panel - Branding */}
-                <div className={loginStyles.brandingPanel}>
-                    <div className={loginStyles.brandingBackground} />
-                    <div className={loginStyles.brandingContent}>
-                        <div className={loginStyles.brandHeader}>
-                            <Image src="/logo.png" alt="Logo" width={64} height={64} />
-                            <div>
-                                <h2 className={loginStyles.brandTitle}>Barangay Gordon Heights</h2>
-                                <div className={loginStyles.brandSubtitle}>Olongapo City</div>
-                            </div>
-                        </div>
-
-                        <div className={loginStyles.brandSection}>
-                            <div className={loginStyles.sectionTitle}>Mandate</div>
-                            <div className={loginStyles.sectionText}>
-                                Barangay Gordon Heights is responsible for delivering essential services, maintaining peace and order, implementing local governance and facilitating citizen's participation.
-                            </div>
-                        </div>
-
-                        <div className={loginStyles.brandSection}>
-                            <div className={loginStyles.sectionTitle}>Vision</div>
-                            <div className={loginStyles.sectionText}>
-                                Peaceful barangay, God fearing, productive with self-reliance and with law abiding citizens.
-                            </div>
-                        </div>
-
-                        <div className={loginStyles.brandSection}>
-                            <div className={loginStyles.sectionTitle}>Mission</div>
-                            <div className={loginStyles.sectionText}>
-                                To translate the convention on the rights of every Filipino into local policies, sustainable programs and services, and support the survival, protection, development and participation of the people in community building through the provision of good education, health and other institution with special protection, information, communication by legislating ordinances, formulating strategies, enforcing and implementing the same.
-                            </div>
-                        </div>
-
-                        <div className={loginStyles.brandSection}>
-                            <div className={loginStyles.sectionTitle}>Service Pledge</div>
-                            <p style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
-                            <ul className={loginStyles.coreValues}>
-                                <li>• Serve with honesty and integrity</li>
-                                <li>• Be polite and courteous at all times</li>
-                                <li>• Demonstrate appropriate behavior and professionalism</li>
-                                <li>• Be prompt and timely</li>
-                                <li>• Provide adequate and reliable information</li>
-                                <li>• Be available during office hours</li>
-                                <li>• Provide feedback mechanism and respond to complaints</li>
-                                <li>• Equal treatment to all</li>
-                            </ul>
-                        </div>
+                <div className={styles.slidingCard} style={{ maxWidth: '640px', height: 'auto', padding: '3.5rem 2.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                        <CheckCircle size={38} />
                     </div>
-                </div>
-
-                <div className={loginStyles.formPanel}>
-                    <div className={styles.registerCard}>
-                        <div className={styles.successMessage}>
-                            <div style={{ fontSize: '3rem', margin: '0 auto 1.5rem' }}></div>
-                            <h2 style={{ color: '#111827', fontSize: '1.75rem', marginBottom: '1rem', fontWeight: 'bold' }}>Registration Successful!</h2>
-                            <p>Please check your email inbox and click the verification link to confirm your account. Once verified, you can log in to your account and upload your ID document in your profile.</p>
-                            <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.75rem' }}>Didn&apos;t receive the email? Check your spam folder.</p>
-                            <Link href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className={styles.link}>Go to Login</Link>
-                        </div>
-                    </div>
+                    <h2 style={{ fontSize: '1.5rem', color: '#111827', fontWeight: 700, marginBottom: '0.5rem' }}>Account Created Successfully!</h2>
+                    <p style={{ color: '#4b5563', fontSize: '0.95rem', maxWidth: '440px', lineHeight: 1.6, marginBottom: '1.75rem' }}>
+                        We have sent a verification link to <strong>{email}</strong>. Please check your inbox and verify your email to activate your account.
+                    </p>
+                    <Link href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className={styles.createButton} style={{ textDecoration: 'none', maxWidth: '280px' }}>
+                        Proceed to Sign In
+                    </Link>
                 </div>
             </div>
         )
     }
 
-
-
     return (
-        <div className={loginStyles.loginContainer}>
+        <div className={styles.pageWrapper}>
+            <div className={styles.bgBlob1} />
+            <div className={styles.bgBlob2} />
 
-            {/* Left Panel - Branding */}
-            <div className={loginStyles.brandingPanel} style={{ justifyContent: 'flex-start', paddingTop: '3rem' }}>
-                <div className={loginStyles.brandingBackground} />
-                <div className={loginStyles.brandingContent}>
-                    <div className={loginStyles.brandHeader}>
-                        <Image src="/logo.png" alt="Logo" width={64} height={64} />
-                        <div>
-                            <h2 className={loginStyles.brandTitle}>Barangay Gordon Heights</h2>
-                            <div className={loginStyles.brandSubtitle}>Olongapo City</div>
+            <div className={styles.slidingCard}>
+                {/* ------------------------------------------------------------- */}
+                {/* LEFT PANEL: Deep Green Integrated Showcase (Matching Login)   */}
+                {/* ------------------------------------------------------------- */}
+                <div 
+                    className={styles.showcasePanel}
+                    onMouseEnter={() => setIsPaused(true)}
+                    onMouseLeave={() => setIsPaused(false)}
+                >
+                    <div className={styles.showcaseTop}>
+                        {/* Branding Header */}
+                        <div className={styles.brandingHeader}>
+                            <div className={styles.logoRing}>
+                                <Image 
+                                    src="/logo.png" 
+                                    alt="Barangay Gordon Heights Logo" 
+                                    width={50} 
+                                    height={50}
+                                    priority
+                                    style={{ objectFit: 'contain' }}
+                                />
+                            </div>
+                            <div className={styles.brandTitles}>
+                                <h2 className={styles.brandName}>Barangay Gordon Heights</h2>
+                                <span className={styles.brandCity}>OLONGAPO CITY</span>
+                            </div>
+                        </div>
+
+                        {/* Carousel Slides Container with Unified Text Box */}
+                        <div className={styles.carouselViewport}>
+                            {SLIDES.map((slide, index) => (
+                                <div 
+                                    key={slide.id} 
+                                    className={`${styles.slideContent} ${index === activeSlide ? styles.activeSlide : ''}`}
+                                    aria-hidden={index !== activeSlide}
+                                >
+                                    {/* Single Unified Modern Card/Text Box */}
+                                    <div className={styles.unifiedBox}>
+                                        <div className={styles.sectionHeaderRow}>
+                                            <span className={styles.sectionTag}>{slide.sectionTitle}</span>
+                                        </div>
+                                        
+                                        <p className={styles.sectionDescription}>
+                                            {slide.description}
+                                        </p>
+
+                                        <div className={styles.boxDivider} />
+
+                                        {/* Neatly Aligned 2-Column Feature Grid */}
+                                        <ul className={styles.featureGrid}>
+                                            {slide.features.map((feature, fIdx) => (
+                                                <li key={fIdx} className={styles.featureItem}>
+                                                    <div className={styles.checkBadge}>
+                                                        <Check size={11} strokeWidth={3} />
+                                                    </div>
+                                                    <span>{feature}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    <div className={loginStyles.brandSection}>
-                        <div className={loginStyles.sectionTitle}>Mandate</div>
-                        <div className={loginStyles.sectionText}>
-                            Barangay Gordon Heights is responsible for delivering essential services, maintaining peace and order, implementing local governance and facilitating citizen's participation.
+                    {/* Bottom Indicators & Waves */}
+                    <div className={styles.showcaseBottom}>
+                        <div className={styles.indicatorContainer} role="tablist">
+                            {SLIDES.map((slide, idx) => (
+                                <button
+                                    key={slide.id}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={idx === activeSlide}
+                                    aria-label={`Go to ${slide.sectionTitle}`}
+                                    className={`${styles.indicatorDot} ${idx === activeSlide ? styles.activeDot : ''}`}
+                                    onClick={() => setActiveSlide(idx)}
+                                />
+                            ))}
                         </div>
+                        <span className={styles.slideCounter}>
+                            {SLIDES[activeSlide].sectionTitle}
+                        </span>
                     </div>
 
-                    <div className={loginStyles.brandSection}>
-                        <div className={loginStyles.sectionTitle}>Vision</div>
-                        <div className={loginStyles.sectionText}>
-                            Peaceful barangay, God fearing, productive with self-reliance and with law abiding citizens.
-                        </div>
-                    </div>
-
-                    <div className={loginStyles.brandSection}>
-                        <div className={loginStyles.sectionTitle}>Mission</div>
-                        <div className={loginStyles.sectionText}>
-                            To translate the convention on the rights of every Filipino into local policies, sustainable programs and services, and support the survival, protection, development and participation of the people in community building through the provision of good education, health and other institution with special protection, information, communication by legislating ordinances, formulating strategies, enforcing and implementing the same.
-                        </div>
-                    </div>
-
-                    <div className={loginStyles.brandSection}>
-                        <div className={loginStyles.sectionTitle}>Service Pledge</div>
-                        <p style={{ marginBottom: '0.5rem', fontSize: '0.8rem' }}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
-                        <ul className={loginStyles.coreValues}>
-                            <li>• Serve with honesty and integrity</li>
-                            <li>• Be polite and courteous at all times</li>
-                            <li>• Demonstrate appropriate behavior and professionalism</li>
-                            <li>• Be prompt and timely</li>
-                            <li>• Provide adequate and reliable information</li>
-                            <li>• Be available during office hours</li>
-                            <li>• Provide feedback mechanism and respond to complaints</li>
-                            <li>• Equal treatment to all</li>
-                        </ul>
+                    {/* Decorative Bottom Wave */}
+                    <div className={styles.bottomWaveGraphic}>
+                        <svg 
+                            className={styles.bottomWaveSvg} 
+                            viewBox="0 0 500 120" 
+                            preserveAspectRatio="none"
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path 
+                                d="M0,80 C150,120 320,30 500,75 L500,120 L0,120 Z" 
+                                fill="rgba(16, 185, 129, 0.12)" 
+                            />
+                            <path 
+                                d="M0,50 C130,15 300,105 500,40 L500,120 L0,120 Z" 
+                                fill="rgba(5, 150, 105, 0.18)" 
+                            />
+                            <path 
+                                d="M0,70 C160,35 340,110 500,60 L500,120 L0,120 Z" 
+                                fill="rgba(4, 120, 87, 0.22)" 
+                            />
+                        </svg>
                     </div>
                 </div>
-            </div>
 
-            {/* Right Panel - Form Container */}
-            <div className={loginStyles.formPanel} style={{ overflowY: 'auto' }}>
-                <Link href="/" className={loginStyles.backButton} style={{ position: 'sticky', background: '#fff', zIndex: 10, width: '100%', padding: '1.75rem 2rem', top: 0, left: 0, borderBottom: '1px solid #f1f5f9' }}>
-                    Back to Home
-                </Link>
-                <div className={styles.registerCard}>
-                    <div className={styles.logoSection}>
-                        <div className={styles.logoIcon}>
-                            <Image src="/logo.png" alt="Logo" width={72} height={72} />
-                        </div>
-                        <h1 style={{ color: '#111827', fontSize: '1.5rem', marginTop: '0.5rem' }}>Create Account</h1>
-                        <p>Join the E-Barangay system</p>
+                {/* ------------------------------------------------------------- */}
+                {/* RIGHT PANEL: Structured Scrollable Registration Form          */}
+                {/* ------------------------------------------------------------- */}
+                <div className={styles.formPanel}>
+                    {/* Top Row: Back to Home */}
+                    <div className={styles.formTopRow}>
+                        <Link href="/" className={styles.backButton}>
+                            <ArrowLeft size={15} />
+                            <span>Back to Home</span>
+                        </Link>
                     </div>
 
-                     <form onSubmit={handleSubmit} className={styles.form}>
-                        {redirectUrl && redirectUrl.startsWith('/request/') && (
-                            <div style={{
-                                padding: '0.875rem 1rem',
-                                borderRadius: '12px',
-                                backgroundColor: '#eff6ff',
-                                border: '1px solid #bfdbfe',
-                                color: '#1e3a8a',
-                                fontSize: '0.85rem',
-                                fontWeight: 500,
-                                marginBottom: '1rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                            }}>
-                                <Info size={16} style={{ flexShrink: 0 }} />
-                                <span>Please create an account to request this document. You will be redirected back to the form immediately after.</span>
+                    {/* Scrollable Form Content */}
+                    <div className={styles.scrollableFormArea}>
+                        {/* Header */}
+                        <div className={styles.formHeader}>
+                            <div className={styles.formLogoBadge}>
+                                <Image 
+                                    src="/logo.png" 
+                                    alt="Barangay Logo" 
+                                    width={56} 
+                                    height={56}
+                                    priority
+                                    style={{ objectFit: 'contain' }}
+                                />
                             </div>
-                        )}
+                            <h1 className={styles.formTitle}>Create Account</h1>
+                            <div className={styles.formSubtitle}>Join the E-Barangay system</div>
+                        </div>
+
+                        {/* Error Alert */}
                         {error && (
-                            <div className={styles.errorMessage}>
-                                {error}
+                            <div className={`${styles.alertBox} ${styles.alertError}`} role="alert" style={{ marginBottom: '1rem' }}>
+                                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <span>{error}</span>
                             </div>
                         )}
 
-                        <div className={styles.nameGrid}>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="firstName">First Name *</label>
-                                <input
-                                    id="firstName"
-                                    type="text"
-                                    value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
-                                    placeholder="Juan"
-                                    required
-                                />
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="middleName">Middle Name</label>
-                                <input
-                                    id="middleName"
-                                    type="text"
-                                    value={middleName}
-                                    onChange={(e) => setMiddleName(e.target.value)}
-                                    placeholder="Luna"
-                                />
-                            </div>
-                        </div>
-
-                        <div className={styles.nameGrid}>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="lastName">Last Name *</label>
-                                <input
-                                    id="lastName"
-                                    type="text"
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
-                                    placeholder="Dela Cruz"
-                                    required
-                                />
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="suffix">Suffix</label>
-                                <select
-                                    id="suffix"
-                                    value={suffix}
-                                    onChange={(e) => setSuffix(e.target.value)}
-                                    className={styles.select}
-                                >
-                                    <option value="">None</option>
-                                    <option value="Jr.">Jr.</option>
-                                    <option value="Sr.">Sr.</option>
-                                    <option value="II">II</option>
-                                    <option value="III">III</option>
-                                    <option value="IV">IV</option>
-                                    <option value="V">V</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="email">Email Address *</label>
-                            <input
-                                id="email"
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="you@example.com"
-                                required
-                            />
-                        </div>
-
-                        <div className={styles.inputRow}>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="password">Password *</label>
-                                <div className={styles.passwordInputWrapper}>
+                        <form onSubmit={handleSubmit} className={styles.form}>
+                            {/* Row 1: First Name & Middle Name */}
+                            <div className={styles.fieldRow}>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="firstName">First Name *</label>
                                     <input
-                                        id="password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••"
+                                        id="firstName"
+                                        type="text"
+                                        className={styles.inputField}
+                                        value={firstName}
+                                        onChange={(e) => setFirstName(e.target.value)}
+                                        placeholder="Juan"
                                         required
+                                        disabled={loading}
                                     />
-                                    <button
-                                        type="button"
-                                        className={styles.passwordToggle}
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        tabIndex={-1}
-                                    >
-                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                    </button>
                                 </div>
-                                <div className={styles.requirementList}>
-                                    <div className={`${styles.requirementItem} ${hasMinLength ? styles.validRequirement : styles.invalidRequirement}`}>
-                                        {hasMinLength ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                        <span>At least 8 characters</span>
-                                    </div>
-                                    <div className={`${styles.requirementItem} ${hasUppercase ? styles.validRequirement : styles.invalidRequirement}`}>
-                                        {hasUppercase ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                        <span>Uppercase letter</span>
-                                    </div>
-                                    <div className={`${styles.requirementItem} ${hasLowercase ? styles.validRequirement : styles.invalidRequirement}`}>
-                                        {hasLowercase ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                        <span>Lowercase letter</span>
-                                    </div>
-                                    <div className={`${styles.requirementItem} ${hasNumber ? styles.validRequirement : styles.invalidRequirement}`}>
-                                        {hasNumber ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                        <span>Number</span>
-                                    </div>
-                                    <div className={`${styles.requirementItem} ${hasSpecial ? styles.validRequirement : styles.invalidRequirement}`}>
-                                        {hasSpecial ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                        <span>Special character (@$!%*#?&)</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="confirmPassword">Confirm Password *</label>
-                                <div className={styles.passwordInputWrapper}>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="middleName">Middle Name</label>
                                     <input
-                                        id="confirmPassword"
-                                        type={showConfirmPassword ? 'text' : 'password'}
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        placeholder="••••••••"
-                                        required
+                                        id="middleName"
+                                        type="text"
+                                        className={styles.inputField}
+                                        value={middleName}
+                                        onChange={(e) => setMiddleName(e.target.value)}
+                                        placeholder="Luna"
+                                        disabled={loading}
                                     />
-                                    <button
-                                        type="button"
-                                        className={styles.passwordToggle}
-                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                        tabIndex={-1}
-                                    >
-                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                    </button>
                                 </div>
-                                {showMatchStatus && (
-                                    <div className={`${styles.matchStatus} ${passwordsMatch ? styles.matchSuccess : styles.matchError}`}>
-                                        {passwordsMatch ? (
-                                            <>
-                                                <ShieldCheck size={14} />
-                                                <span>Passwords match</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <ShieldAlert size={14} />
-                                                <span>Passwords do not match</span>
-                                            </>
-                                        )}
+                            </div>
+
+                            {/* Row 2: Last Name & Suffix */}
+                            <div className={styles.fieldRow}>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="lastName">Last Name *</label>
+                                    <input
+                                        id="lastName"
+                                        type="text"
+                                        className={styles.inputField}
+                                        value={lastName}
+                                        onChange={(e) => setLastName(e.target.value)}
+                                        placeholder="Dela Cruz"
+                                        required
+                                        disabled={loading}
+                                    />
+                                </div>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="suffix">Suffix</label>
+                                    <select
+                                        id="suffix"
+                                        className={styles.selectField}
+                                        value={suffix}
+                                        onChange={(e) => setSuffix(e.target.value)}
+                                        disabled={loading}
+                                    >
+                                        <option value="">None</option>
+                                        <option value="Jr.">Jr.</option>
+                                        <option value="Sr.">Sr.</option>
+                                        <option value="II">II</option>
+                                        <option value="III">III</option>
+                                        <option value="IV">IV</option>
+                                        <option value="V">V</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Row 3: Email Address */}
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="email">Email Address *</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    className={styles.inputField}
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="you@example.com"
+                                    required
+                                    disabled={loading}
+                                    autoComplete="username"
+                                />
+                            </div>
+
+                            {/* Row 4: Password & Confirm Password */}
+                            <div className={styles.fieldRow}>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="password">Password *</label>
+                                    <div className={styles.passwordInputWrapper}>
+                                        <input
+                                            id="password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            className={styles.inputField}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                            required
+                                            disabled={loading}
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            className={styles.passwordToggle}
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            tabIndex={-1}
+                                        >
+                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
                                     </div>
-                                )}
+                                </div>
+
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="confirmPassword">Confirm Password *</label>
+                                    <div className={styles.passwordInputWrapper}>
+                                        <input
+                                            id="confirmPassword"
+                                            type={showConfirmPassword ? 'text' : 'password'}
+                                            className={styles.inputField}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                            required
+                                            disabled={loading}
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            className={styles.passwordToggle}
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            tabIndex={-1}
+                                        >
+                                            {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="address">Full Home Address *</label>
-                            <input
-                                id="address"
-                                type="text"
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                placeholder="Street, Blk/Lot, Gordon Heights, Olongapo City"
-                                required
-                            />
-                        </div>
+                            {/* Password Requirements Box */}
+                            <div className={styles.passwordValidationBox}>
+                                <div className={`${styles.ruleItem} ${hasMinLength ? styles.valid : ''}`}>
+                                    <div className={styles.ruleIcon}>{hasMinLength ? <Check size={12} strokeWidth={3} /> : '•'}</div>
+                                    <span>At least 8 characters</span>
+                                </div>
+                                <div className={`${styles.ruleItem} ${hasUppercase ? styles.valid : ''}`}>
+                                    <div className={styles.ruleIcon}>{hasUppercase ? <Check size={12} strokeWidth={3} /> : '•'}</div>
+                                    <span>Uppercase letter</span>
+                                </div>
+                                <div className={`${styles.ruleItem} ${hasLowercase ? styles.valid : ''}`}>
+                                    <div className={styles.ruleIcon}>{hasLowercase ? <Check size={12} strokeWidth={3} /> : '•'}</div>
+                                    <span>Lowercase letter</span>
+                                </div>
+                                <div className={`${styles.ruleItem} ${hasNumber ? styles.valid : ''}`}>
+                                    <div className={styles.ruleIcon}>{hasNumber ? <Check size={12} strokeWidth={3} /> : '•'}</div>
+                                    <span>Number</span>
+                                </div>
+                                <div className={`${styles.ruleItem} ${hasSpecial ? styles.valid : ''}`}>
+                                    <div className={styles.ruleIcon}>{hasSpecial ? <Check size={12} strokeWidth={3} /> : '•'}</div>
+                                    <span>Special character (@$!%*#?&)</span>
+                                </div>
+                            </div>
 
-                        <div className={styles.inputRow}>
+                            {/* Row 5: Full Home Address */}
                             <div className={styles.inputGroup}>
-                                <label htmlFor="phone">Phone Number *</label>
+                                <label htmlFor="address">Full Home Address *</label>
                                 <input
-                                    id="phone"
-                                    type="tel"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    placeholder="09XX XXX XXXX"
+                                    id="address"
+                                    type="text"
+                                    className={styles.inputField}
+                                    value={address}
+                                    onChange={(e) => setAddress(e.target.value)}
+                                    placeholder="Street, Blk/Lot, Gordon Heights, Olongapo City"
                                     required
+                                    disabled={loading}
                                 />
                             </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="birthdate">Birthdate *</label>
-                                <input
-                                    id="birthdate"
-                                    type="date"
-                                    value={birthdate}
-                                    onChange={(e) => setBirthdate(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
 
-                        <div className={styles.inputRow}>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="gender">Gender *</label>
-                                <select
-                                    id="gender"
-                                    value={gender}
-                                    onChange={(e) => setGender(e.target.value as 'Male' | 'Female')}
-                                    className={styles.select}
-                                    required
+                            {/* Row 6: Phone Number & Birthdate */}
+                            <div className={styles.fieldRow}>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="phone">Phone Number *</label>
+                                    <input
+                                        id="phone"
+                                        type="tel"
+                                        className={styles.inputField}
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        placeholder="09XX XXX XXXX"
+                                        required
+                                        disabled={loading}
+                                    />
+                                </div>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="birthdate">Birthdate *</label>
+                                    <input
+                                        id="birthdate"
+                                        type="date"
+                                        className={styles.inputField}
+                                        value={birthdate}
+                                        onChange={(e) => setBirthdate(e.target.value)}
+                                        required
+                                        disabled={loading}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Row 7: Gender & Relationship Status */}
+                            <div className={styles.fieldRow}>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="gender">Gender *</label>
+                                    <select
+                                        id="gender"
+                                        className={styles.selectField}
+                                        value={gender}
+                                        onChange={(e) => setGender(e.target.value as any)}
+                                        required
+                                        disabled={loading}
+                                    >
+                                        <option value="">Select Gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+                                <div className={styles.inputGroup}>
+                                    <label htmlFor="relationshipStatus">Relationship Status *</label>
+                                    <select
+                                        id="relationshipStatus"
+                                        className={styles.selectField}
+                                        value={relationshipStatus}
+                                        onChange={(e) => setRelationshipStatus(e.target.value)}
+                                        required
+                                        disabled={loading}
+                                    >
+                                        <option value="">Select Status</option>
+                                        <option value="Single">Single</option>
+                                        <option value="Married">Married</option>
+                                        <option value="Widowed">Widowed</option>
+                                        <option value="Separated">Separated</option>
+                                        <option value="Divorced">Divorced</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Row 8: Sectoral Classification (Optional) */}
+                            <div className={styles.sectorAccordion}>
+                                <button
+                                    type="button"
+                                    className={styles.sectorHeader}
+                                    onClick={() => setShowSectors(!showSectors)}
                                 >
-                                    <option value="">Select Gender</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
-                            </div>
-                            <div className={styles.inputGroup}>
-                                <label htmlFor="relationshipStatus">Relationship Status *</label>
-                                <select
-                                    id="relationshipStatus"
-                                    value={relationshipStatus}
-                                    onChange={(e) => setRelationshipStatus(e.target.value)}
-                                    className={styles.select}
-                                    required
-                                >
-                                    <option value="">Select Status</option>
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Widowed">Widowed</option>
-                                    <option value="Separated">Separated</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Sectoral Classification */}
-                        <div style={{
-                            margin: '0.5rem 0',
-                            background: '#f8faff',
-                            borderRadius: '16px',
-                            border: '1px solid #e2e8f0',
-                            overflow: 'hidden',
-                        }}>
-                            <button
-                                type="button"
-                                onClick={() => setShowSectors(!showSectors)}
-                                style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '1rem 1.25rem',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    fontWeight: 700,
-                                    color: '#1e293b',
-                                }}
-                            >
-                                <span>
-                                    Sectoral Classification
-                                    <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: '0.5rem', fontSize: '0.75rem' }}>
-                                        (Optional{sectors.length > 0 ? ` • ${sectors.length} selected` : ''})
-                                    </span>
-                                </span>
-                                <span style={{
-                                    transform: showSectors ? 'rotate(180deg)' : 'rotate(0deg)',
-                                    transition: 'transform 0.2s ease',
-                                    fontSize: '0.75rem',
-                                    color: '#94a3b8',
-                                }}>▼</span>
-                            </button>
-
-                            {showSectors && (
-                                <div style={{ padding: '0 1.25rem 1.25rem' }}>
-                                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '0.75rem', lineHeight: 1.4 }}>
-                                        Select all sectors that apply. You can update this later in your profile.
-                                    </p>
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(2, 1fr)',
-                                        gap: '0.4rem',
-                                    }}>
-                                        {SECTOR_OPTIONS.map(opt => {
+                                    <span>Sectoral Classification (Optional) {sectors.length > 0 && `(${sectors.length} selected)`}</span>
+                                    {showSectors ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+                                {showSectors && (
+                                    <div className={styles.sectorChipsGrid}>
+                                        {SECTOR_OPTIONS.map((opt) => {
                                             const isSelected = sectors.includes(opt.value)
                                             return (
                                                 <div
                                                     key={opt.value}
-                                                    style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '0.45rem',
-                                                        padding: '0.5rem 0.65rem',
-                                                        borderRadius: '8px',
-                                                        border: `1.5px solid ${isSelected ? '#059669' : '#e2e8f0'}`,
-                                                        background: isSelected ? 'rgba(34, 197, 94, 0.06)' : '#fff',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.15s ease',
-                                                        fontSize: '0.78rem',
-                                                        color: isSelected ? '#15803d' : '#475569',
-                                                        fontWeight: isSelected ? 600 : 400,
-                                                        userSelect: 'none',
-                                                    }}
-                                                    onClick={() => setSectors(prev =>
-                                                        prev.includes(opt.value)
-                                                            ? prev.filter(s => s !== opt.value)
-                                                            : [...prev, opt.value]
-                                                    )}
+                                                    className={`${styles.sectorChip} ${isSelected ? styles.activeChip : ''}`}
+                                                    onClick={() => handleSectorToggle(opt.value)}
                                                 >
-                                                    <span style={{
-                                                        width: '14px',
-                                                        height: '14px',
-                                                        borderRadius: '3px',
-                                                        border: `2px solid ${isSelected ? '#059669' : '#cbd5e1'}`,
-                                                        background: isSelected ? '#059669' : '#fff',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        flexShrink: 0,
-                                                        fontSize: '0.6rem',
-                                                        color: '#fff',
-                                                    }}>
-                                                        {isSelected && <Check size={10} strokeWidth={3} />}
-                                                    </span>
                                                     <span>{opt.icon}</span>
-                                                    {opt.label || opt.value}
+                                                    <span>{opt.label || opt.value}</span>
                                                 </div>
                                             )
                                         })}
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
 
-                        <div className={styles.checkboxGroup}>
-                            <input
-                                id="terms"
-                                type="checkbox"
-                                checked={agreedToTerms}
-                                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                required
-                            />
-                            <label htmlFor="terms">
-                                I have read and agree to the <button type="button" onClick={() => setShowTermsModal(true)} className={styles.inlineButton}>Terms and Conditions</button> and <button type="button" onClick={() => setShowPrivacyModal(true)} className={styles.inlineButton}>Privacy Policy</button>
-                            </label>
-                        </div>
+                            {/* Row 9: Terms and Conditions Agreement */}
+                            <div className={styles.termsRow}>
+                                <input
+                                    id="terms"
+                                    type="checkbox"
+                                    checked={agreedToTerms}
+                                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                    required
+                                />
+                                <label htmlFor="terms">
+                                    I have read and agree to the <button type="button" onClick={() => setShowTermsModal(true)} className={styles.modalLink}>Terms and Conditions</button> and <button type="button" onClick={() => setShowPrivacyModal(true)} className={styles.modalLink}>Privacy Policy</button>
+                                </label>
+                            </div>
 
-                        <button
-                            type="submit"
-                            className={styles.submitButton}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <>
-                                    <span className={styles.spinner}></span>
-                                    Creating Account...
-                                </>
-                            ) : (
-                                'Create Account'
-                            )}
-                        </button>
-                    </form>
+                            {/* Submit Button */}
+                            <button
+                                type="submit"
+                                className={styles.createButton}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className={styles.spinnerIcon} />
+                                        <span>Creating Account...</span>
+                                    </>
+                                ) : (
+                                    'Create Account'
+                                )}
+                            </button>
+                        </form>
+                    </div>
 
-                    <div className={styles.footer}>
-                        <p>Already have an account?{' '}
-                            <Link href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className={styles.link}>Sign in</Link>
+                    {/* Bottom Registration Footer */}
+                    <div className={styles.formDivider} />
+                    <div className={styles.formFooter}>
+                        <p className={styles.footerText}>
+                            Already have an account?
+                            <Link 
+                                href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} 
+                                className={styles.signinLink}
+                            >
+                                Sign in
+                            </Link>
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Modals */}
+            {/* Terms Modal */}
             {showTermsModal && (
                 <div className={styles.modalOverlay} onClick={() => setShowTermsModal(false)}>
                     <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
@@ -708,23 +734,23 @@ function RegisterContent() {
                             <button type="button" onClick={() => setShowTermsModal(false)} className={styles.closeButton}>&times;</button>
                         </div>
                         <div className={styles.modalBody}>
-                            <p>These Terms and Conditions represent a binding contract between you (the user) and the E-Barangay application. By creating an account, you agree to:</p>
+                            <p>These Terms and Conditions represent a binding agreement with Barangay Gordon Heights E-Barangay portal. By creating an account, you agree to:</p>
                             <ul>
                                 <li>Provide accurate and truthful information during registration.</li>
-                                <li>Use the application services solely for legitimate barangay-related transactions.</li>
-                                <li>Maintain the confidentiality of your account credentials and not share them with others.</li>
-                                <li>Comply with all local and national laws while using the platform.</li>
-                                <li>Acknowledge that any misuse of the platform may lead to account suspension.</li>
+                                <li>Use the portal services solely for legitimate barangay requests and transactions.</li>
+                                <li>Maintain confidentiality of your login credentials.</li>
+                                <li>Comply with local ordinances and national laws.</li>
                             </ul>
                             <h4>1. Acceptance of Terms</h4>
                             <p>By accessing or using E-Barangay, you agree to be bound by these terms. If you do not agree, please do not use our services.</p>
                             <h4>2. Account Responsibility</h4>
-                            <p>You are responsible for all activities that occur under your account. You must notify us immediately of any unauthorized use.</p>
+                            <p>You are responsible for all activities that occur under your account.</p>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* Privacy Modal */}
             {showPrivacyModal && (
                 <div className={styles.modalOverlay} onClick={() => setShowPrivacyModal(false)}>
                     <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
@@ -733,20 +759,15 @@ function RegisterContent() {
                             <button type="button" onClick={() => setShowPrivacyModal(false)} className={styles.closeButton}>&times;</button>
                         </div>
                         <div className={styles.modalBody}>
-                            <p>We value your privacy and are committed to full compliance with Data Privacy Laws (e.g., Data Privacy Act of 2012). This policy explains our practices regarding your information.</p>
+                            <p>Barangay Gordon Heights is committed to protecting your privacy in full compliance with the Philippine Data Privacy Act of 2012 (RA 10173).</p>
                             <h4>Data Collection & Storage</h4>
-                            <p>We collect personal information such as your name, email, birthdate, phone number, and address to facilitate barangay services. This data is stored securely using industry-standard encryption protocols provided by Supabase.</p>
+                            <p>We collect personal information such as your name, email, birthdate, phone number, and address strictly to facilitate barangay services and official certificate requests.</p>
                             <h4>User Rights</h4>
-                            <p>As a user, you have the following rights regarding your data:</p>
                             <ul>
                                 <li><strong>Right to be Informed:</strong> Know how your data is collected and processed.</li>
-                                <li><strong>Right to Access:</strong> View the information we have on file for you.</li>
-                                <li><strong>Right to Rectification:</strong> Request corrections to inaccurate data.</li>
-                                <li><strong>Right to Erasure:</strong> Request deletion of your account and associated data.</li>
-                                <li><strong>Right to Object:</strong> Object to unauthorized data processing.</li>
+                                <li><strong>Right to Access:</strong> View information recorded in your citizen profile.</li>
+                                <li><strong>Right to Rectification:</strong> Request corrections to outdated or inaccurate records.</li>
                             </ul>
-                            <h4>Compliance</h4>
-                            <p>E-Barangay adheres to the standards set by the National Privacy Commission and ensures that all data handlers are trained in privacy best practices.</p>
                         </div>
                     </div>
                 </div>
@@ -757,7 +778,13 @@ function RegisterContent() {
 
 export default function RegisterPage() {
     return (
-        <Suspense fallback={<div className={loginStyles.loginContainer}>Loading...</div>}>
+        <Suspense fallback={
+            <div className={styles.pageWrapper}>
+                <div className={styles.slidingCard} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className={styles.spinnerIcon} style={{ borderColor: 'rgba(5, 150, 105, 0.2)', borderTopColor: '#059669', width: '2rem', height: '2rem' }} />
+                </div>
+            </div>
+        }>
             <RegisterContent />
         </Suspense>
     )

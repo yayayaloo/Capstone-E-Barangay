@@ -1,446 +1,791 @@
-.registerCard {
-    width: 100%;
-    max-width: 680px;
-    background: #ffffff;
-    /* Optional: custom padding for register */
-    padding: 3.5rem 4rem;
-    animation: slideUpFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+/* GClamp-Style Modern Sliding Registration Page Layout */
 
-.logoSection {
-    text-align: center;
-    margin-bottom: 2.5rem;
-}
-
-.backLink {
+.pageWrapper {
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    background: #f3f4f6;
-    color: #6b7280;
-    text-decoration: none;
+    padding: 2rem 1.5rem;
+    background: radial-gradient(circle at 15% 20%, #e2f4e8 0%, #edf7f0 35%, #f4fbf6 70%, #ebf5ee 100%);
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Ambient background organic accents */
+.bgBlob1 {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    top: -150px;
+    left: -150px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(209, 250, 229, 0) 70%);
     border-radius: 50%;
-    transition: all 0.2s;
-    margin-bottom: 1rem;
-    font-size: 1.25rem;
+    filter: blur(40px);
+    pointer-events: none;
+    z-index: 0;
 }
 
-.backLink:hover {
-    background: #e5e7eb;
-    color: #059669;
-    transform: scale(1.1);
+.bgBlob2 {
+    position: absolute;
+    width: 550px;
+    height: 550px;
+    bottom: -120px;
+    right: -100px;
+    background: radial-gradient(circle, rgba(5, 150, 105, 0.1) 0%, rgba(209, 250, 229, 0) 70%);
+    border-radius: 50%;
+    filter: blur(50px);
+    pointer-events: none;
+    z-index: 0;
 }
 
-.logoIcon {
-    font-size: 2.5rem;
-    margin-bottom: 0.75rem;
+/* Main Sliding Card matching Login */
+.slidingCard {
+    width: 100%;
+    max-width: 1120px;
+    height: min(92vh, 780px);
+    background: #ffffff;
+    border-radius: 28px;
+    box-shadow: 0 20px 60px -15px rgba(6, 78, 59, 0.16),
+                0 4px 20px -2px rgba(0, 0, 0, 0.05),
+                0 0 0 1px rgba(16, 185, 129, 0.15);
+    display: grid;
+    grid-template-columns: 1fr;
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    animation: cardAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.logoSection h1 {
+@media (min-width: 960px) {
+    .slidingCard {
+        grid-template-columns: 1.05fr 1.25fr;
+        height: min(92vh, 800px);
+    }
+}
+
+/* ------------------------------------------------------------- */
+/* LEFT PANEL: Deep Green Showcase & Carousel (Matching Login)   */
+/* ------------------------------------------------------------- */
+.showcasePanel {
+    background: linear-gradient(150deg, #064e3b 0%, #053f30 50%, #022c22 100%);
+    padding: 2.75rem 2.25rem 2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    color: #ffffff;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 959px) {
+    .showcasePanel {
+        display: none; /* Mobile focuses on the form */
+    }
+}
+
+.showcaseTop {
+    position: relative;
+    z-index: 2;
+}
+
+.brandingHeader {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.95rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.logoRing {
+    width: 58px;
+    height: 58px;
+    min-width: 58px;
+    border-radius: 50%;
+    background: #ffffff;
+    padding: 3px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25),
+                0 0 0 2px rgba(52, 211, 153, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+
+.logoRing:hover {
+    transform: scale(1.05);
+}
+
+.brandTitles {
+    display: flex;
+    flex-direction: column;
+}
+
+.brandName {
     font-family: var(--font-poppins, sans-serif);
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: 0.3px;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.brandCity {
+    font-size: 0.72rem;
     font-weight: 700;
-    background: #059669;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 0.25rem;
+    color: #6ee7b7;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    margin-top: 0.25rem;
 }
 
-.logoSection p {
-    color: #6b7280;
-    font-size: 0.9rem;
+/* Carousel Viewport */
+.carouselViewport {
+    position: relative;
+    min-height: 275px;
+    z-index: 2;
+    margin-bottom: 0.5rem;
 }
 
+.slideContent {
+    opacity: 0;
+    transform: translateX(18px);
+    transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+}
+
+.slideContent.activeSlide {
+    opacity: 1;
+    transform: translateX(0);
+    position: relative;
+    pointer-events: auto;
+}
+
+/* Single Unified Modern Card/Text Box */
+.unifiedBox {
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-left: 3.5px solid #10b981;
+    border-radius: 16px;
+    padding: 1rem 1.2rem;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    transition: all 0.25s ease;
+}
+
+.unifiedBox:hover {
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.sectionHeaderRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sectionTag {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #34d399;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-bottom: 2px solid #10b981;
+    padding-bottom: 0.15rem;
+    display: inline-block;
+}
+
+.sectionDescription {
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: #f3f4f6;
+    margin: 0;
+    font-weight: 400;
+}
+
+.boxDivider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.09);
+    width: 100%;
+}
+
+/* 2-Column Feature Grid */
+.featureGrid {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem 0.85rem;
+}
+
+@media (max-width: 540px) {
+    .featureGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.featureItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    font-size: 0.81rem;
+    color: #e5e7eb;
+    font-weight: 450;
+    line-height: 1.35;
+    transition: transform 0.2s ease;
+}
+
+.featureItem:hover {
+    transform: translateX(2px);
+    color: #ffffff;
+}
+
+.checkBadge {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.25);
+    border: 1.5px solid #34d399;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6ee7b7;
+    font-size: 0.65rem;
+    margin-top: 1px;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+    flex-shrink: 0;
+}
+
+.showcaseBottom {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+}
+
+.indicatorContainer {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.indicatorDot {
+    height: 8px;
+    width: 8px;
+    border-radius: 9999px;
+    background: transparent;
+    border: 1.5px solid rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity: 0.7;
+}
+
+.indicatorDot:hover {
+    opacity: 1;
+    transform: scale(1.15);
+}
+
+.indicatorDot.activeDot {
+    width: 26px;
+    background: #34d399;
+    border-color: #34d399;
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+}
+
+.slideCounter {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #6ee7b7;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.bottomWaveGraphic {
+    position: absolute;
+    bottom: -1px;
+    left: -1px;
+    right: -1px;
+    width: calc(100% + 2px);
+    height: 110px;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.bottomWaveSvg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ------------------------------------------------------------- */
+/* RIGHT PANEL: Scrollable Modern Registration Form              */
+/* ------------------------------------------------------------- */
+.formPanel {
+    background: #ffffff;
+    padding: 2rem 2.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+@media (max-width: 959px) {
+    .formPanel {
+        padding: 1.75rem 1.5rem 1.25rem;
+        height: auto;
+        min-height: 100vh;
+    }
+}
+
+.formTopRow {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+}
+
+.backButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: #64748b;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    padding: 0.2rem 0;
+}
+
+.backButton:hover {
+    color: #059669;
+    transform: translateX(-2px);
+}
+
+/* Scrollable Inner Form Container */
+.scrollableFormArea {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    margin-right: -0.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.scrollableFormArea::-webkit-scrollbar {
+    width: 5px;
+}
+
+.scrollableFormArea::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollableFormArea::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.scrollableFormArea::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Form Header */
+.formHeader {
+    text-align: center;
+    margin-bottom: 1.35rem;
+}
+
+.formLogoBadge {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #ffffff;
+    padding: 2px;
+    box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.08);
+}
+
+.formTitle {
+    font-family: var(--font-poppins, sans-serif);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #059669;
+    margin: 0;
+    letter-spacing: -0.2px;
+}
+
+.formSubtitle {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+/* Form Fields Grid & Controls */
 .form {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
+    padding-bottom: 0.5rem;
 }
 
-.inputRow {
+.fieldRow {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    gap: 0.85rem;
+}
+
+@media (max-width: 600px) {
+    .fieldRow {
+        grid-template-columns: 1fr;
+    }
 }
 
 .inputGroup {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.35rem;
 }
 
 .inputGroup label {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #374151;
-    letter-spacing: 0.3px;
-}
-
-.inputGroup input {
-    padding: 0.9rem 1.15rem;
-    background: #f9fafb;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 12px;
-    color: #111827;
-    font-size: 0.95rem;
-    font-family: var(--font-inter, sans-serif);
-    transition: all 0.2s;
-    outline: none;
-}
-
-.inputGroup input::placeholder {
-    color: #9ca3af;
-}
-
-.inputGroup input:focus {
-    border-color: #10b981;
-    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
-    transform: translateY(-1px);
-}
-
-.nameGrid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1.5rem;
-}
-
-.select {
-    padding: 0.9rem 1.15rem;
-    background: #f1f5f9;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    color: #1e293b;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    outline: none;
-    width: 100%;
-}
-
-.select:focus {
-    border-color: #10b981;
-    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
-    transform: translateY(-1px);
-}
-
-.idUploadSection {
-    margin: 1rem 0;
-    background: #f8faff;
-    padding: 1.75rem;
-    border-radius: 16px;
-    border: 1px dashed #cbd5e1;
-}
-
-.idUploadSection label {
-    font-size: 0.85rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 0.25rem;
-    display: block;
+    letter-spacing: 0.4px;
+    color: #374151;
 }
 
-.uploadInfo {
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-bottom: 1rem;
-    line-height: 1.4;
-}
-
-.fileInputWrapper {
-    position: relative;
+.inputField,
+.selectField {
     width: 100%;
-    height: 3.5rem;
-}
-
-.fileInput {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    z-index: 2;
-}
-
-.fileInputPlaceholder {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: 0.75rem 0.95rem;
     background: #ffffff;
     border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    color: #475569;
+    border-radius: 10px;
     font-size: 0.9rem;
-    font-weight: 500;
-    transition: all 0.2s;
-    pointer-events: none;
+    color: #111827;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.fileInput:hover+.fileInputPlaceholder {
-    border-color: #10b981;
-    background: #f1f5f9;
+.inputField::placeholder {
+    color: #94a3b8;
+    font-size: 0.86rem;
+}
+
+.inputField:focus,
+.selectField:focus {
+    border-color: #059669;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.selectField {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    background-size: 1rem;
+    padding-right: 2.25rem;
+    cursor: pointer;
 }
 
 .passwordInputWrapper {
     position: relative;
+    width: 100%;
     display: flex;
     align-items: center;
 }
 
-.passwordInputWrapper input {
-    width: 100%;
+.passwordInputWrapper .inputField {
     padding-right: 2.5rem;
 }
 
 .passwordToggle {
     position: absolute;
-    right: 1rem;
+    right: 0.7rem;
     top: 50%;
     transform: translateY(-50%);
-    background: none;
+    background: transparent;
     border: none;
-    color: #64748b;
+    color: #94a3b8;
     cursor: pointer;
-    padding: 0.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
-    z-index: 3;
+    padding: 0.25rem;
+    border-radius: 6px;
+    transition: color 0.2s ease;
 }
 
 .passwordToggle:hover {
-    color: #10b981;
+    color: #059669;
 }
 
-.passwordStrength {
-    margin-top: 0.4rem;
-    min-height: 1rem;
-}
-
-.strengthIndicator {
-    font-size: 0.75rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.strengthIndicator.invalid {
-    color: #ef4444;
-}
-
-.strengthIndicator.acceptable {
-    color: #10b981;
-}
-
-.requirementList {
-    margin-top: 0.75rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
+/* Password Validation Box */
+.passwordValidationBox {
     background: #f8fafc;
-    padding: 0.75rem;
-    border-radius: 12px;
     border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.4rem 0.75rem;
+    font-size: 0.74rem;
+    margin-top: -0.25rem;
 }
 
-.requirementItem {
+.ruleItem {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    color: #64748b;
+    transition: color 0.2s ease;
 }
 
-.validRequirement {
-    color: #10b981;
-}
-
-.invalidRequirement {
-    color: #94a3b8;
-}
-
-.matchStatus {
-    margin-top: 0.4rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
+.ruleItem.valid {
+    color: #059669;
     font-weight: 600;
 }
 
-.matchSuccess {
-    color: #10b981;
+.ruleIcon {
+    width: 13px;
+    height: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.matchError {
-    color: #ef4444;
+/* Sector Accordion / Multi-Select */
+.sectorAccordion {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    overflow: hidden;
+    transition: border-color 0.2s ease;
 }
 
-.errorMessage {
-    padding: 0.75rem 1rem;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 12px;
-    color: #dc2626;
-    font-size: 0.85rem;
-    animation: shakeError 0.4s ease-in-out;
-}
-
-.successMessage {
-    text-align: center;
-    padding: 2rem;
-}
-
-.successMessage h2 {
-    font-family: var(--font-poppins, sans-serif);
-    font-size: 1.5rem;
-    background: #10b981;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 1rem;
-}
-
-.successMessage p {
-    color: #4b5563;
-    margin-bottom: 1.5rem;
-    line-height: 1.6;
-}
-
-.submitButton {
-    padding: 1.125rem;
-    background: #059669;
+.sectorHeader {
+    width: 100%;
+    padding: 0.75rem 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
     border: none;
-    border-radius: 12px;
-    color: #fff;
-    font-size: 1.05rem;
-    font-weight: 600;
-    font-family: var(--font-inter, sans-serif);
     cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 1rem;
-}
-
-.submitButton:hover:not(:disabled) {
-    box-shadow: 0 8px 25px rgba(22, 163, 74, 0.4);
-    transform: translateY(-1px);
-}
-
-.submitButton:active:not(:disabled) {
-    transform: scale(0.97);
-}
-
-.submitButton:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.footer {
-    text-align: center;
-    margin-top: 2rem;
-    padding-top: 1.75rem;
-    border-top: 1px solid #e5e7eb;
-}
-
-.footer p {
-    color: #6b7280;
-    font-size: 0.9rem;
-}
-
-.link {
-    color: #059669;
-    text-decoration: none;
+    font-size: 0.82rem;
     font-weight: 600;
-    transition: color 0.2s;
+    color: #374151;
+    transition: background 0.15s ease;
 }
 
-.link:hover {
-    text-decoration: underline;
+.sectorHeader:hover {
+    background: #f1f5f9;
 }
 
-.checkboxGroup {
+.sectorChipsGrid {
+    padding: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.45rem;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    max-height: 170px;
+    overflow-y: auto;
+}
+
+.sectorChip {
     display: flex;
-    align-items: flex-start;
-    gap: 0.85rem;
-    margin: 1rem 0;
-    padding: 1rem;
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
-.checkboxGroup input[type="checkbox"] {
-    margin-top: 0.25rem;
-    width: 1.1rem;
-    height: 1.1rem;
-    cursor: pointer;
-}
-
-.checkboxGroup label {
-    font-size: 0.85rem;
-    color: #4b5563;
-    line-height: 1.4;
-    cursor: pointer;
-}
-
-.inlineLink {
-    color: #059669;
-    text-decoration: underline;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.74rem;
     font-weight: 500;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    transition: all 0.15s ease;
+    user-select: none;
 }
 
-.inlineLink:hover {
-    color: #15803d;
+.sectorChip:hover {
+    border-color: #cbd5e1;
+    background: #f1f5f9;
 }
 
-@media (max-width: 768px) {
-    .registerCard {
-        padding: 2.5rem 2rem;
-    }
+.sectorChip.activeChip {
+    background: #ecfdf5;
+    border-color: #10b981;
+    color: #065f46;
+    font-weight: 600;
 }
 
-@media (max-width: 640px) {
-    .inputRow {
-        grid-template-columns: 1fr;
-    }
-
-    .nameGrid {
-        grid-template-columns: 1fr;
-    }
+/* Terms Checkbox Row */
+.termsRow {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.75rem 0.95rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    color: #4b5563;
 }
 
-@media (max-width: 480px) {
-    .registerCard {
-        padding: 2rem 1.5rem;
-    }
+.termsRow input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #059669;
+    cursor: pointer;
 }
 
-.inlineButton {
+.modalLink {
     background: none;
     border: none;
     padding: 0;
-    font: inherit;
+    font-size: inherit;
+    font-weight: 600;
     color: #059669;
     text-decoration: underline;
-    font-weight: 500;
     cursor: pointer;
+    font-family: inherit;
 }
 
-.inlineButton:hover {
+.modalLink:hover {
+    color: #047857;
+}
+
+/* Submit Action Button */
+.createButton {
+    width: 100%;
+    padding: 0.85rem 1.5rem;
+    background: #059669;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.createButton:hover:not(:disabled) {
+    background: #047857;
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
+    transform: translateY(-1px);
+}
+
+.createButton:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.createButton:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+/* Bottom Registration Footer */
+.formDivider {
+    height: 1px;
+    background: #f1f5f9;
+    margin: 0.85rem 0 0.65rem;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.formFooter {
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.footerText {
+    font-size: 0.86rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.signinLink {
+    color: #059669;
+    font-weight: 700;
+    text-decoration: none;
+    margin-left: 0.3rem;
+    transition: color 0.15s ease;
+}
+
+.signinLink:hover {
+    color: #047857;
+    text-decoration: underline;
+}
+
+/* Alerts */
+.alertBox {
+    padding: 0.75rem 0.95rem;
+    border-radius: 10px;
+    font-size: 0.84rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.alertError {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+
+.alertSuccess {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
     color: #15803d;
 }
 
+.spinnerIcon {
+    width: 1.15rem;
+    height: 1.15rem;
+    border: 2.5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #ffffff;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Modals */
 .modalOverlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(15, 23, 42, 0.6);
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -450,108 +795,64 @@
 }
 
 .modalContent {
-    background: #fff;
+    background: #ffffff;
+    border-radius: 20px;
+    max-width: 580px;
     width: 100%;
-    max-width: 600px;
-    max-height: 85vh;
-    border-radius: 16px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 2rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: fadeIn 0.25s ease;
 }
 
 .modalHeader {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid #e2e8f0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #f8fafc;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .modalHeader h3 {
     margin: 0;
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: #1e293b;
+    font-size: 1.25rem;
+    color: #111827;
 }
 
 .closeButton {
     background: none;
     border: none;
     font-size: 1.5rem;
-    color: #64748b;
+    color: #94a3b8;
     cursor: pointer;
     line-height: 1;
-    padding: 0.2rem 0.5rem;
-    border-radius: 8px;
-    transition: all 0.2s;
 }
 
 .closeButton:hover {
-    background: #e2e8f0;
-    color: #0f172a;
+    color: #111827;
 }
 
 .modalBody {
-    padding: 1.5rem;
-    overflow-y: auto;
-    color: #475569;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     line-height: 1.6;
+    color: #4b5563;
 }
 
 .modalBody h4 {
-    margin-top: 1.5rem;
-    margin-bottom: 0.5rem;
-    color: #1e293b;
-    font-weight: 600;
-}
-
-.modalBody h4:first-child {
-    margin-top: 0;
+    margin: 1rem 0 0.4rem;
+    color: #111827;
+    font-size: 0.95rem;
 }
 
 .modalBody ul {
-    margin-top: 0.5rem;
-    margin-bottom: 1rem;
-    padding-left: 1.5rem;
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
 }
 
-.modalBody p {
-    margin-bottom: 1rem;
-}
-
-/* Animations */
-@keyframes slideUpFadeIn {
-    0% {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes shakeError {
-
-    0%,
-    100% {
-        transform: translateX(0);
-    }
-
-    20%,
-    60% {
-        transform: translateX(-5px);
-    }
-
-    40%,
-    80% {
-        transform: translateX(5px);
-    }
+.modalBody li {
+    margin-bottom: 0.35rem;
 }
 
 @keyframes spin {
@@ -560,14 +861,24 @@
     }
 }
 
-.spinner {
-    display: inline-block;
-    width: 1.1rem;
-    height: 1.1rem;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 0.8s linear infinite;
-    vertical-align: middle;
-    margin-right: 0.5rem;
+@keyframes cardAppear {
+    0% {
+        opacity: 0;
+        transform: scale(0.97) translateY(14px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
