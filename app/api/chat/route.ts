@@ -59,14 +59,16 @@ MGA AVAILABLE NA SERBISYO (lahat ay pwedeng i-request online sa portal):
    - Bayad: Libre
 
 6. LOT CERTIFICATION / OCCUPANCY / FENCING / BUILDING PERMIT
-   - Gamit: Issued to actual lot occupants for compliance to government agencies.
+   - Gamit: Issued to actual lot occupants for compliance to government agencies, fencing, building, o occupancy.
    - Mga Kailangan: Certification from Purok Leader, Titulo o Tax Dec, Latest Tax Payment
    - Bayad: ₱1.00 per square meter
+   - Tandaan: Tiyaking para sa Lot / Building certification ito at huwag ipagkamali sa Certificate of Residency.
 
-7. KATARUNGANG PAMBARANGAY (Lupong Tagapamayapa)
-   - Gamit: Pag-file ng reklamo o hearing.
-   - Mga Kailangan: Complaint Sheet
-   - Bayad: ₱150.00 filing fee
+7. COMPLAINTS / PAG-FILE NG REKLAMO SA PORTAL
+   - Gamit: Online na pagsampa ng reklamo (Noise Disturbance, Property Dispute, Public Disturbance, Waste Disposal, atbp.).
+   - Paano: I-click ang "Complaints" tab sa dashboard at i-click ang "+ File a Complaint".
+   - Libreng serbisyo sa portal para sa verified residents.
+   - MAHALAGANG PATAKARAN: Huwag kailanman gamitin ang salitang "Lupon" o "Lupong Tagapamayapa".
 
 8. VAWC (Violence Against Women and their Children)
    - Gamit: Pagsampa ng reklamo laban sa pang-aabuso.
@@ -79,7 +81,7 @@ PARA SA MGA BAGONG RESIDENTE:
 2. Punan ang personal na impormasyon
 3. Mag-upload ng valid ID (para sa verification)
 4. Hintayin ang approval ng admin (1–2 araw)
-5. Kapag na-verify na, pwede nang mag-request ng dokumento
+5. Kapag na-verify na, pwede nang mag-request ng dokumento o mag-file ng reklamo
 
 PARA MAG-REQUEST NG DOKUMENTO:
 1. Mag-login sa iyong account
@@ -88,6 +90,17 @@ PARA MAG-REQUEST NG DOKUMENTO:
 4. Ilagay ang layunin ng request
 5. Mag-upload ng mga requirements (kung kinakailangan)
 6. I-click ang "Submit"
+
+PARA MAG-FILE NG REKLAMO (COMPLAINTS) SA SYSTEM:
+1. Mag-login sa iyong verified resident account
+2. Pumunta sa "Complaints" tab sa dashboard
+3. I-click ang "+ File a Complaint" button
+4. Piliin ang Uri ng Reklamo (Noise, Property Dispute, Waste, atbp.)
+5. Ilagay ang Paksa (subject), buong detalye (description), pangalan ng inirereklamo (respondent), at lokasyon
+6. Mag-upload ng katibayan o ebidensya kung mayroon (optional)
+7. I-click ang "Submit Complaint"
+8. Masusubaybayan ang status (Received → Under Investigation → Resolved) at gamitin ang "Discuss" button para direktang makipag-usap sa mga opisyal ng barangay.
+Paalala: Kailangang verified ang account para makapag-file ng reklamo sa portal.
 
 PARA SUBAYBAYAN ANG REQUEST:
 - Pumunta sa tab na "My Requests"
