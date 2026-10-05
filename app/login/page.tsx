@@ -169,7 +169,7 @@ function LoginContent() {
 
             updateToast(toastId, 'Signed in successfully!', 'success')
 
-            // Resolve role instantly from verified session metadata (0ms latency, no extra round-trip to Sydney)
+            // Resolve role from verified session metadata first (0ms latency), falling back to profile data if needed
             let role = session.user.app_metadata?.role || session.user.user_metadata?.role
             if (!role) {
                 try {
