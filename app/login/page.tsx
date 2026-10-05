@@ -169,20 +169,19 @@ function LoginContent() {
 
             updateToast(toastId, 'Signed in successfully!', 'success')
 
-// Resolve role instantly from verified session metadata (0ms latency, no extra round-trip to Sydney)
-let role = session.user.app_metadata?.role || session.user.user_metadata?.role
-if (!role) {
-    try {
-        const { data: profileData } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-        role = profileData?.role || 'resident'
-    } catch {
-        role = 'resident'
-    }
-}
+            // Resolve role instantly from verified session metadata (0ms latency, no extra round-trip to Sydney)
+            let role = session.user.app_metadata?.role || session.user.user_metadata?.role
+            if (!role) {
+                try {
+                    const { data: profileData } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', session.user.id)
+                        .single()
+                    role = profileData?.role || 'resident'
+                } catch {
+                    role = 'resident'
+                }
             }
 
             const isValidLocalRedirect = (url: string) => {
