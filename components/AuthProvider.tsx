@@ -358,25 +358,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const signOut = async () => {
         const toastId = showToast('Signing out...', 'loading')
 
-        // 1. Call the server-side logout route to clear HTTP-only session cookies.
-        //    Without this, the middleware still sees a stale cookie after logout
-        //    and blocks navigation to the home page (redirects back to dashboard).
-        try {
-            await fetch('/api/auth/logout', { method: 'POST' })
-        } catch {
-            // Non-fatal — proceed with client-side signout regardless
-        }
+        // 1. Fire server-side cookie clearance in parallel
+        const serverLogoutPromise = fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
 
-        // Clear client-side service worker cache and offline data
+        // 2. Clear local storage immediately
         try {
             if (typeof window !== 'undefined') {
-                if ('caches' in window) {
-                    const cacheKeys = await window.caches.keys()
-                    await Promise.all(cacheKeys.map(key => window.caches.delete(key)))
-                }
-                
-                // Clear local storage data
-                const keysToRemove = []
+                const keysToRemove: string[] = []
                 for (let i = 0; i < window.localStorage.length; i++) {
                     const key = window.localStorage.key(i)
                     if (key && (key.startsWith('e_brgy_') || key.startsWith('sb-') || key.startsWith('supabase.auth.'))) {
@@ -385,17 +373,24 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 }
                 keysToRemove.forEach(key => window.localStorage.removeItem(key))
             }
-        } catch (cacheError) {
-            console.error('Error cleaning PWA caches during signout:', cacheError)
+        } catch (storageError) {
+            console.error('Error cleaning local storage during signout:', storageError)
         }
 
-        // 2. Clear client-side session state
-        await supabase.auth.signOut()
+        // 3. Clear client-side session state instantly with local scope
+        try {
+            await supabase.auth.signOut({ scope: 'local' })
+        } catch {}
 
-        // Update toast to success
+        setUser(null)
+        setProfile(null)
+        setSession(null)
+
+        // 4. Ensure server cookies are cleared
+        await serverLogoutPromise
+
+        // 5. Update toast and navigate to login
         updateToast(toastId, 'Signed out successfully!', 'success')
-
-        // 3. Navigate to login
         router.push('/login')
     }
 
