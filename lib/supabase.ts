@@ -18,7 +18,14 @@ export function getSupabase() {
 
     _supabase = createBrowserClient(
         url || 'https://placeholder.supabase.co',
-        key || 'placeholder_key'
+        key || 'placeholder_key',
+        {
+            auth: {
+                lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
+                    return await fn()
+                }
+            }
+        }
     )
     return _supabase
 }

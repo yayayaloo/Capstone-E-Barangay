@@ -223,29 +223,30 @@ function AdminDashboardContent() {
 
     const fetchOverviewStats = async () => {
         try {
-            const [
-                { count: pending },
-                { count: processing },
-                { count: completed },
-                { count: rejected },
-                { count: totalRequests },
-                { count: totalResidents }
-            ] = await Promise.all([
-                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
-                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-                supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
-                supabase.from('service_requests').select('*', { count: 'exact', head: true }),
+            const [requestsRes, residentsRes] = await Promise.all([
+                supabase.from('service_requests').select('status'),
                 supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'resident')
             ])
 
+            let pending = 0
+            let processing = 0
+            let completed = 0
+            let rejected = 0
+            const allReqs = requestsRes.data || []
+            for (const r of allReqs) {
+                if (r.status === 'pending') pending++
+                else if (r.status === 'processing') processing++
+                else if (r.status === 'completed') completed++
+                else if (r.status === 'rejected') rejected++
+            }
+
             setStats({
-                pending: pending || 0,
-                processing: processing || 0,
-                completed: completed || 0,
-                rejected: rejected || 0,
-                totalRequests: totalRequests || 0,
-                totalResidents: totalResidents || 0
+                pending,
+                processing,
+                completed,
+                rejected,
+                totalRequests: allReqs.length,
+                totalResidents: residentsRes.count || 0
             })
         } catch (error) {
             console.error('Error fetching stats:', error)
@@ -258,9 +259,9 @@ function AdminDashboardContent() {
         setLoading(true)
         try {
             if (tab === 'overview') {
-                await fetchOverviewStats()
-                // Fetch recent top 5 requests & announcements
-                const [reqRes, annRes, qrRes, demoRes] = await Promise.all([
+                // Fetch stats and top 5 recent items in a single parallel batch
+                const [, reqRes, annRes, qrRes, demoRes] = await Promise.all([
+                    fetchOverviewStats(),
                     supabase.from('service_requests').select('*, profiles!inner(full_name)').order('created_at', { ascending: false }).limit(5),
                     supabase.from('announcements').select('*').order('published_at', { ascending: false }).limit(5),
                     supabase.from('qr_verifications').select('*').order('verified_at', { ascending: false }).limit(5),

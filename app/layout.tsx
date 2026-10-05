@@ -29,6 +29,9 @@ export const metadata: Metadata = {
         statusBarStyle: 'black-translucent',
         title: 'E-Barangay',
     },
+    other: {
+        'mobile-web-app-capable': 'yes',
+    },
 }
 
 export default function RootLayout({
