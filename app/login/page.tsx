@@ -169,8 +169,7 @@ function LoginContent() {
 
             updateToast(toastId, 'Signed in successfully!', 'success')
 
-<<<<<<< HEAD
-            // Resolve role instantly from verified session metadata (0ms latency, no extra round-trip to Sydney)
+            // Resolve role prioritizing session metadata, falling back to profiles table if needed
             let role = session.user.app_metadata?.role || session.user.user_metadata?.role
             if (!role) {
                 try {
@@ -183,22 +182,6 @@ function LoginContent() {
                 } catch {
                     role = 'resident'
                 }
-=======
-            let role = 'resident'
-            try {
-                const { data: profileData } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', session.user.id)
-                    .single()
-                if (profileData?.role) {
-                    role = profileData.role
-                } else {
-                    role = session.user.app_metadata?.role || session.user.user_metadata?.role || 'resident'
-                }
-            } catch {
-                role = session.user.app_metadata?.role || session.user.user_metadata?.role || 'resident'
->>>>>>> olracupdate2
             }
 
             const isValidLocalRedirect = (url: string) => {
