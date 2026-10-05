@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { submitDocumentRequest } from '@/app/actions/requestActions'
 import { 
@@ -74,6 +75,7 @@ export default function RequestPage() {
     const slug = params?.slug as string
     const doc = DOCUMENTS[slug]
 
+    const { user: authUser, profile: authProfile, loading: authLoading } = useAuth()
     const [user, setUser] = useState<any>(null)
     const [profile, setProfile] = useState<any>(null)
     const [authChecked, setAuthChecked] = useState(false)
@@ -91,75 +93,62 @@ export default function RequestPage() {
     const [success, setSuccess] = useState<{ id: string; docType: string } | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
 
-    // Check auth state — C2 FIX: use getUser() for cryptographic verification instead of getSession()
+    // Pre-populate user and profile instantly from memory via useAuth()
     useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-                if (authUser && !authError) {
-                    setUser(authUser)
-                    const { data: profileData } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', authUser.id)
-                        .single()
-                    if (profileData) {
-                        setProfile(profileData)
-                        // H5 FIX: Detect admin role to show contextual message
-                        if (profileData.role === 'admin') {
-                            setIsAdmin(true)
-                        }
-                        setForm(prev => ({
-                            ...prev,
-                            fullName: profileData.full_name || prev.fullName,
-                            email: profileData.email || prev.email,
-                            phone: profileData.phone || prev.phone,
-                            address: profileData.address || prev.address,
-                        }))
+        if (authUser) {
+            setUser(authUser)
+        }
+        if (authProfile) {
+            setProfile(authProfile)
+            if (authProfile.role === 'admin') {
+                setIsAdmin(true)
+            }
+            setForm(prev => ({
+                ...prev,
+                fullName: authProfile.full_name || prev.fullName,
+                email: authProfile.email || prev.email,
+                phone: authProfile.phone || prev.phone,
+                address: authProfile.address || prev.address,
+            }))
 
-                        let initialAge = ''
-                        if (profileData.birthdate) {
-                            const today = new Date()
-                            const born = new Date(profileData.birthdate)
-                            if (!isNaN(born.getTime())) {
-                                let a = today.getFullYear() - born.getFullYear()
-                                const m = today.getMonth() - born.getMonth()
-                                if (m < 0 || (m === 0 && today.getDate() < born.getDate())) a--
-                                initialAge = a.toString()
-                            }
-                        }
+            let initialAge = ''
+            if (authProfile.birthdate) {
+                const today = new Date()
+                const born = new Date(authProfile.birthdate)
+                if (!isNaN(born.getTime())) {
+                    let a = today.getFullYear() - born.getFullYear()
+                    const m = today.getMonth() - born.getMonth()
+                    if (m < 0 || (m === 0 && today.getDate() < born.getDate())) a--
+                    initialAge = a.toString()
+                }
+            }
 
-                        let initialYearsOfResidency = ''
-                        if (profileData.resident_since) {
-                            if (profileData.resident_since === 'Since Birth') {
-                                initialYearsOfResidency = initialAge
-                            } else {
-                                const year = parseInt(profileData.resident_since)
-                                if (!isNaN(year)) {
-                                    initialYearsOfResidency = (new Date().getFullYear() - year).toString()
-                                }
-                            }
-                        }
-
-                        setDocSpecificData({
-                            address: profileData.address || '',
-                            birthdate: profileData.birthdate || '',
-                            civilStatus: profileData.relationship_status || '',
-                            age: initialAge,
-                            residentSince: profileData.resident_since || '',
-                            yearsOfResidency: initialYearsOfResidency,
-                            isRenewal: true
-                        })
+            let initialYearsOfResidency = ''
+            if (authProfile.resident_since) {
+                if (authProfile.resident_since === 'Since Birth') {
+                    initialYearsOfResidency = initialAge
+                } else {
+                    const year = parseInt(authProfile.resident_since)
+                    if (!isNaN(year)) {
+                        initialYearsOfResidency = (new Date().getFullYear() - year).toString()
                     }
                 }
-            } catch (e) {
-                console.error('Auth check error:', e)
-            } finally {
-                setAuthChecked(true)
             }
+
+            setDocSpecificData(prev => ({
+                ...prev,
+                address: authProfile.address || '',
+                birthdate: authProfile.birthdate || '',
+                civilStatus: authProfile.relationship_status || '',
+                age: initialAge,
+                residentSince: authProfile.resident_since || '',
+                yearsOfResidency: initialYearsOfResidency,
+            }))
         }
-        checkAuth()
-    }, [])
+        if (!authLoading) {
+            setAuthChecked(true)
+        }
+    }, [authUser, authProfile, authLoading])
 
     // Real-time validation
     const validate = useCallback((data: FormData, dynamicData: Record<string, any>): FormErrors => {

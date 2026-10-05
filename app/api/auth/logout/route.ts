@@ -34,8 +34,10 @@ export async function POST(request: NextRequest) {
         }
     )
 
-    // Sign out server-side — this clears the session cookies properly
-    await supabase.auth.signOut()
+    // Sign out server-side locally — clears session cookies immediately without waiting for a remote network trip
+    try {
+        await supabase.auth.signOut({ scope: 'local' })
+    } catch {}
 
     const response = NextResponse.json({ success: true })
 
