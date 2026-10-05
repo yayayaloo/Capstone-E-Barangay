@@ -4,11 +4,62 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Eye, EyeOff, Info } from 'lucide-react'
+import { Eye, EyeOff, Info, ArrowLeft, Check, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 import styles from './login.module.css'
+
+const SLIDES = [
+    {
+        id: 0,
+        sectionTitle: "MANDATE",
+        description: "Barangay Gordon Heights is responsible for delivering essential services, maintaining peace and order, implementing local governance and facilitating citizen's participation.",
+        features: [
+            "Delivering essential community services",
+            "Maintaining peace and public order",
+            "Implementing transparent local governance",
+            "Facilitating citizen's active participation"
+        ]
+    },
+    {
+        id: 1,
+        sectionTitle: "VISION",
+        description: "Peaceful barangay, God fearing, productive with self-reliance and with law abiding citizens.",
+        features: [
+            "Peaceful, secure, and orderly barangay",
+            "God fearing and values-driven community",
+            "Productive citizens with self-reliance",
+            "Law abiding and empowered residents"
+        ]
+    },
+    {
+        id: 2,
+        sectionTitle: "MISSION",
+        description: "To translate the convention on the rights of every Filipino into local policies, sustainable programs and services, and support the survival, protection, development and participation of the people in community building through the provision of good education, health and other institution with special protection, information, communication by legislating ordinances, formulating strategies, enforcing and implementing the same.",
+        features: [
+            "Translate Filipino rights into local policies",
+            "Sustainable community programs & services",
+            "Support education, health & special protection",
+            "Legislate ordinances & enforce strategies"
+        ]
+    },
+    {
+        id: 3,
+        sectionTitle: "SERVICE PLEDGE",
+        description: "Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:",
+        features: [
+            "Serve with honesty and integrity",
+            "Be polite and courteous at all times",
+            "Demonstrate appropriate behavior and professionalism",
+            "Be prompt and timely",
+            "Provide adequate and reliable information",
+            "Be available during office hours",
+            "Provide feedback mechanism and respond to complaints",
+            "Equal treatment to all"
+        ]
+    }
+]
 
 function LoginContent() {
     const [email, setEmail] = useState('')
@@ -19,11 +70,25 @@ function LoginContent() {
     const [loading, setLoading] = useState(false)
     const [unconfirmedEmail, setUnconfirmedEmail] = useState('')
     const [resending, setResending] = useState(false)
+    
+    // Carousel State
+    const [activeSlide, setActiveSlide] = useState(0)
+    const [isPaused, setIsPaused] = useState(false)
+
     const { signIn, resendOtp } = useAuth()
     const { showToast, updateToast } = useToast()
     const router = useRouter()
     const searchParams = useSearchParams()
     const redirectUrl = searchParams ? searchParams.get('redirect') : null
+
+    // Auto-advance slides with pause-on-hover
+    useEffect(() => {
+        if (isPaused) return
+        const timer = setInterval(() => {
+            setActiveSlide((prev) => (prev + 1) % SLIDES.length)
+        }, 6000)
+        return () => clearInterval(timer)
+    }, [isPaused])
 
     useEffect(() => {
         // Handle email confirmation success
@@ -66,7 +131,7 @@ function LoginContent() {
             return
         }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        const emailRegex = /^[^\s@]+@[^\s@]+$/
         if (!emailRegex.test(trimmedEmail)) {
             setError('Please enter a valid email address.')
             return
@@ -104,6 +169,7 @@ function LoginContent() {
 
             updateToast(toastId, 'Signed in successfully!', 'success')
 
+<<<<<<< HEAD
             // Resolve role instantly from verified session metadata (0ms latency, no extra round-trip to Sydney)
             let role = session.user.app_metadata?.role || session.user.user_metadata?.role
             if (!role) {
@@ -117,6 +183,22 @@ function LoginContent() {
                 } catch {
                     role = 'resident'
                 }
+=======
+            let role = 'resident'
+            try {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single()
+                if (profileData?.role) {
+                    role = profileData.role
+                } else {
+                    role = session.user.app_metadata?.role || session.user.user_metadata?.role || 'resident'
+                }
+            } catch {
+                role = session.user.app_metadata?.role || session.user.user_metadata?.role || 'resident'
+>>>>>>> olracupdate2
             }
 
             const isValidLocalRedirect = (url: string) => {
@@ -133,199 +215,279 @@ function LoginContent() {
         }
     }
 
-
     return (
-        <div className={styles.loginContainer}>
+        <div className={styles.pageWrapper}>
+            {/* Ambient Background Accents */}
+            <div className={styles.bgBlob1} />
+            <div className={styles.bgBlob2} />
 
-            {/* Left Panel - Branding */}
-            <div className={styles.brandingPanel}>
-                <div className={styles.brandingBackground} />
-                <div className={styles.brandingContent}>
-                    <div className={styles.brandHeader}>
-                        <Image src="/logo.png" alt="Logo" width={64} height={64} />
-                        <div>
-                            <h2 className={styles.brandTitle}>Barangay Gordon Heights</h2>
-                            <div className={styles.brandSubtitle}>Olongapo City</div>
+            <div className={styles.slidingCard}>
+                {/* ------------------------------------------------------------- */}
+                {/* LEFT PANEL: Deep Green Showcase with Unified Text Box         */}
+                {/* ------------------------------------------------------------- */}
+                <div 
+                    className={styles.showcasePanel}
+                    onMouseEnter={() => setIsPaused(true)}
+                    onMouseLeave={() => setIsPaused(false)}
+                >
+                    <div className={styles.showcaseTop}>
+                        {/* Official Barangay Header */}
+                        <div className={styles.brandingHeader}>
+                            <div className={styles.logoRing}>
+                                <Image 
+                                    src="/logo.png" 
+                                    alt="Barangay Gordon Heights Logo" 
+                                    width={50} 
+                                    height={50}
+                                    priority
+                                    style={{ objectFit: 'contain' }}
+                                />
+                            </div>
+                            <div className={styles.brandTitles}>
+                                <h2 className={styles.brandName}>Barangay Gordon Heights</h2>
+                                <span className={styles.brandCity}>OLONGAPO CITY</span>
+                            </div>
+                        </div>
+
+                        {/* Carousel Slides Container with Unified Text Box */}
+                        <div className={styles.carouselViewport}>
+                            {SLIDES.map((slide, index) => (
+                                <div 
+                                    key={slide.id} 
+                                    className={`${styles.slideContent} ${index === activeSlide ? styles.activeSlide : ''}`}
+                                    aria-hidden={index !== activeSlide}
+                                >
+                                    {/* Single Unified Modern Card/Text Box */}
+                                    <div className={styles.unifiedBox}>
+                                        <div className={styles.sectionHeaderRow}>
+                                            <span className={styles.sectionTag}>{slide.sectionTitle}</span>
+                                        </div>
+                                        
+                                        <p className={styles.sectionDescription}>
+                                            {slide.description}
+                                        </p>
+
+                                        <div className={styles.boxDivider} />
+
+                                        {/* Neatly Aligned 2-Column Feature Grid */}
+                                        <ul className={styles.featureGrid}>
+                                            {slide.features.map((feature, fIdx) => (
+                                                <li key={fIdx} className={styles.featureItem}>
+                                                    <div className={styles.checkBadge}>
+                                                        <Check size={11} strokeWidth={3} />
+                                                    </div>
+                                                    <span>{feature}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    <div className={styles.brandSection}>
-                        <div className={styles.sectionTitle}>Mandate</div>
-                        <div className={styles.sectionText}>
-                            Barangay Gordon Heights is responsible for delivering essential services, maintaining peace and order, implementing local governance and facilitating citizen's participation.
+                    {/* Bottom Indicators & Wave Graphic */}
+                    <div className={styles.showcaseBottom}>
+                        <div className={styles.indicatorContainer} role="tablist" aria-label="Portal Highlights Carousel">
+                            {SLIDES.map((slide, idx) => (
+                                <button
+                                    key={slide.id}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={idx === activeSlide}
+                                    aria-label={`Go to ${slide.sectionTitle}`}
+                                    className={`${styles.indicatorDot} ${idx === activeSlide ? styles.activeDot : ''}`}
+                                    onClick={() => setActiveSlide(idx)}
+                                />
+                            ))}
                         </div>
+                        <span className={styles.slideCounter}>
+                            {SLIDES[activeSlide].sectionTitle}
+                        </span>
                     </div>
 
-                    <div className={styles.brandSection}>
-                        <div className={styles.sectionTitle}>Vision</div>
-                        <div className={styles.sectionText}>
-                            Peaceful barangay, God fearing, productive with self-reliance and with law abiding citizens.
-                        </div>
-                    </div>
-
-                    <div className={styles.brandSection}>
-                        <div className={styles.sectionTitle}>Mission</div>
-                        <div className={styles.sectionText}>
-                            To translate the convention on the rights of every Filipino into local policies, sustainable programs and services, and support the survival, protection, development and participation of the people in community building through the provision of good education, health and other institution with special protection, information, communication by legislating ordinances, formulating strategies, enforcing and implementing the same.
-                        </div>
-                    </div>
-
-                    <div className={styles.brandSection}>
-                        <div className={styles.sectionTitle}>Service Pledge</div>
-                        <p style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>Barangay Gordon Heights pledge and commit to deliver efficient and quality public service:</p>
-                        <ul className={styles.coreValues}>
-                            <li>• Serve with honesty and integrity</li>
-                            <li>• Be polite and courteous at all times</li>
-                            <li>• Demonstrate appropriate behavior and professionalism</li>
-                            <li>• Be prompt and timely</li>
-                            <li>• Provide adequate and reliable information</li>
-                            <li>• Be available during office hours</li>
-                            <li>• Provide feedback mechanism and respond to complaints</li>
-                            <li>• Equal treatment to all</li>
-                        </ul>
+                    {/* Decorative Bottom Organic Waves */}
+                    <div className={styles.bottomWaveGraphic}>
+                        <svg 
+                            className={styles.bottomWaveSvg} 
+                            viewBox="0 0 500 120" 
+                            preserveAspectRatio="none"
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path 
+                                d="M0,80 C150,120 320,30 500,75 L500,120 L0,120 Z" 
+                                fill="rgba(16, 185, 129, 0.12)" 
+                            />
+                            <path 
+                                d="M0,50 C130,15 300,105 500,40 L500,120 L0,120 Z" 
+                                fill="rgba(5, 150, 105, 0.18)" 
+                            />
+                            <path 
+                                d="M0,70 C160,35 340,110 500,60 L500,120 L0,120 Z" 
+                                fill="rgba(4, 120, 87, 0.22)" 
+                            />
+                        </svg>
                     </div>
                 </div>
-            </div>
 
-            {/* Right Panel - Form */}
-            <div className={styles.formPanel}>
-                <Link href="/" className={styles.backButton}>
-                    Back to Home
-                </Link>
-                <div className={styles.loginCard}>
-                    <div className={styles.logoSection}>
-                        <div className={styles.logoIcon}>
-                            <Image src="/logo.png" alt="Logo" width={90} height={90} />
-                        </div>
-                        <h1 style={{ color: '#111827', fontSize: '1.4rem' }}>Barangay Gordon Heights</h1>
-                        <p style={{ textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '1px', marginTop: '0.25rem', fontWeight: 600 }}>E-Barangay System</p>
+                {/* ------------------------------------------------------------- */}
+                {/* RIGHT PANEL: Clean Modern White Form                         */}
+                {/* ------------------------------------------------------------- */}
+                <div className={styles.formPanel}>
+                    {/* Back to Home Link */}
+                    <div className={styles.formTopRow}>
+                        <Link href="/" className={styles.backButton}>
+                            <ArrowLeft size={16} />
+                            <span>Back to Home</span>
+                        </Link>
                     </div>
 
-                    <form onSubmit={handleSubmit} className={styles.form}>
-                        {redirectUrl && redirectUrl.startsWith('/request/') && (
-                            <div style={{
-                                padding: '0.875rem 1rem',
-                                borderRadius: '12px',
-                                backgroundColor: '#eff6ff',
-                                border: '1px solid #bfdbfe',
-                                color: '#1e3a8a',
-                                fontSize: '0.85rem',
-                                fontWeight: 500,
-                                marginBottom: '1rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                            }}>
-                                <Info size={16} style={{ flexShrink: 0 }} />
-                                <span>Please sign in to complete your document request. You will be redirected back to the form immediately after.</span>
+                    {/* Centered Form Wrapper */}
+                    <div className={styles.formCenterWrapper}>
+                        {/* Center Logo & Title */}
+                        <div className={styles.formHeader}>
+                            <div className={styles.formLogoBadge}>
+                                <Image 
+                                    src="/logo.png" 
+                                    alt="Barangay Gordon Heights Logo" 
+                                    width={64} 
+                                    height={64}
+                                    priority
+                                    style={{ objectFit: 'contain' }}
+                                />
                             </div>
-                        )}
-                        {successMessage && (
-                            <div style={{
-                                padding: '0.875rem 1rem',
-                                borderRadius: '12px',
-                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                color: '#059669',
-                                fontSize: '0.85rem',
-                                fontWeight: 500,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                            }}>
-                                {successMessage}
-                            </div>
-                        )}
-                        {error && (
-                            <div className={styles.errorMessage} role="alert">
-                                <div>{error}</div>
-                                {unconfirmedEmail && email.trim() === unconfirmedEmail && (
-                                    <button
-                                        type="button"
-                                        className={styles.resendButton}
-                                        onClick={handleResendVerification}
-                                        disabled={resending}
-                                    >
-                                        {resending ? 'Resending verification link...' : 'Resend verification email'}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="email">Email Address</label>
-                            <input
-                                id="email"
-                                type="email"
-                                value={email}
-                                onChange={(e) => {
-                                    setEmail(e.target.value)
-                                    if (error) setError('')
-                                }}
-                                placeholder="you@example.com"
-                                required
-                                disabled={loading}
-                            />
+                            <h1 className={styles.formTitle}>Barangay Gordon Heights</h1>
+                            <div className={styles.formSubtitle}>E-BARANGAY SYSTEM</div>
                         </div>
 
-                        <div className={styles.inputGroup}>
-                            <label htmlFor="password">Password</label>
-                            <div className={styles.passwordInputWrapper}>
+                        {/* Sign In Form */}
+                        <form onSubmit={handleSubmit} className={styles.form}>
+                            {redirectUrl && redirectUrl.startsWith('/request/') && (
+                                <div className={`${styles.alertBox} ${styles.alertInfo}`}>
+                                    <Info size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <span>Please sign in to complete your document request. You will be redirected back immediately.</span>
+                                </div>
+                            )}
+
+                            {successMessage && (
+                                <div className={`${styles.alertBox} ${styles.alertSuccess}`}>
+                                    <CheckCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <span>{successMessage}</span>
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className={`${styles.alertBox} ${styles.alertError}`} role="alert">
+                                    <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <div>
+                                        <div>{error}</div>
+                                        {unconfirmedEmail && email.trim() === unconfirmedEmail && (
+                                            <button
+                                                type="button"
+                                                className={styles.resendBtn}
+                                                onClick={handleResendVerification}
+                                                disabled={resending}
+                                            >
+                                                {resending ? 'Resending verification link...' : 'Resend verification email'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Email Address Field */}
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="email">EMAIL ADDRESS</label>
                                 <input
-                                    id="password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
+                                    id="email"
+                                    type="email"
+                                    className={styles.inputField}
+                                    value={email}
                                     onChange={(e) => {
-                                        setPassword(e.target.value)
+                                        setEmail(e.target.value)
                                         if (error) setError('')
                                     }}
-                                    placeholder="••••••••"
+                                    placeholder="you@example.com"
                                     required
                                     disabled={loading}
+                                    autoComplete="username"
                                 />
-                                <button
-                                    type="button"
-                                    className={styles.passwordToggle}
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    disabled={loading}
-                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                    aria-pressed={showPassword}
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
                             </div>
+
+                            {/* Password Field with Eye Toggle */}
+                            <div className={styles.inputGroup}>
+                                <label htmlFor="password">PASSWORD</label>
+                                <div className={styles.passwordInputWrapper}>
+                                    <input
+                                        id="password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        className={styles.inputField}
+                                        value={password}
+                                        onChange={(e) => {
+                                            setPassword(e.target.value)
+                                            if (error) setError('')
+                                        }}
+                                        placeholder="••••••••"
+                                        required
+                                        disabled={loading}
+                                        autoComplete="current-password"
+                                    />
+                                    <button
+                                        type="button"
+                                        className={styles.passwordToggle}
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        disabled={loading}
+                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Forgot Password Row */}
+                            <div className={styles.forgotPasswordRow}>
+                                <Link href="/forgot-password" className={styles.forgotPasswordLink}>
+                                    Forgot Password?
+                                </Link>
+                            </div>
+
+                            {/* Primary Action Button */}
+                            <button
+                                type="submit"
+                                className={styles.signInButton}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className={styles.spinnerIcon} />
+                                        <span>Signing In...</span>
+                                    </>
+                                ) : (
+                                    'Sign In'
+                                )}
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* Bottom Registration Row with Divider */}
+                    <div>
+                        <div className={styles.formDivider} />
+                        <div className={styles.formFooter}>
+                            <p className={styles.footerText}>
+                                Don&apos;t have an account?
+                                <Link 
+                                    href={searchParams.get('redirect') ? `/register?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : "/register"} 
+                                    className={styles.signupLink}
+                                >
+                                    Sign up here
+                                </Link>
+                            </p>
                         </div>
-
-                        <div style={{ textAlign: 'right', marginTop: '-0.5rem' }}>
-                            <Link href="/forgot-password" className={styles.link} style={{ fontSize: '0.85rem' }}>
-                                Forgot Password?
-                            </Link>
-                        </div>
-
-                        <button
-                            type="submit"
-                            className={styles.submitButton}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <>
-                                    <span className={styles.spinner}></span>
-                                    Signing In...
-                                </>
-                            ) : (
-                                'Sign In'
-                            )}
-                        </button>
-                    </form>
-
-                    <div className={styles.footer}>
-                        <p>Don&apos;t have an account?{' '}
-                            <Link href={searchParams.get('redirect') ? `/register?redirect=${searchParams.get('redirect')}` : "/register"} className={styles.link}>Sign up here</Link>
-                        </p>
                     </div>
                 </div>
             </div>
-
         </div>
     )
 }
@@ -333,17 +495,11 @@ function LoginContent() {
 export default function LoginPage() {
     return (
         <Suspense fallback={
-            <div className={styles.loginContainer}>
-                <div className={styles.brandingPanel}>
-                    <div className={styles.brandingBackground} />
-                    <div className={styles.brandingContent}>
-                        {/* Static visual layout structure placeholder to prevent layout shifts */}
-                    </div>
-                </div>
-                <div className={styles.formPanel}>
-                    <div className={styles.loginCard} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
-                        <span className={styles.spinner} style={{ width: '2.5rem', height: '2.5rem', borderWidth: '3px', borderTopColor: '#059669', borderColor: 'rgba(5, 150, 105, 0.15)' }}></span>
-                        <p style={{ marginTop: '1.25rem', color: '#6b7280', fontSize: '0.9rem', fontWeight: 500 }}>Loading E-Barangay portal...</p>
+            <div className={styles.pageWrapper}>
+                <div className={styles.slidingCard} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '450px' }}>
+                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                        <span className={styles.spinnerIcon} style={{ borderColor: 'rgba(5, 150, 105, 0.2)', borderTopColor: '#059669', width: '2rem', height: '2rem', margin: '0 auto 1rem' }} />
+                        <p style={{ color: '#6b7280', fontSize: '0.9rem', fontWeight: 500 }}>Loading E-Barangay Portal...</p>
                     </div>
                 </div>
             </div>
