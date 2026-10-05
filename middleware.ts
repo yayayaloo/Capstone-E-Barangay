@@ -87,12 +87,13 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // Secure user verification - cryptographically verifies the signature on the JWT against the server
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
- 
+    // Fast in-memory session validation — avoids blocking HTTPS network calls to Sydney on every click
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    const user = session?.user
+
     // Redirect unauthenticated users trying to access protected routes
     // C1 FIX: Preserve the original path as ?redirect= so users return after login
-    if ((!user || userError) && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
+    if ((!user || sessionError) && (pathname.startsWith('/admin') || pathname.startsWith('/resident'))) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
         redirectUrl.searchParams.set('redirect', pathname)
