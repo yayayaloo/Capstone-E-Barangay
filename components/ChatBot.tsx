@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import styles from './ChatBot.module.css'
 import { ServiceRequest, Profile } from '@/lib/types'
 
@@ -27,15 +27,22 @@ function cleanDocType(type: string | undefined | null) {
     return trimmed
 }
 
-const quickReplies = [
-    'Paano makuha ang Barangay Clearance?',
-    'Paano ang Certificate of Residency?',
-    'Ano ang Business Clearance?',
-    'First Time Job Seeker - paano?',
-    'Ano ang Certificate of Indigency?',
-    'Paano ang Lot Certification?',
-    'I-check ang aking request status',
-    'Kailan bukas ang Barangay Hall?',
+interface QuickChatOption {
+    label: string
+    prompt: string
+}
+
+const quickReplies: QuickChatOption[] = [
+    { label: 'Barangay Clearance', prompt: 'Paano makuha ang Barangay Clearance at ano ang mga requirements?' },
+    { label: 'Certificate of Residency', prompt: 'Ano ang requirements at proseso para sa Certificate of Residency?' },
+    { label: 'Certificate of Indigency', prompt: 'Paano mag-apply para sa Certificate of Indigency at ano ang kailangan?' },
+    { label: 'Business Clearance', prompt: 'Ano ang requirements at bayad para sa Business Clearance?' },
+    { label: 'First Time Job Seeker', prompt: 'Paano mag-avail ng First Time Job Seeker certificate (RA 11261)?' },
+    { label: 'Lot Certification', prompt: 'Ano ang proseso at requirements para sa Lot o Building Certification?' },
+    { label: 'Barangay ID', prompt: 'Paano makuha ang opisyal na Barangay ID at QR code?' },
+    { label: 'Check Request Status', prompt: 'Maaari mo bang i-check ang status ng aking mga active request?' },
+    { label: 'Office Hours & Hotline', prompt: 'Kailan bukas ang Barangay Hall at ano ang mga emergency hotline?' },
+    { label: 'File a Complaint', prompt: 'Paano mag-file ng reklamo sa portal?' },
 ]
 
 // Detect if message is Tagalog/Filipino
@@ -53,7 +60,8 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
     const lower = message.toLowerCase()
     const tl = isTagalog(message)
 
-    if (lower.includes('status') || lower.includes('track') || lower.includes('request') || lower.includes('pending')) {
+    // 1. My Requests / Status check
+    if (/\b(status|track|tracking|pending|request|requests)\b/i.test(lower)) {
         if (!userRequests || userRequests.length === 0)
             return tl
                 ? 'Wala ka pang aktibong request. I-click ang "Request Document" para magsimula!'
@@ -68,47 +76,207 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
             : `You have ${pending.length} active request(s):\n${pending.map(r => `• ${cleanDocType(r.document_type)} (${r.status})`).join('\n')}`
     }
 
-    if (lower.includes('clearance') && !lower.includes('business')) return tl
-        ? 'Para sa **Barangay Clearance**, kailangan mo ng:\n• Valid Government ID\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
-        : 'For **Barangay Clearance**, you need:\n• Valid Government ID\n• Fee: ₱50.00\nClick "Request Document" to apply!'
+    // 2. Complaints in the System
+    if (/\b(reklamo|blotter|complaint|complaints|alitan|mediation|hearing)\b/i.test(lower)) {
+        return tl
+            ? 'Para mag-file ng **Reklamo (Complaint)** sa E-Barangay portal:\n\n1. **Mag-login** sa iyong verified resident account.\n2. Pumunta sa **"Complaints"** tab sa iyong dashboard.\n3. I-click ang **"+ File a Complaint"** button.\n4. Punan ang mga sumusunod na detalye:\n   • **Uri ng Reklamo** (Noise, Property Dispute, Waste, Public Disturbance, atbp.)\n   • **Paksa at Detalye** ng pangyayari\n   • **Pangalan ng Inirereklamo** at **Lokasyon ng Insidente**\n   • **Katibayan o Evidence** (larawan o dokumento - optional)\n5. I-click ang **"Submit Complaint"**.\n\nMakikita ang status sa iyong Complaints tab (*Received*, *Under Investigation*, *Resolved*) at maaari mong gamitin ang **"Discuss"** button para direktang makipag-ugnayan sa mga opisyal ng barangay.\n*(Paalala: Kailangang verified ang account para makapag-file ng reklamo sa portal).*'
+            : 'To file a **Complaint** in the E-Barangay portal:\n\n1. **Log in** to your verified resident account.\n2. Go to the **"Complaints"** tab on your dashboard.\n3. Click the **"+ File a Complaint"** button.\n4. Fill in the required details:\n   • **Complaint Type** (Noise, Property Dispute, Waste, Public Disturbance, etc.)\n   • **Subject & Incident Description**\n   • **Respondent Name** and **Incident Location**\n   • **Supporting Evidence / Photo** (optional attachment)\n5. Click **"Submit Complaint"**.\n\nYou can track the progress on your Complaints tab (*Received*, *Under Investigation*, *Resolved*) and use the **"Discuss"** button to communicate directly with barangay officials.\n*(Note: Your account must be verified to file a complaint online).*'
+    }
 
-    if (lower.includes('certification') || lower.includes('residency') || lower.includes('tirahan') || lower.includes('loan') || lower.includes('good moral')) return tl
-        ? 'Para sa **Certificate of Residency**, kailangan mo ng:\n• Valid Government ID\n• Layunin: Residency, Loan, o Good Moral Character\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
-        : 'For **Certificate of Residency**, you need:\n• Valid Government ID\n• Purpose: Residency, Loan, or Good Moral Character\n• Fee: ₱50.00\nClick "Request Document" to apply!'
+    // 3. Lot / Building Certification (Strict word boundary to NEVER match "blotter")
+    if (/\b(lot|lots|occupancy|fencing|building|lupa|sukat)\b/i.test(lower)) {
+        return tl
+            ? 'Para sa **Lot Certification (Occupancy / Fencing / Building)**, kailangan mo ng:\n• Certification mula sa Purok Leader\n• Titulo o Tax Declaration\n• Latest Tax Payment\n• Bayad: ₱1.00 per square meter\nI-click ang "Request Document" para mag-apply!'
+            : 'For **Lot Certification (Occupancy / Fencing / Building)**, you need:\n• Certification from Purok Leader\n• Title or Tax Declaration\n• Latest Tax Payment\n• Fee: ₱1.00 per square meter\nClick "Request Document" to apply!'
+    }
 
-    if (lower.includes('business clearance') || lower.includes('negosyo') || lower.includes('business permit')) return tl
-        ? 'Para sa **Business Clearance**, kailangan mo ng:\n• DTI Certificate\n• Bayad: **Libre (Free)**\n• Para sa mga negosyante para sa compliance ng business permit.\nI-click ang "Request Document" para mag-apply!'
-        : 'For **Business Clearance**, you need:\n• DTI Certificate\n• Fee: **Free**\n• For business owners for compliance with business permit.\nClick "Request Document" to apply!'
+    // 4. Business Clearance
+    if (/\b(business|negosyo|business permit|dti)\b/i.test(lower)) {
+        return tl
+            ? 'Para sa **Business Clearance**, kailangan mo ng:\n• DTI Certificate\n• Bayad: **Libre (Free)**\n• Para sa mga negosyante para sa compliance ng business permit.\nI-click ang "Request Document" para mag-apply!'
+            : 'For **Business Clearance**, you need:\n• DTI Certificate\n• Fee: **Free**\n• For business owners for compliance with business permit.\nClick "Request Document" to apply!'
+    }
 
-    if (lower.includes('lot') || lower.includes('occupancy') || lower.includes('fencing') || lower.includes('building')) return tl
-        ? 'Para sa **Lot Certification**, kailangan mo ng:\n• Certification mula sa Purok Leader\n• Titulo o Tax Declaration\n• Latest Tax Payment\n• Bayad: ₱1.00 per square meter\nI-click ang "Request Document" para mag-apply!'
-        : 'For **Lot Certification**, you need:\n• Certification from Purok Leader\n• Title or Tax Declaration\n• Latest Tax Payment\n• Fee: ₱1.00 per square meter\nClick "Request Document" to apply!'
+    // 5. Barangay Clearance
+    if (/\b(clearance|barangay clearance)\b/i.test(lower)) {
+        return tl
+            ? 'Para sa **Barangay Clearance**, kailangan mo ng:\n• Valid Government ID\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
+            : 'For **Barangay Clearance**, you need:\n• Valid Government ID\n• Fee: ₱50.00\nClick "Request Document" to apply!'
+    }
 
-    if (lower.includes('first time') || lower.includes('job seeker') || lower.includes('ftjs') || lower.includes('trabaho')) return tl
-        ? 'Ang **First Time Job Seeker** certificate ay:\n• Para sa mga 18–30 taong gulang\n• Libreng pagkuha ng pre-employment requirements (RA 11261)\n• Bayad: **Libre (Free)**\n• Kailangan: Valid ID\nI-click ang "Request Document" para mag-apply!'
-        : 'The **First Time Job Seeker** certificate is:\n• For ages 18–30 years old\n• Free waiver for pre-employment requirements (RA 11261)\n• Fee: **Free**\n• Requirement: Valid ID\nClick "Request Document" to apply!'
+    // 6. Certificate of Residency
+    if (/\b(residency|residente|tirahan|good moral|certificate of residency)\b/i.test(lower)) {
+        return tl
+            ? 'Para sa **Certificate of Residency**, kailangan mo ng:\n• Valid Government ID\n• Layunin: Residency, Loan, o Good Moral Character\n• Bayad: ₱50.00\nI-click ang "Request Document" para mag-apply!'
+            : 'For **Certificate of Residency**, you need:\n• Valid Government ID\n• Purpose: Residency, Loan, or Good Moral Character\n• Fee: ₱50.00\nClick "Request Document" to apply!'
+    }
 
-    if (lower.includes('indigency') || lower.includes('mahirap') || lower.includes('financial')) return tl
-        ? 'Ang **Certificate of Indigency** ay:\n• Patunay ng financial status para sa tulong/assistance\n• Bayad: **Libre (Free)**\n• Kailangan: Valid ID\nI-click ang "Request Document" para mag-apply!'
-        : 'The **Certificate of Indigency** is:\n• Proof of financial status for assistance\n• Fee: **Free**\n• Requirement: Valid ID\nClick "Request Document" to apply!'
+    // 7. First Time Job Seeker
+    if (/\b(job seeker|jobseeker|first time job|ftjs|trabaho|ra 11261)\b/i.test(lower)) {
+        return tl
+            ? 'Ang **First Time Job Seeker** certificate ay:\n• Para sa mga 18–30 taong gulang\n• Libreng pagkuha ng pre-employment requirements (RA 11261)\n• Bayad: **Libre (Free)**\n• Kailangan: Valid ID\nI-click ang "Request Document" para mag-apply!'
+            : 'The **First Time Job Seeker** certificate is:\n• For ages 18–30 years old\n• Free waiver for pre-employment requirements (RA 11261)\n• Fee: **Free**\n• Requirement: Valid ID\nClick "Request Document" to apply!'
+    }
 
-    if (lower.includes('hours') || lower.includes('open') || lower.includes('bukas') || lower.includes('oras') || lower.includes('location') || lower.includes('hall')) return tl
-        ? 'Bukas ang Barangay Hall tuwing Lunes–Biyernes, 8:00 AM – 5:00 PM. Sarado sa Sabado, Linggo, at mga holiday. Tel: 223-5497.'
-        : 'Barangay Hall is open Monday–Friday, 8:00 AM – 5:00 PM. Closed on weekends and holidays. Tel: 223-5497.'
+    // 8. Certificate of Indigency
+    if (/\b(indigency|indigent|mahirap|financial|tulong)\b/i.test(lower)) {
+        return tl
+            ? 'Ang **Certificate of Indigency** ay:\n• Patunay ng financial status para sa tulong/assistance\n• Bayad: **Libre (Free)**\n• Kailangan: Valid ID\nI-click ang "Request Document" para mag-apply!'
+            : 'The **Certificate of Indigency** is:\n• Proof of financial status for assistance\n• Fee: **Free**\n• Requirement: Valid ID\nClick "Request Document" to apply!'
+    }
 
-    if (lower.includes('id')) return tl
-        ? (userProfile?.is_verified ? 'Aktibo na ang iyong Digital ID! Tingnan ang QR code sa Profile tab.' : 'Para makuha ang Barangay ID, kumpletuhin ang iyong profile at hintayin ang verification ng admin.')
-        : (userProfile?.is_verified ? 'Your Digital ID is active! View the QR code on your Profile tab.' : 'To get your Barangay ID, complete your profile and wait for admin verification.')
+    // 9. Barangay ID (Word boundary so "resident" or "valid" don't match)
+    if (/\b(id|digital id|barangay id)\b/i.test(lower)) {
+        return tl
+            ? (userProfile?.is_verified ? 'Aktibo na ang iyong Digital ID! Tingnan ang QR code sa Profile tab.' : 'Para makuha ang Barangay ID, kumpletuhin ang iyong profile at hintayin ang verification ng admin.')
+            : (userProfile?.is_verified ? 'Your Digital ID is active! View the QR code on your Profile tab.' : 'To get your Barangay ID, complete your profile and wait for admin verification.')
+    }
 
-    if (lower.includes('hello') || lower.includes('hi') || lower.includes('kumusta') || lower.includes('hey')) return tl
-        ? `Kumusta, ${userProfile?.first_name || 'Residente'}! Paano kita matutulungan ngayon?`
-        : `Hello ${userProfile?.first_name || 'Resident'}! How can I help you today?`
+    // 10. Office Hours & Location
+    if (/\b(hours|open|bukas|oras|schedule|location|hall|address|hotline|phone)\b/i.test(lower)) {
+        return tl
+            ? 'Bukas ang Barangay Hall tuwing Lunes–Biyernes, 8:00 AM – 5:00 PM. Sarado sa Sabado, Linggo, at mga holiday. Tel: 223-5497.'
+            : 'Barangay Hall is open Monday–Friday, 8:00 AM – 5:00 PM. Closed on weekends and holidays. Tel: 223-5497.'
+    }
+
+    // 11. Greeting
+    if (/\b(hello|hi|kumusta|hey|good morning|good afternoon)\b/i.test(lower)) {
+        return tl
+            ? `Kumusta, ${userProfile?.first_name || 'Residente'}! Paano kita matutulungan ngayon?`
+            : `Hello ${userProfile?.first_name || 'Resident'}! How can I help you today?`
+    }
 
     return tl
         ? 'Maaari akong tumulong sa mga dokumento, status ng request, at impormasyon ng barangay. Subukang tanungin: "Paano makuha ang Barangay Clearance?" o "Kailan bukas ang Barangay Hall?"'
         : "I can help with document requests, status tracking, and barangay info. Try asking: 'How to get Barangay Clearance?' or 'What are the office hours?'"
 }
 
+// Interactive Slidable Horizontal Row with Arrow Navigation, Mouse Wheel & Drag-to-Scroll
+function SlidableRow({
+    children,
+    className = ''
+}: {
+    children: React.ReactNode
+    className?: string
+}) {
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const [canScrollLeft, setCanScrollLeft] = useState(false)
+    const [canScrollRight, setCanScrollRight] = useState(false)
+    const isDragging = useRef(false)
+    const startX = useRef(0)
+    const scrollStart = useRef(0)
+    const hasMoved = useRef(false)
+
+    const checkScroll = useCallback(() => {
+        if (!scrollRef.current) return
+        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
+        setCanScrollLeft(scrollLeft > 4)
+        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4)
+    }, [])
+
+    useEffect(() => {
+        checkScroll()
+        const timer = setTimeout(checkScroll, 120)
+        window.addEventListener('resize', checkScroll)
+        return () => {
+            clearTimeout(timer)
+            window.removeEventListener('resize', checkScroll)
+        }
+    }, [children, checkScroll])
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (!scrollRef.current) return
+        const scrollAmount = Math.max(scrollRef.current.clientWidth * 0.7, 180)
+        scrollRef.current.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        })
+        setTimeout(checkScroll, 280)
+    }
+
+    const handleWheel = (e: React.WheelEvent) => {
+        if (!scrollRef.current) return
+        // Translate vertical mouse wheel scroll to horizontal scroll
+        if (e.deltaY !== 0 && Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+            scrollRef.current.scrollLeft += e.deltaY
+            checkScroll()
+        }
+    }
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!scrollRef.current) return
+        isDragging.current = true
+        hasMoved.current = false
+        startX.current = e.pageX - scrollRef.current.offsetLeft
+        scrollStart.current = scrollRef.current.scrollLeft
+    }
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging.current || !scrollRef.current) return
+        const x = e.pageX - scrollRef.current.offsetLeft
+        const walk = (x - startX.current) * 1.3
+        if (Math.abs(walk) > 4) {
+            hasMoved.current = true
+        }
+        scrollRef.current.scrollLeft = scrollStart.current - walk
+        checkScroll()
+    }
+
+    const handleMouseUpOrLeave = () => {
+        isDragging.current = false
+        checkScroll()
+    }
+
+    const handleClickCapture = (e: React.MouseEvent) => {
+        if (hasMoved.current) {
+            e.stopPropagation()
+            e.preventDefault()
+            setTimeout(() => {
+                hasMoved.current = false
+            }, 60)
+        }
+    }
+
+    return (
+        <div className={styles.sliderWrapper}>
+            {canScrollLeft && (
+                <button
+                    type="button"
+                    className={`${styles.sliderArrow} ${styles.sliderArrowLeft}`}
+                    onClick={() => scroll('left')}
+                    aria-label="Slide left"
+                    title="Slide left"
+                >
+                    ‹
+                </button>
+            )}
+            <div
+                ref={scrollRef}
+                className={`${styles.sliderTrack} ${className}`}
+                onScroll={checkScroll}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUpOrLeave}
+                onMouseLeave={handleMouseUpOrLeave}
+                onClickCapture={handleClickCapture}
+            >
+                {children}
+            </div>
+            {canScrollRight && (
+                <button
+                    type="button"
+                    className={`${styles.sliderArrow} ${styles.sliderArrowRight}`}
+                    onClick={() => scroll('right')}
+                    aria-label="Slide right"
+                    title="Slide right"
+                >
+                    ›
+                </button>
+            )}
+        </div>
+    )
+}
 
 export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotProps) {
     const defaultMessage: Message = {
@@ -137,6 +305,13 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
     const [inputValue, setInputValue] = useState('')
     const [isTyping, setIsTyping] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    const handleNewChat = () => {
+        try {
+            sessionStorage.removeItem(STORAGE_KEY)
+        } catch { }
+        setMessages([defaultMessage])
+    }
 
     // Save messages to sessionStorage whenever they change
     useEffect(() => {
@@ -267,7 +442,18 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                             </span>
                         </div>
                     </div>
-                    <button className={styles.closeButton} onClick={onClose}>✕</button>
+                    <div className={styles.headerRight}>
+                        {messages.length > 1 && (
+                            <button
+                                className={styles.newChatButton}
+                                onClick={handleNewChat}
+                                title="Bagong chat / I-reset ang usapan"
+                            >
+                                Bagong Chat
+                            </button>
+                        )}
+                        <button className={styles.closeButton} onClick={onClose}>✕</button>
+                    </div>
                 </div>
 
                 {/* Messages */}
@@ -293,9 +479,9 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                             {message.sender === 'user' && (
                                 <div className={styles.messageAvatar} style={{ background: 'linear-gradient(135deg, #059669, #10b981)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                                     {userProfile?.profile_picture_url ? (
-                                        <img 
-                                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${userProfile.profile_picture_url}`} 
-                                            alt="You" 
+                                        <img
+                                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resident-profile-pictures/${userProfile.profile_picture_url}`}
+                                            alt="You"
                                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                             onError={(e) => {
                                                 const target = e.target as HTMLImageElement;
@@ -327,20 +513,21 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Quick Replies */}
-                {messages.length === 1 && (
-                    <div className={styles.quickReplies}>
+                {/* Unified Quick Chat Options Strip */}
+                <div className={styles.quickChatStrip}>
+                    <SlidableRow>
                         {quickReplies.map((reply, index) => (
                             <button
-                                key={index}
-                                className={styles.quickReplyButton}
-                                onClick={() => handleSend(reply)}
+                                key={`quick-${index}`}
+                                className={styles.quickChatButton}
+                                onClick={() => handleSend(reply.prompt)}
+                                disabled={isTyping}
                             >
-                                {reply}
+                                {reply.label}
                             </button>
                         ))}
-                    </div>
-                )}
+                    </SlidableRow>
+                </div>
 
                 {/* Input */}
                 <div className={styles.inputContainer}>

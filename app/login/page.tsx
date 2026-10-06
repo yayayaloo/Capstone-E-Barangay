@@ -169,7 +169,7 @@ function LoginContent() {
 
             updateToast(toastId, 'Signed in successfully!', 'success')
 
-            // Resolve role prioritizing session metadata, falling back to profiles table if needed
+            // Resolve role from session metadata first, falling back to profiles table if needed
             let role = session.user.app_metadata?.role || session.user.user_metadata?.role
             if (!role) {
                 try {
@@ -455,19 +455,17 @@ function LoginContent() {
                     </div>
 
                     {/* Bottom Registration Row with Divider */}
-                    <div>
-                        <div className={styles.formDivider} />
-                        <div className={styles.formFooter}>
-                            <p className={styles.footerText}>
-                                Don&apos;t have an account?
-                                <Link 
-                                    href={searchParams.get('redirect') ? `/register?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : "/register"} 
-                                    className={styles.signupLink}
-                                >
-                                    Sign up here
-                                </Link>
-                            </p>
-                        </div>
+                    <div className={styles.formDivider} />
+                    <div className={styles.formFooter}>
+                        <p className={styles.footerText}>
+                            Don&apos;t have an account?
+                            <Link 
+                                href={searchParams.get('redirect') ? `/register?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : "/register"} 
+                                className={styles.signupLink}
+                            >
+                                Sign up here
+                            </Link>
+                        </p>
                     </div>
                 </div>
             </div>
