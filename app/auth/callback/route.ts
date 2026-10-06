@@ -61,20 +61,46 @@ export async function GET(request: NextRequest) {
     }
 
     // Code exchange failed
+    const errLower = (error.message || '').toLowerCase()
+    const isPkceFlowError =
+        errLower.includes('flow state') ||
+        errLower.includes('flow_state') ||
+        errLower.includes('code_verifier') ||
+        errLower.includes('code verifier') ||
+        errLower.includes('pkce')
+
     const redirectUrl = request.nextUrl.clone()
+    redirectUrl.searchParams.delete('code')
+    redirectUrl.searchParams.delete('next')
+
     if (next.startsWith('/reset-password')) {
         redirectUrl.pathname = '/reset-password'
-        redirectUrl.searchParams.delete('code')
-        redirectUrl.searchParams.delete('next')
-        redirectUrl.searchParams.set('error', 'link_expired')
-        redirectUrl.searchParams.set(
-            'error_description',
-            'Your password reset link has expired or has already been used. You can request a fresh link or use the 6-digit code sent to your email.'
-        )
+        if (isPkceFlowError) {
+            redirectUrl.searchParams.set('error', 'flow_state_mismatch')
+            redirectUrl.searchParams.set(
+                'error_description',
+                'This reset link was opened in a different browser. Please request a new password reset link in this browser or open the link directly in your installed app.'
+            )
+        } else {
+            redirectUrl.searchParams.set('error', 'link_expired')
+            redirectUrl.searchParams.set(
+                'error_description',
+                'Your password reset link has expired or has already been used. Please request a new link.'
+            )
+        }
     } else {
-        redirectUrl.pathname = '/login'
-        redirectUrl.searchParams.set('error', 'auth_callback_error')
-        redirectUrl.searchParams.set('error_description', error.message || 'Authentication failed.')
+        // Signup email verification or regular login
+        if (isPkceFlowError) {
+            // For signup confirmation: Supabase confirms the email in the DB before code exchange.
+            // When opened in an external browser from mobile, missing the PWA's PKCE verifier causes code exchange to fail,
+            // but the user's email IS confirmed! Redirect to /login with confirmed=true so they can sign in.
+            redirectUrl.pathname = '/login'
+            redirectUrl.searchParams.set('confirmed', 'true')
+        } else {
+            redirectUrl.pathname = '/login'
+            redirectUrl.searchParams.set('error', 'auth_callback_error')
+            redirectUrl.searchParams.set('error_description', error.message || 'Authentication failed.')
+        }
     }
     return NextResponse.redirect(redirectUrl)
 }

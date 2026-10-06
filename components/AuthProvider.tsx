@@ -165,10 +165,40 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
         subscription = authSubscription
 
+        // Foreground re-synchronization for mobile PWAs:
+        // When user returns to the installed PWA from their email app, re-check session
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === 'visible' && mountedRef.current) {
+                try {
+                    const { data: { session: currentSession } } = await supabase.auth.getSession()
+                    if (currentSession?.user?.id !== userRef.current?.id) {
+                        setSession(currentSession)
+                        setUser(currentSession?.user ?? null)
+                        if (currentSession?.user) {
+                            fetchProfile(currentSession.user.id, mountedRef)
+                        } else {
+                            setProfile(null)
+                        }
+                    }
+                } catch {
+                    // Silently ignore background sync errors
+                }
+            }
+        }
+
+        if (typeof window !== 'undefined') {
+            document.addEventListener('visibilitychange', handleVisibilityChange)
+            window.addEventListener('focus', handleVisibilityChange)
+        }
+
         return () => {
             mountedRef.current = false;
             if (subscription) {
                 subscription.unsubscribe()
+            }
+            if (typeof window !== 'undefined') {
+                document.removeEventListener('visibilitychange', handleVisibilityChange)
+                window.removeEventListener('focus', handleVisibilityChange)
             }
         }
     }, [])    // Real-time Profile Synchronization

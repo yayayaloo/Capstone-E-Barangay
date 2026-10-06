@@ -1,20 +1,31 @@
-const CACHE_NAME = 'e-barangay-pwa-v5';
+const CACHE_NAME = 'e-barangay-pwa-v6';
 const OFFLINE_URL = '/~offline';
 
+// Pre-cache only public shell assets. Never pre-cache authenticated routes (/resident, /login).
 const PRECACHE_ASSETS = [
   '/',
-  '/resident',
-  '/login',
   OFFLINE_URL,
   '/logo.png',
   '/manifest.json',
 ];
 
-// On install, pre-cache core resources safely
+// Routes that require fresh network communication and must NEVER be stored in Service Worker cache.
+const isDynamicAuthRoute = (pathname) => {
+  return (
+    pathname.startsWith('/resident') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/forgot-password')
+  );
+};
+
+// On install, pre-cache core public resources safely
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Use Promise.allSettled so a single redirect/failure doesn't abort precaching
       await Promise.allSettled(
         PRECACHE_ASSETS.map((url) =>
           fetch(url)
@@ -54,18 +65,35 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Ignore cross-origin requests (e.g. Supabase API queries) in service worker cache.
-  // We will cache Supabase query data client-side in localStorage for safety and convenience.
+  // 1. Never intercept cross-origin requests (e.g. Supabase API queries)
   if (url.origin !== self.location.origin) {
     return;
   }
 
-  // Handle HTML document requests (navigation)
+  // 2. Bypass API requests completely to guarantee fresh server state and avoid cookie/session interference
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // 3. Handle HTML document requests (Navigation)
   if (event.request.mode === 'navigate') {
+    // Authenticated and auth-flow pages must ALWAYS be fetched live from the network
+    // and NEVER cached, to prevent stale redirects or leaked session views.
+    if (isDynamicAuthRoute(url.pathname)) {
+      event.respondWith(
+        fetch(event.request).catch(async () => {
+          const offlineResponse = await caches.match(OFFLINE_URL, { ignoreSearch: true });
+          if (offlineResponse) return offlineResponse;
+          return getFallbackOfflineHtml();
+        })
+      );
+      return;
+    }
+
+    // Public pages navigation: Network-first, fallback to cache or offline page
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // If successful (HTTP 200), cache a copy of the navigated page
           if (response.status === 200) {
             const responseCopy = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -75,27 +103,79 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(async () => {
-          // 1. Try exact cached request
           const cachedResponse = await caches.match(event.request);
-          if (cachedResponse) {
-            return cachedResponse;
-          }
+          if (cachedResponse) return cachedResponse;
 
-          // 2. Try URL path without query params
           const cachedPath = await caches.match(url.pathname);
-          if (cachedPath) {
-            return cachedPath;
-          }
+          if (cachedPath) return cachedPath;
 
-          // 3. Fallback to /~offline page
           const offlineResponse = await caches.match(OFFLINE_URL, { ignoreSearch: true });
-          if (offlineResponse) {
-            return offlineResponse;
-          }
+          if (offlineResponse) return offlineResponse;
 
-          // 4. Guaranteed HTML Response fallback — prevents ERR_FAILED browser screen
-          return new Response(
-            `<!DOCTYPE html>
+          return getFallbackOfflineHtml();
+        })
+    );
+    return;
+  }
+
+  // 4. Stale-While-Revalidate caching strategy for local static assets
+  const isStaticAsset = 
+    url.pathname.startsWith('/_next/') || 
+    url.pathname.startsWith('/static/') || 
+    url.pathname.endsWith('.png') || 
+    url.pathname.endsWith('.jpg') || 
+    url.pathname.endsWith('.jpeg') || 
+    url.pathname.endsWith('.svg') || 
+    url.pathname.endsWith('.ico') || 
+    url.pathname.endsWith('.woff') || 
+    url.pathname.endsWith('.woff2');
+
+  if (isStaticAsset) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          const fetchPromise = fetch(event.request).then((networkResponse) => {
+            if (networkResponse.status === 200) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => {});
+          
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+
+  // 5. For other same-origin requests:
+  // If it's a dynamic auth route, network only
+  if (isDynamicAuthRoute(url.pathname)) {
+    return;
+  }
+
+  // Otherwise, network first then cache
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response.status === 200) {
+          const responseCopy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseCopy);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
+  );
+});
+
+// Guaranteed HTML Response fallback — prevents ERR_FAILED browser screen when offline
+function getFallbackOfflineHtml() {
+  return new Response(
+    `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -121,59 +201,6 @@ self.addEventListener('fetch', (event) => {
     </div>
 </body>
 </html>`,
-            { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-          );
-        })
-    );
-    return;
-  }
-
-  // Stale-While-Revalidate caching strategy for local static assets
-  const isStaticAsset = 
-    url.pathname.startsWith('/_next/') || 
-    url.pathname.startsWith('/static/') || 
-    url.pathname.endsWith('.png') || 
-    url.pathname.endsWith('.jpg') || 
-    url.pathname.endsWith('.jpeg') || 
-    url.pathname.endsWith('.svg') || 
-    url.pathname.endsWith('.ico') || 
-    url.pathname.endsWith('.woff') || 
-    url.pathname.endsWith('.woff2');
-
-  if (isStaticAsset) {
-    event.respondWith(
-      caches.open(CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          const fetchPromise = fetch(event.request).then((networkResponse) => {
-            if (networkResponse.status === 200) {
-              cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          }).catch(() => {
-            // Silently consume offline fetch errors
-          });
-          
-          return cachedResponse || fetchPromise;
-        });
-      })
-    );
-    return;
-  }
-
-  // For other same-origin requests, try network first, then cache
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.status === 200) {
-          const responseCopy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseCopy);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
+    { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
   );
-});
+}

@@ -114,11 +114,14 @@ export async function GET(request: NextRequest) {
     // When Supabase processes the confirmation link, it confirms the email in the DB *before* redirecting.
     // Since we require users to sign in manually anyway, a missing PKCE session cookie on a new browser/webview
     // does not prevent them from signing in. We can safely treat this as a confirmed email!
-    const isPkceError = error.message?.includes('flow_state_not_found') || 
-                        error.message?.includes('PKCE code verifier not found') ||
-                        error.message?.includes('code_verifier')
+    const errLower = (error.message || '').toLowerCase()
+    const isPkceError = errLower.includes('flow state') ||
+                        errLower.includes('flow_state') ||
+                        errLower.includes('code_verifier') ||
+                        errLower.includes('code verifier') ||
+                        errLower.includes('pkce')
 
-    if (isPkceError) {
+    if (isPkceError && type !== 'recovery') {
         await supabase.auth.signOut().catch(() => {})
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
@@ -130,14 +133,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(redirectUrl)
     }
 
-    // Verification failed for another reason (e.g. invalid or expired token)
+    // Verification failed for another reason (e.g. invalid or expired token, or cross-browser recovery)
     const redirectUrl = request.nextUrl.clone()
     if (type === 'recovery') {
         redirectUrl.pathname = '/reset-password'
-        redirectUrl.searchParams.set('error', 'link_expired')
+        redirectUrl.searchParams.set('error', isPkceError ? 'flow_state_mismatch' : 'link_expired')
         redirectUrl.searchParams.set(
             'error_description',
-            error.message || 'Your password reset link has expired or is invalid. Please request a new link or enter your 6-digit code.'
+            isPkceError
+                ? 'This reset link was opened in a different browser. Please request a new password reset link in this browser or open the link directly in your installed app.'
+                : (error.message || 'Your password reset link has expired or is invalid. Please request a new link.')
         )
     } else {
         redirectUrl.pathname = '/login'

@@ -100,13 +100,15 @@ function LoginContent() {
             }
         }
         // Handle email confirmation success
-        if (searchParams.get('confirmed') === 'true') {
+        if (searchParams.get('confirmed') === 'true' || searchParams.get('verified') === 'true') {
             setSuccessMessage('Your email has been verified successfully! You can now sign in.')
-        }
-        // Handle email confirmation errors
-        const errorDesc = searchParams.get('error_description')
-        if (errorDesc) {
-            setError(errorDesc)
+            setError('')
+        } else {
+            // Handle email confirmation errors
+            const errorDesc = searchParams.get('error_description')
+            if (errorDesc) {
+                setError(errorDesc)
+            }
         }
     }, [searchParams])
 
@@ -196,13 +198,11 @@ function LoginContent() {
                 return url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\')
             }
 
-            if (redirectUrl && isValidLocalRedirect(redirectUrl)) {
-                router.push(redirectUrl)
-            } else if (role === 'admin') {
-                router.push('/admin')
-            } else {
-                router.push('/resident')
-            }
+            const destination = (redirectUrl && isValidLocalRedirect(redirectUrl))
+                ? redirectUrl
+                : (role === 'admin' ? '/admin' : '/resident')
+
+            window.location.href = destination
         }
     }
 
