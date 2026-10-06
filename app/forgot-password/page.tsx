@@ -76,13 +76,26 @@ export default function ForgotPasswordPage() {
         return () => clearInterval(timer)
     }, [isPaused])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const [cooldown, setCooldown] = useState(0)
+
+    useEffect(() => {
+        if (cooldown <= 0) return
+        const timer = setInterval(() => {
+            setCooldown((prev) => prev - 1)
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [cooldown])
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault()
+        if (!email.trim()) return
+
         setLoading(true)
         setError('')
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/reset-password`,
+        // Use /auth/callback?next=/reset-password so Next.js server exchanges the PKCE code and sets session cookies reliably
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+            redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
         })
 
         setLoading(false)
@@ -92,7 +105,8 @@ export default function ForgotPasswordPage() {
             showToast(error.message, 'error')
         } else {
             setSubmitted(true)
-            showToast('Reset link sent! Check your inbox.', 'success')
+            setCooldown(45)
+            showToast('Reset instructions dispatched! Please check your inbox.', 'success')
         }
     }
 
@@ -249,21 +263,68 @@ export default function ForgotPasswordPage() {
                                 </button>
                             </form>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
                                 <div className={`${styles.alertBox} ${styles.alertSuccess}`}>
                                     <CheckCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                                    <span>Password reset instructions have been dispatched to your email.</span>
+                                    <span>Password reset instructions have been sent to <strong>{email}</strong>.</span>
                                 </div>
-                                <Link href="/login" className={styles.submitButton} style={{ textDecoration: 'none', textAlign: 'center' }}>
+
+                                <div style={{ 
+                                    background: '#f8fafc', 
+                                    border: '1px solid #e2e8f0', 
+                                    borderRadius: '10px', 
+                                    padding: '0.9rem 1rem', 
+                                    fontSize: '0.82rem', 
+                                    color: '#475569',
+                                    lineHeight: 1.5 
+                                }}>
+                                    <strong style={{ color: '#0f172a', display: 'block', marginBottom: '4px' }}>💡 Haven't seen the email yet?</strong>
+                                    • Check your <strong>Spam or Junk folder</strong> in case it was filtered.<br />
+                                    • Click the secure reset link inside the email to set your new password.
+                                </div>
+
+                                <Link 
+                                    href="/login" 
+                                    className={styles.submitButton} 
+                                    style={{ textDecoration: 'none', textAlign: 'center' }}
+                                >
                                     Return to Sign In
                                 </Link>
-                                <button
-                                    type="button"
-                                    onClick={() => setSubmitted(false)}
-                                    style={{ background: 'none', border: 'none', color: '#059669', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}
-                                >
-                                    Try another email
-                                </button>
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSubmit()}
+                                        disabled={loading || cooldown > 0}
+                                        style={{ 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            color: cooldown > 0 ? '#94a3b8' : '#059669', 
+                                            fontWeight: 600, 
+                                            cursor: cooldown > 0 ? 'not-allowed' : 'pointer', 
+                                            fontSize: '0.83rem',
+                                            padding: 0
+                                        }}
+                                    >
+                                        {cooldown > 0 ? `Resend email (${cooldown}s)` : 'Resend reset link'}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setSubmitted(false)}
+                                        style={{ 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            color: '#64748b', 
+                                            fontWeight: 500, 
+                                            cursor: 'pointer', 
+                                            fontSize: '0.83rem',
+                                            padding: 0
+                                        }}
+                                    >
+                                        Change email
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

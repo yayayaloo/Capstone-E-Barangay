@@ -62,8 +62,19 @@ export async function GET(request: NextRequest) {
 
     // Code exchange failed
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/login'
-    redirectUrl.searchParams.set('error', 'auth_callback_error')
-    redirectUrl.searchParams.set('error_description', error.message || 'Authentication failed.')
+    if (next.startsWith('/reset-password')) {
+        redirectUrl.pathname = '/reset-password'
+        redirectUrl.searchParams.delete('code')
+        redirectUrl.searchParams.delete('next')
+        redirectUrl.searchParams.set('error', 'link_expired')
+        redirectUrl.searchParams.set(
+            'error_description',
+            'Your password reset link has expired or has already been used. You can request a fresh link or use the 6-digit code sent to your email.'
+        )
+    } else {
+        redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.set('error', 'auth_callback_error')
+        redirectUrl.searchParams.set('error_description', error.message || 'Authentication failed.')
+    }
     return NextResponse.redirect(redirectUrl)
 }

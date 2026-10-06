@@ -84,7 +84,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (!error) {
-        // Email confirmed successfully!
+        // If this is a password recovery flow, redirect to reset-password with active session
+        if (type === 'recovery') {
+            const redirectUrl = request.nextUrl.clone()
+            redirectUrl.pathname = '/reset-password'
+            redirectUrl.searchParams.delete('token_hash')
+            redirectUrl.searchParams.delete('type')
+            redirectUrl.searchParams.delete('code')
+            redirectUrl.searchParams.delete('next')
+            return NextResponse.redirect(redirectUrl)
+        }
+
+        // Email confirmed successfully for signup!
         // Sign out the user so they must log in with their credentials
         // (prevents auto-login before admin verification)
         await supabase.auth.signOut()
@@ -121,8 +132,17 @@ export async function GET(request: NextRequest) {
 
     // Verification failed for another reason (e.g. invalid or expired token)
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/login'
-    redirectUrl.searchParams.set('error', 'confirmation_failed')
-    redirectUrl.searchParams.set('error_description', error.message || 'Email confirmation failed. The link may have expired.')
+    if (type === 'recovery') {
+        redirectUrl.pathname = '/reset-password'
+        redirectUrl.searchParams.set('error', 'link_expired')
+        redirectUrl.searchParams.set(
+            'error_description',
+            error.message || 'Your password reset link has expired or is invalid. Please request a new link or enter your 6-digit code.'
+        )
+    } else {
+        redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.set('error', 'confirmation_failed')
+        redirectUrl.searchParams.set('error_description', error.message || 'Email confirmation failed. The link may have expired.')
+    }
     return NextResponse.redirect(redirectUrl)
 }
