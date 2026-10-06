@@ -101,14 +101,14 @@ function ResetPasswordContent() {
             setCountdown((prev) => {
                 if (prev <= 1) {
                     clearInterval(timer)
-                    router.push('/login')
+                    window.location.href = '/login'
                     return 0
                 }
                 return prev - 1
             })
         }, 1000)
         return () => clearInterval(timer)
-    }, [success, router])
+    }, [success])
 
     // Initial code exchange, OTP verify, and session check
     useEffect(() => {
@@ -289,7 +289,14 @@ function ResetPasswordContent() {
             setSuccess(true)
             showToast('Password updated successfully! Redirecting to login...', 'success')
 
-            // Safely sign out so the user signs in fresh with new credentials
+            // 1. Force server-side cookie deletion via /api/auth/logout
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' })
+            } catch (err) {
+                console.warn('Server logout call warning:', err)
+            }
+
+            // 2. Clear client-side state
             try {
                 await supabase.auth.signOut({ scope: 'local' })
             } catch (signOutErr) {
@@ -332,13 +339,14 @@ function ResetPasswordContent() {
                                 Redirecting to sign in page in <strong>{countdown}s</strong>...
                             </div>
 
-                            <Link 
-                                href="/login" 
+                            <button 
+                                type="button"
+                                onClick={() => { window.location.href = '/login' }}
                                 className={styles.submitButton} 
-                                style={{ textDecoration: 'none', maxWidth: '320px' }}
+                                style={{ maxWidth: '320px', cursor: 'pointer' }}
                             >
                                 Return to Sign In Now →
-                            </Link>
+                            </button>
                         </div>
                     </div>
                 </div>
