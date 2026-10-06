@@ -13,7 +13,7 @@ interface HeaderProps {
 
 export default function Header({ title, userName, onSignOut, variant = 'resident' }: HeaderProps) {
     return (
-        <header className={`${styles.header} ${variant === 'admin' ? styles.adminHeader : ''}`}>
+        <header className={`${styles.header} ${variant === 'admin' ? styles.adminHeader : styles.residentHeader}`}>
             <div className="container flex-between">
                 <Link href={variant === 'admin' ? '/admin' : '/resident'} className={styles.logo}>
                     <Image src="/logo.png" alt="Barangay Logo" width={28} height={28} className={styles.logoImage} />

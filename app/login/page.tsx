@@ -91,6 +91,14 @@ function LoginContent() {
     }, [isPaused])
 
     useEffect(() => {
+        // Handle registration completion guidance
+        if (searchParams.get('registered') === 'true') {
+            setSuccessMessage('Registration successful! Please confirm your email via the link sent to your inbox, then sign in below to complete your resident account verification.')
+            const queryEmail = searchParams.get('email')
+            if (queryEmail) {
+                setEmail(queryEmail)
+            }
+        }
         // Handle email confirmation success
         if (searchParams.get('confirmed') === 'true') {
             setSuccessMessage('Your email has been verified successfully! You can now sign in.')

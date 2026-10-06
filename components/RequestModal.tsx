@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, X } from 'lucide-react'
 import styles from './RequestModal.module.css'
 
 interface RequestModalProps {
@@ -12,12 +12,12 @@ interface RequestModalProps {
 }
 
 const documentTypes = [
-    { value: 'Barangay Clearance', label: ' Barangay Clearance', desc: 'Verification of residency, good moral character, no derogatory record.', reqs: 'Valid ID (Php 50.00)' },
-    { value: 'Certificate of Residency', label: ' Certificate of Residency', desc: 'Proof of address and duration of stay in the barangay.', reqs: 'Valid ID (Php 50.00)' },
-    { value: 'Business Clearance', label: ' Business Clearance', desc: 'Compliance for business permit within Gordon Heights.', reqs: 'DTI Certificate (Free)' },
-    { value: 'Lot Certification', label: ' Lot / Building Certification', desc: 'Issued to actual lot occupants for compliance to government agencies.', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment, etc. (Php 1.00/sqm)' },
-    { value: 'First Time Job Seeker', label: ' First Time Job Seeker', desc: 'Waives fees for pre-employment requirements (Ages 18-30).', reqs: 'Valid ID (Free)' },
-    { value: 'Certificate of Indigency', label: ' Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
+    { value: 'Barangay Clearance', label: 'Barangay Clearance', desc: 'Verification of residency, good moral character, no derogatory record.', reqs: 'Valid ID (Php 50.00)' },
+    { value: 'Certificate of Residency', label: 'Certificate of Residency', desc: 'Proof of address and duration of stay in the barangay.', reqs: 'Valid ID (Php 50.00)' },
+    { value: 'Business Clearance', label: 'Business Clearance', desc: 'Compliance for business permit within Gordon Heights.', reqs: 'DTI Certificate (Free)' },
+    { value: 'Lot Certification', label: 'Lot / Building Certification', desc: 'Issued to actual lot occupants for compliance to government agencies.', reqs: 'Purok Cert, Tax Dec, Latest Tax Payment, etc. (Php 1.00/sqm)' },
+    { value: 'First Time Job Seeker', label: 'First Time Job Seeker', desc: 'Waives fees for pre-employment requirements (Ages 18-30).', reqs: 'Valid ID (Free)' },
+    { value: 'Certificate of Indigency', label: 'Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
 ]
 
 export default function RequestModal({ onClose, onSubmit, initialType, profile }: RequestModalProps) {
@@ -136,7 +136,9 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
                 <div className={styles.modalHeader}>
                     <h2>Request a Document</h2>
-                    <button className={styles.closeButton} onClick={onClose}>✕</button>
+                    <button className={styles.closeButton} onClick={onClose} aria-label="Close modal">
+                        <X size={20} />
+                    </button>
                 </div>
                 {!profile?.is_verified ? (
                     <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>

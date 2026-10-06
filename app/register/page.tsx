@@ -6,7 +6,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { 
     Eye, EyeOff, Check, ArrowLeft, AlertCircle, CheckCircle, ChevronDown, ChevronUp,
-    User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX
+    User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX,
+    Mail, ShieldCheck, ArrowRight
 } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
@@ -240,16 +241,57 @@ function RegisterContent() {
                 <div className={styles.bgBlob1} />
                 <div className={styles.bgBlob2} />
 
-                <div className={styles.slidingCard} style={{ maxWidth: '640px', height: 'auto', padding: '3.5rem 2.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
-                        <CheckCircle size={38} />
+                <div className={styles.slidingCard} style={{ maxWidth: '680px', height: 'auto', padding: '3rem 2.25rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', boxShadow: '0 4px 12px rgba(5, 150, 105, 0.15)' }}>
+                        <CheckCircle size={36} />
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', color: '#111827', fontWeight: 700, marginBottom: '0.5rem' }}>Account Created Successfully!</h2>
-                    <p style={{ color: '#4b5563', fontSize: '0.95rem', maxWidth: '440px', lineHeight: 1.6, marginBottom: '1.75rem' }}>
-                        We have sent a verification link to <strong>{email}</strong>. Please check your inbox and verify your email to activate your account.
+                    <h2 style={{ fontSize: '1.5rem', color: '#111827', fontWeight: 800, marginBottom: '0.4rem', fontFamily: 'var(--font-poppins, sans-serif)' }}>Registration Successful!</h2>
+                    <p style={{ color: '#4b5563', fontSize: '0.92rem', maxWidth: '480px', lineHeight: 1.55, marginBottom: '1.75rem' }}>
+                        Your citizen account has been created. Follow the 2 steps below to activate and verify your resident access:
                     </p>
-                    <Link href={redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className={styles.createButton} style={{ textDecoration: 'none', maxWidth: '280px' }}>
-                        Proceed to Sign In
+
+                    {/* Step-by-Step Verification Journey */}
+                    <div style={{ width: '100%', maxWidth: '520px', display: 'flex', flexDirection: 'column', gap: '0.9rem', marginBottom: '2rem', textAlign: 'left' }}>
+                        {/* Step 1 */}
+                        <div style={{ display: 'flex', gap: '0.9rem', background: '#f8fafc', padding: '1rem 1.15rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ width: '32px', height: '32px', minWidth: '32px', borderRadius: '50%', background: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                                1
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                                    <Mail size={15} style={{ color: '#2563eb' }} />
+                                    <strong style={{ fontSize: '0.9rem', color: '#1e293b' }}>Confirm Your Email</strong>
+                                </div>
+                                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0, lineHeight: 1.45 }}>
+                                    We sent a verification link to <strong style={{ color: '#1e293b' }}>{email}</strong>. Open your email inbox and click the link to activate your login.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Step 2 */}
+                        <div style={{ display: 'flex', gap: '0.9rem', background: '#ecfdf5', padding: '1rem 1.15rem', borderRadius: '12px', border: '1px solid #a7f3d0' }}>
+                            <div style={{ width: '32px', height: '32px', minWidth: '32px', borderRadius: '50%', background: '#059669', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                                2
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                                    <ShieldCheck size={16} style={{ color: '#059669' }} />
+                                    <strong style={{ fontSize: '0.9rem', color: '#065f46' }}>Sign In & Verify Resident Status</strong>
+                                </div>
+                                <p style={{ fontSize: '0.82rem', color: '#047857', margin: 0, lineHeight: 1.45 }}>
+                                    Sign in to your resident dashboard and submit your verification details (Valid ID / Proof of Residency) to obtain your official Barangay Resident ID and unlock document requests.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Link 
+                        href={`/login?registered=true&email=${encodeURIComponent(email)}${redirectUrl ? `&redirect=${encodeURIComponent(redirectUrl)}` : ''}`} 
+                        className={styles.createButton} 
+                        style={{ textDecoration: 'none', maxWidth: '320px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                        <span>Proceed to Sign In & Verify</span>
+                        <ArrowRight size={16} />
                     </Link>
                 </div>
             </div>

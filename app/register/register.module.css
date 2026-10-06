@@ -2,6 +2,7 @@
 
 .pageWrapper {
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -41,8 +42,8 @@
 /* Main Sliding Card matching Login */
 .slidingCard {
     width: 100%;
-    max-width: 1120px;
-    height: min(92vh, 780px);
+    max-width: 1100px;
+    height: min(92vh, 760px);
     background: #ffffff;
     border-radius: 28px;
     box-shadow: 0 20px 60px -15px rgba(6, 78, 59, 0.16),
@@ -53,13 +54,13 @@
     position: relative;
     z-index: 1;
     overflow: hidden;
-    animation: cardAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: cardAppear 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @media (min-width: 960px) {
     .slidingCard {
         grid-template-columns: 1.05fr 1.25fr;
-        height: min(92vh, 800px);
+        height: min(92vh, 760px);
     }
 }
 
@@ -67,6 +68,7 @@
 /* LEFT PANEL: Deep Green Showcase & Carousel (Matching Login)   */
 /* ------------------------------------------------------------- */
 .showcasePanel {
+    height: 100%;
     background: linear-gradient(150deg, #064e3b 0%, #053f30 50%, #022c22 100%);
     padding: 2.75rem 2.25rem 2rem;
     display: flex;
@@ -345,14 +347,6 @@
     height: 100%;
     overflow: hidden;
     position: relative;
-}
-
-@media (max-width: 959px) {
-    .formPanel {
-        padding: 1.75rem 1.5rem 1.25rem;
-        height: auto;
-        min-height: 100vh;
-    }
 }
 
 .formTopRow {
@@ -727,6 +721,7 @@
 
 .formFooter {
     text-align: center;
+    padding-bottom: 0.25rem;
     flex-shrink: 0;
 }
 
@@ -863,12 +858,10 @@
 
 @keyframes cardAppear {
     0% {
-        opacity: 0;
-        transform: scale(0.97) translateY(14px);
+        opacity: 0.95;
     }
     100% {
         opacity: 1;
-        transform: scale(1) translateY(0);
     }
 }
 
@@ -880,5 +873,59 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@media (max-width: 959px) {
+    .pageWrapper {
+        padding: 1rem;
+    }
+
+    .slidingCard {
+        max-width: 480px;
+        height: auto;
+        min-height: auto;
+        border-radius: 20px;
+    }
+
+    .showcasePanel {
+        display: none;
+    }
+
+    .formPanel {
+        padding: 2rem 1.75rem 1.5rem;
+        width: 100%;
+        height: auto;
+        min-height: auto;
+        overflow: visible;
+    }
+
+    .scrollableFormArea {
+        overflow-y: visible;
+        padding-right: 0;
+        margin-right: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .pageWrapper {
+        padding: 0.75rem;
+    }
+
+    .slidingCard {
+        border-radius: 16px;
+    }
+
+    .formPanel {
+        padding: 1.5rem 1.25rem 1.25rem;
+    }
+
+    .formTitle {
+        font-size: 1.2rem;
+    }
+
+    .inputField,
+    .selectField {
+        font-size: 1rem; /* Prevents auto-zoom on iOS */
     }
 }

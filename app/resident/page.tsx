@@ -19,7 +19,10 @@ import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 import { ServiceRequest, Announcement, Profile, Complaint, ComplaintType, ComplaintComment } from '@/lib/types'
 import { QRCodeSVG } from 'qrcode.react'
-import { FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake, MessageSquare, Send, FileText, X, ClipboardList, Bot } from 'lucide-react'
+import { 
+    FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake, MessageSquare, Send, FileText, X, 
+    ClipboardList, Bot, ShieldCheck, ShieldAlert, CheckCircle, Clock, Copy, ArrowRight, UserCheck, Upload, AlertCircle, Check, Paperclip 
+} from 'lucide-react'
 import styles from './resident.module.css'
 import { saveOfflineSubmission, getOfflineSubmissions, deleteOfflineSubmission, OfflineSubmission } from '@/lib/offlineQueue'
 import { submitDocumentRequest } from '@/app/actions/requestActions'
@@ -35,6 +38,17 @@ function ResidentPortalContent() {
     const { user, profile, signOut, refreshProfile } = useAuth()
     const { showToast, updateToast } = useToast()
     const [activeTab, setActiveTab] = useState('overview')
+    const [copiedId, setCopiedId] = useState(false)
+
+    const copyUserId = () => {
+        const idToCopy = profile?.id || user?.id
+        if (idToCopy) {
+            navigator.clipboard.writeText(idToCopy)
+            setCopiedId(true)
+            showToast('User ID copied to clipboard!', 'success')
+            setTimeout(() => setCopiedId(false), 2500)
+        }
+    }
     const [isOnline, setIsOnline] = useState(true)
     const [isSyncingOfflineQueue, setIsSyncingOfflineQueue] = useState(false)
     const [showChatBot, setShowChatBot] = useState(false)
@@ -863,17 +877,17 @@ function ResidentPortalContent() {
                             <div className={styles.idCardSub}>
                                 <span>Gordon Heights Resident</span>
                                 {profile?.is_verified ? (
-                                    <span className={styles.verifiedBadge}>Verified Resident</span>
+                                    <span className={styles.verifiedBadge}><ShieldCheck size={11} style={{ marginRight: '3px' }} /> Verified</span>
                                 ) : profile?.is_rejected ? (
-                                    <span className={styles.rejectedBadge} style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Registration Rejected</span>
+                                    <span className={styles.rejectedBadge} style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}><X size={11} style={{ marginRight: '3px' }} /> Rejected</span>
                                 ) : (
-                                    <span className={styles.pendingBadge}>Account for Review</span>
+                                    <span className={styles.pendingBadge}><ShieldAlert size={11} style={{ marginRight: '3px' }} /> Not Verified</span>
                                 )}
                             </div>
                             <div className={styles.idCardFoot}>
                                 {profile?.is_verified
-                                    ? `ID NO: ${profile?.resident_id_number || 'Official Issued'}`
-                                    : `USER REF: ${profile?.id?.slice(0, 8).toUpperCase() || 'UNVERIFIED'}`
+                                    ? `RESIDENT ID: ${profile?.resident_id_number || 'Official Issued'}`
+                                    : `USER ID: ${profile?.id ? profile.id.slice(0, 8).toUpperCase() : 'UNVERIFIED'}`
                                 }
                             </div>
                         </div>
@@ -889,25 +903,148 @@ function ResidentPortalContent() {
                 </div>
             </section>
 
-            {/* Verification Restriction Notice */}
+            {/* Account Verification Step-by-Step Prompt */}
             {!profile?.is_verified && (
-                <div className="glass-card" style={{ 
-                    marginBottom: '2rem', 
-                    borderLeft: profile?.is_rejected ? '4px solid #ef4444' : '4px solid #f59e0b', 
-                    background: profile?.is_rejected ? 'rgba(239, 68, 68, 0.05)' : 'rgba(245, 158, 11, 0.05)' 
-                }}>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <div>
-                            <strong style={{ display: 'block', color: profile?.is_rejected ? '#ef4444' : 'inherit' }}>
-                                {profile?.is_rejected ? 'Registration Rejected' : 'Account Under Review'}
-                            </strong>
-                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                {profile?.is_rejected 
-                                    ? 'Your registration has been declined by the Barangay Admin. Please contact the barangay hall or re-submit your requirements to resolve this.' 
-                                    : 'Some features are restricted. Please wait for the Barangay Admin to verify your account to access all digital services.'
-                                }
-                            </p>
+                <div className={`glass-card ${styles.verificationGuideCard}`}>
+                    <div className={styles.verificationGuideHeader}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                            <div className={styles.verificationIconBadge}>
+                                <ShieldAlert size={24} />
+                            </div>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#064e3b' }}>Account Verification Required</h3>
+                                    {profile?.is_rejected ? (
+                                        <span className={styles.statusBadgeRejected}>Rejected</span>
+                                    ) : (
+                                        <span className={styles.statusBadgeNotVerified}>Not Verified</span>
+                                    )}
+                                </div>
+                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.88rem', color: '#334155' }}>
+                                    {profile?.is_rejected 
+                                        ? 'Your registration was declined by Barangay Administrators. Please review the requirements below or visit the Barangay Hall.'
+                                        : 'To request official barangay documents, clearances, and certificates, please complete the account verification steps below.'}
+                                </p>
+                            </div>
                         </div>
+                    </div>
+
+                    <div className={styles.stepsRoadmapGrid}>
+                        {/* Step 1 */}
+                        <div className={styles.stepRoadmapCard}>
+                            <div className={styles.stepNumberBadge}>1</div>
+                            <div className={styles.stepContent}>
+                                <h4>Complete Your Profile</h4>
+                                <p>Ensure your Full Name, Gordon Heights Address, Contact Number, and Birthdate are accurate.</p>
+                                <div className={styles.stepFooter}>
+                                    <span className={profile?.address && profile?.phone && profile?.birthdate ? styles.pillDone : styles.pillPending}>
+                                        {profile?.address && profile?.phone && profile?.birthdate ? (
+                                            <>
+                                                <Check size={12} strokeWidth={2.5} />
+                                                <span>Profile Details Ready</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <AlertCircle size={12} strokeWidth={2.5} />
+                                                <span>Missing Details</span>
+                                            </>
+                                        )}
+                                    </span>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline" 
+                                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', background: '#ffffff' }}
+                                        onClick={() => setShowProfileModal(true)}
+                                    >
+                                        Edit Profile
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Step 2 */}
+                        <div className={styles.stepRoadmapCard}>
+                            <div className={styles.stepNumberBadge}>2</div>
+                            <div className={styles.stepContent}>
+                                <h4>Submit Valid ID</h4>
+                                <p>Upload a government-issued photo ID (National ID, Driver&apos;s License, Voter&apos;s ID) or proof of residency.</p>
+                                <div className={styles.stepFooter}>
+                                    <span className={profile?.id_document_url ? styles.pillDone : styles.pillPending}>
+                                        {profile?.id_document_url ? (
+                                            <>
+                                                <Check size={12} strokeWidth={2.5} />
+                                                <span>ID Uploaded</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <AlertCircle size={12} strokeWidth={2.5} />
+                                                <span>Valid ID Required</span>
+                                            </>
+                                        )}
+                                    </span>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline" 
+                                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', background: '#ffffff' }}
+                                        onClick={() => setShowProfileModal(true)}
+                                    >
+                                        {profile?.id_document_url ? 'Update ID' : 'Upload Valid ID'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Step 3 */}
+                        <div className={styles.stepRoadmapCard}>
+                            <div className={styles.stepNumberBadge}>3</div>
+                            <div className={styles.stepContent}>
+                                <h4>Barangay Admin Approval</h4>
+                                <p>Administrators will review your credentials and issue your official <strong>Resident ID Number</strong> and Verified Digital QR Pass.</p>
+                                <div className={styles.stepFooter}>
+                                    <span className={profile?.is_rejected ? styles.pillPending : styles.pillInfo}>
+                                        {profile?.is_rejected ? (
+                                            <>
+                                                <X size={12} strokeWidth={2.5} />
+                                                <span>Declined</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Clock size={12} strokeWidth={2.5} />
+                                                <span>Awaiting Review</span>
+                                            </>
+                                        )}
+                                    </span>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline" 
+                                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', background: '#ffffff' }}
+                                        onClick={() => setActiveTab('profile')}
+                                    >
+                                        Check Status
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className={styles.verificationGuideActions}>
+                        <button 
+                            type="button" 
+                            className="btn btn-primary" 
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}
+                            onClick={() => setShowProfileModal(true)}
+                        >
+                            <Upload size={16} /> Complete Verification & Upload ID
+                        </button>
+                        <button 
+                            type="button" 
+                            className="btn btn-outline" 
+                            style={{ fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: '#ffffff' }}
+                            onClick={() => setActiveTab('profile')}
+                        >
+                            <span>Go to Profile & Verification Status</span>
+                            <ArrowRight size={15} />
+                        </button>
                     </div>
                 </div>
             )}
@@ -993,17 +1130,15 @@ function ResidentPortalContent() {
                                 </div>
                             </a>
                             <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className={styles.hotlineItem}>
-
                                 <div className={styles.hotlineContent}>
                                     <strong>Official Facebook</strong>
-                                    <span style={{ fontSize: '0.65rem' }}>Bago at progresibong Gordon Heights</span>
+                                    <span style={{ fontSize: '0.75rem', fontFamily: 'inherit' }}>Bago at progresibong Gordon Heights</span>
                                 </div>
                             </a>
                             <a href="mailto:barangaygordonheights2018@gmail.com" className={styles.hotlineItem}>
-
                                 <div className={styles.hotlineContent}>
                                     <strong>Email Address</strong>
-                                    <span style={{ fontSize: '0.65rem' }}>barangaygordonheights...</span>
+                                    <span style={{ fontSize: '0.75rem', wordBreak: 'break-all' }}>barangaygordonheights2018@gmail.com</span>
                                 </div>
                             </a>
                         </div>
@@ -1012,14 +1147,13 @@ function ResidentPortalContent() {
                     {/* Olongapo City Group */}
                     <div className="glass-card" style={{ padding: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            Olongapo City Central
+                            Olongapo City
                         </h3>
                         <div className={styles.hotlineList}>
                             <a href="tel:09985937446" className={styles.hotlineItem}>
-
                                 <div className={styles.hotlineContent}>
                                     <strong>City Rescue (DRRMO)</strong>
-                                    <span>0998-593-7446 | 0917-306-5966</span>
+                                    <span>0998-593-7446 / 0917-306-5966</span>
                                 </div>
                             </a>
                             <a href="tel:2235731" className={styles.hotlineItem}>
@@ -1121,24 +1255,93 @@ function ResidentPortalContent() {
                             </div>
                         )}
                     </div>
-                    <h2 style={{ marginBottom: '0.5rem' }}>{profile?.full_name || 'Barangay Resident'}</h2>
-                    <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '1.5rem' }}>
-                        RESIDENT PASS | {profile?.resident_id_number || 'Pending ID'}
+                    <h2 style={{ marginBottom: '0.4rem', textAlign: 'center' }}>{profile?.full_name || 'Barangay Resident'}</h2>
+                    
+                    {/* Prominent Verification Status Banner */}
+                    {profile?.is_verified ? (
+                        <div className={styles.profileStatusBannerVerified}>
+                            <ShieldCheck size={16} /> Verified Resident
+                        </div>
+                    ) : profile?.is_rejected ? (
+                        <div className={styles.profileStatusBannerRejected}>
+                            <X size={16} /> Registration Rejected
+                        </div>
+                    ) : (
+                        <div className={styles.profileStatusBannerUnverified}>
+                            <ShieldAlert size={16} /> Not Verified
+                        </div>
+                    )}
+
+                    <p style={{ color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                        RESIDENT PASS | {profile?.resident_id_number || 'Pending Official ID'}
                     </p>
 
-                    <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Resident Since</span>
+                    <div style={{ width: '100%', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+                        {/* User ID / Account ID with Copy Button */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>User ID</span>
+                                <button 
+                                    type="button" 
+                                    onClick={copyUserId}
+                                    style={{ 
+                                        background: 'transparent', 
+                                        border: 'none', 
+                                        color: copiedId ? '#10b981' : 'var(--primary-500, #059669)', 
+                                        cursor: 'pointer', 
+                                        fontSize: '0.75rem', 
+                                        display: 'inline-flex', 
+                                        alignItems: 'center', 
+                                        gap: '4px', 
+                                        padding: 0,
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    {copiedId ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy ID</>}
+                                </button>
+                            </div>
+                            <code style={{ 
+                                fontSize: '0.74rem', 
+                                padding: '0.45rem 0.65rem', 
+                                background: 'var(--bg-tertiary, rgba(255,255,255,0.04))', 
+                                borderRadius: '8px', 
+                                wordBreak: 'break-all', 
+                                display: 'block', 
+                                color: 'var(--text-primary)', 
+                                border: '1px solid var(--border-color)' 
+                            }}>
+                                {profile?.id || user?.id || '—'}
+                            </code>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Resident Since</span>
                             <strong>{new Date(profile?.created_at || '').toLocaleDateString()}</strong>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Account ID</span>
-                            <strong style={{ fontSize: '0.8rem' }}>{profile?.id?.split('-')[0] || 'REF'}</strong>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Official Resident ID</span>
+                            <strong style={{ fontSize: '0.85rem', color: profile?.resident_id_number ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                {profile?.resident_id_number || 'Pending Verification'}
+                            </strong>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Status</span>
-                            <strong style={{ color: profile?.is_verified ? 'var(--success-600)' : profile?.is_rejected ? '#ef4444' : 'var(--warning-600)' }}>
-                                {profile?.is_verified ? 'Verified Resident' : profile?.is_rejected ? 'Rejected' : 'Verification Pending'}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Verification Status</span>
+                            <strong style={{ 
+                                color: profile?.is_verified ? '#10b981' : profile?.is_rejected ? '#ef4444' : '#f59e0b',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.88rem'
+                            }}>
+                                {profile?.is_verified ? (
+                                    <><ShieldCheck size={15} /> Verified</>
+                                ) : profile?.is_rejected ? (
+                                    <><X size={15} /> Rejected</>
+                                ) : (
+                                    <><ShieldAlert size={15} /> Not Verified</>
+                                )}
                             </strong>
                         </div>
                     </div>
@@ -1147,6 +1350,36 @@ function ResidentPortalContent() {
                 <div className="glass-card" style={{ padding: '2rem' }}>
                     <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>Profile Information</h3>
                     <div className={styles.infoGrid}>
+                        {/* Verification Status Block */}
+                        <div className={styles.infoGroup} style={{ gridColumn: '1 / -1', minWidth: 0 }}>
+                            <label className={styles.infoLabel}>Verification Status</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+                                {profile?.is_verified ? (
+                                    <span className={styles.statusBadgeVerified}>
+                                        <ShieldCheck size={14} /> Verified Resident
+                                    </span>
+                                ) : profile?.is_rejected ? (
+                                    <span className={styles.statusBadgeRejected}>
+                                        <X size={14} /> Rejected
+                                    </span>
+                                ) : (
+                                    <span className={styles.statusBadgeNotVerified}>
+                                        <ShieldAlert size={14} /> Not Verified
+                                    </span>
+                                )}
+                                {!profile?.is_verified && !profile?.is_rejected && (
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline" 
+                                        style={{ fontSize: '0.75rem', padding: '0.25rem 0.65rem' }}
+                                        onClick={() => setShowProfileModal(true)}
+                                    >
+                                        Verify Account / Upload ID
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
                         <div className={styles.infoGroup}>
                             <label className={styles.infoLabel}>Full Name</label>
                             <p className={styles.infoValue}>{profile?.full_name}</p>
@@ -1163,22 +1396,34 @@ function ResidentPortalContent() {
                             <label className={styles.infoLabel}>Birthdate</label>
                             <p className={styles.infoValue}>
                                 {profile?.birthdate
-                                    ? `${new Date(profile.birthdate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${Math.floor((Date.now() - new Date(profile.birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))} yrs old)`
+                                    ? (() => {
+                                        const today = new Date();
+                                        const birth = new Date(profile.birthdate);
+                                        let age = today.getFullYear() - birth.getFullYear();
+                                        const m = today.getMonth() - birth.getMonth();
+                                        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+                                        return `${birth.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${age} yrs old)`;
+                                    })()
                                     : 'Not specified'}
                             </p>
-                        </div>
-                        <div className={styles.infoGroup}>
-                            <label className={styles.infoLabel}>Email Address</label>
-                            <p className={styles.infoValue}>{profile?.email}</p>
-                        </div>
-                        <div className={styles.infoGroup}>
-                            <label className={styles.infoLabel}>Home Address</label>
-                            <p className={styles.infoValue}>{profile?.address || 'Not specified'}</p>
                         </div>
                         <div className={styles.infoGroup}>
                             <label className={styles.infoLabel}>Phone Number</label>
                             <p className={styles.infoValue}>{profile?.phone || 'Not specified'}</p>
                         </div>
+                        <div className={styles.infoGroup}>
+                            <label className={styles.infoLabel}>Home Address</label>
+                            <p className={styles.infoValue}>{profile?.address || 'Not specified'}</p>
+                        </div>
+
+                        {/* Email Address - Non-overlapping and responsive */}
+                        <div className={`${styles.infoGroup} ${styles.emailInfoGroup}`}>
+                            <label className={styles.infoLabel}>Email Address</label>
+                            <p className={styles.infoValue} style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+                                {profile?.email || user?.email || 'Not specified'}
+                            </p>
+                        </div>
+
                         <div className={styles.infoGroup} style={{ gridColumn: '1 / -1' }}>
                             <label className={styles.infoLabel}>Sectoral Classification</label>
                             {profile?.sectors && profile.sectors.length > 0 ? (
@@ -1189,9 +1434,9 @@ function ResidentPortalContent() {
                                             borderRadius: '99px',
                                             fontSize: '0.72rem',
                                             fontWeight: 600,
-                                            background: 'rgba(34, 197, 94, 0.12)',
-                                            color: '#a5b4fc',
-                                            border: '1px solid rgba(34, 197, 94, 0.2)',
+                                            background: '#ecfdf5',
+                                            color: '#065f46',
+                                            border: '1px solid #a7f3d0',
                                         }}>
                                             {s}
                                         </span>
@@ -1202,8 +1447,38 @@ function ResidentPortalContent() {
                             )}
                         </div>
                     </div>
-                    <button className="btn btn-primary" style={{ marginTop: '2.5rem', width: '100%' }} onClick={() => setShowProfileModal(true)}>
-                        Edit Information
+
+                    {/* How to get verified helper notice if unverified */}
+                    {!profile?.is_verified && (
+                        <div style={{
+                            marginTop: '1.5rem',
+                            padding: '1rem 1.25rem',
+                            borderRadius: '12px',
+                            border: profile?.is_rejected ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                            background: profile?.is_rejected ? 'rgba(239, 68, 68, 0.05)' : 'rgba(245, 158, 11, 0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.35rem'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: profile?.is_rejected ? '#ef4444' : '#f59e0b', fontWeight: 700, fontSize: '0.9rem' }}>
+                                <ShieldAlert size={17} />
+                                {profile?.is_rejected ? 'Registration Notice' : 'How to become a Verified Resident:'}
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                {profile?.is_rejected 
+                                    ? 'Your registration was declined. Click below to review your information and upload a new valid ID, or visit the Barangay Gordon Heights Hall.'
+                                    : 'Click the button below to upload your government-issued ID (or submit proof of residency at the Barangay Hall). Once approved by an Administrator, your official Resident ID and Verified Digital Pass will be issued.'}
+                            </p>
+                        </div>
+                    )}
+
+                    <button 
+                        className="btn btn-primary" 
+                        style={{ marginTop: '1.75rem', width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }} 
+                        onClick={() => setShowProfileModal(true)}
+                    >
+                        <Upload size={16} />
+                        {profile?.is_verified ? 'Edit Information' : 'Edit Information & Upload ID'}
                     </button>
                 </div>
             </div>
@@ -1288,7 +1563,14 @@ function ResidentPortalContent() {
                             className="glass-card"
                             key={s.type}
                             style={{ padding: '1.25rem', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.15s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}
-                            onClick={() => { setSelectedServiceType(s.type); setShowRequestModal(true); }}
+                            onClick={() => {
+                                if (!profile?.is_verified) {
+                                    showToast('Verification Required: Please wait for admin approval to request documents.', 'info');
+                                    return;
+                                }
+                                setSelectedServiceType(s.type);
+                                setShowRequestModal(true);
+                            }}
                         >
                             <div style={{ fontSize: '2rem' }}>{getDocIcon(s.type)}</div>
                             <h4 style={{ fontSize: '0.9rem', margin: 0 }}>{s.type}</h4>
@@ -1432,8 +1714,8 @@ function ResidentPortalContent() {
                                             <span className="badge badge-info" style={{ fontSize: '0.65rem', alignSelf: 'flex-start' }}>{c.complaint_type}</span>
                                             <span style={{ fontSize: '0.85rem' }}>{c.subject}</span>
                                             {c.attachment_url && (
-                                                <span style={{ fontSize: '0.72rem', color: 'var(--success-600)', display: 'flex', alignItems: 'center', gap: '0.15rem', marginTop: '0.1rem' }}>
-                                                    📎 Evidence Attached
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--success-600)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.1rem' }}>
+                                                    <Paperclip size={12} /> Evidence Attached
                                                 </span>
                                             )}
                                         </div>
@@ -1511,33 +1793,31 @@ function ResidentPortalContent() {
                     <span>Offline Mode: Showing cached information. Unsent requests will be queued locally.</span>
                 </div>
             )}
-            <div className={styles.stickyHeaderWrapper}>
-                <Header
-                    title="E-Barangay"
-                    userName={profile?.full_name || 'Resident'}
-                    onSignOut={signOut}
-                    variant="resident"
-                />
+            <Header
+                title="E-Barangay"
+                userName={profile?.full_name || 'Resident'}
+                onSignOut={signOut}
+                variant="resident"
+            />
 
-                <nav className={styles.tabNav}>
-                    <div className={styles.tabInner}>
-                        <button className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`} onClick={() => setActiveTab('overview')}>
-                            Overview
-                        </button>
-                        <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => {
-                setActiveTab('requests'); }}>
-                            My Requests
-                        </button>
-                        <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => {
-                setActiveTab('complaints'); }}>
-                            My Complaints
-                        </button>
-                        <button className={`${styles.tabBtn} ${activeTab === 'profile' ? styles.activeTab : ''}`} onClick={() => setActiveTab('profile')}>
-                            My Profile
-                        </button>
-                    </div>
-                </nav>
-            </div>
+            <nav className={styles.tabNav}>
+                <div className={styles.tabInner}>
+                    <button className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`} onClick={() => setActiveTab('overview')}>
+                        Overview
+                    </button>
+                    <button className={`${styles.tabBtn} ${activeTab === 'requests' ? styles.activeTab : ''}`} onClick={() => {
+            setActiveTab('requests'); }}>
+                        My Requests
+                    </button>
+                    <button className={`${styles.tabBtn} ${activeTab === 'complaints' ? styles.activeTab : ''}`} onClick={() => {
+            setActiveTab('complaints'); }}>
+                        My Complaints
+                    </button>
+                    <button className={`${styles.tabBtn} ${activeTab === 'profile' ? styles.activeTab : ''}`} onClick={() => setActiveTab('profile')}>
+                        My Profile
+                    </button>
+                </div>
+            </nav>
 
             <main className={styles.main}>
                 <div className="container">
@@ -1579,8 +1859,18 @@ function ResidentPortalContent() {
             {/* Complaint Submission Modal */}
             {showComplaintModal && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setShowComplaintModal(false)}>
-                    <div className="glass-card animate-fadeIn" style={{ maxWidth: '500px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                        <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary-400)' }}>File a Complaint</h2>
+                    <div className="glass-card animate-fadeIn" style={{ maxWidth: '500px', width: '100%', padding: '2rem', background: 'var(--bg-primary, #ffffff)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-xl)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.35rem' }}>File a Complaint</h2>
+                            <button 
+                                type="button" 
+                                onClick={() => setShowComplaintModal(false)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.25rem' }}
+                                aria-label="Close"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
                         <form onSubmit={handleComplaintSubmit}>
                             <div style={{ marginBottom: '1rem' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Complaint Type *</label>
@@ -1712,9 +2002,9 @@ function ResidentPortalContent() {
             {/* Complaint Detail & Discussion Modal */}
             {complaintModal.isOpen && complaintModal.complaint && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setComplaintModal({ isOpen: false, complaint: null })}>
-                    <div className="glass-card" style={{ maxWidth: '950px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                    <div className="glass-card" style={{ maxWidth: '950px', width: '100%', padding: '2rem', background: 'var(--bg-primary, #ffffff)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-xl)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                            <h3 style={{ margin: 0 }}>Complaint Details &amp; Discussion</h3>
+                            <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Complaint Details &amp; Discussion</h3>
                             <button 
                                 type="button" 
                                 onClick={() => setComplaintModal({ isOpen: false, complaint: null })}
@@ -1761,13 +2051,13 @@ function ResidentPortalContent() {
                                     <strong>{complaintModal.complaint.subject}</strong>
                                 </div>
 
-                                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                <div style={{ padding: '1rem', background: 'var(--bg-tertiary, #f8fafc)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                                     <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Description</label>
                                     <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.9rem' }}>{complaintModal.complaint.description}</p>
                                 </div>
 
                                 {complaintModal.complaint.attachment_url && (
-                                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <div style={{ padding: '1rem', background: 'var(--bg-tertiary, #f8fafc)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                         <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Attached Evidence</label>
                                         <button
                                             type="button"
@@ -1783,7 +2073,7 @@ function ResidentPortalContent() {
 
                                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem', marginTop: 'auto' }}>
                                     <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Official Admin Notes</label>
-                                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)', minHeight: '60px', display: 'flex', alignItems: 'center' }}>
+                                    <div style={{ padding: '1rem', background: 'var(--bg-tertiary, #f8fafc)', borderRadius: '8px', border: '1px solid var(--border-color)', minHeight: '60px', display: 'flex', alignItems: 'center' }}>
                                         <p style={{ margin: 0, fontSize: '0.9rem', color: complaintModal.complaint.admin_notes ? 'var(--text-primary)' : 'var(--text-muted)', fontStyle: complaintModal.complaint.admin_notes ? 'normal' : 'italic' }}>
                                             {complaintModal.complaint.admin_notes || 'No notes added by administrators yet.'}
                                         </p>
@@ -1794,11 +2084,11 @@ function ResidentPortalContent() {
                             {/* Right Column: Discussion / Chat interface */}
                             <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.5rem', height: '100%', minHeight: '400px' }}>
                                 <h4 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem', fontWeight: 600 }}>
-                                    <MessageSquare size={18} style={{ color: 'var(--primary-400)' }} />
+                                    <MessageSquare size={18} style={{ color: 'var(--primary-600, #059669)' }} />
                                     Interactive Discussion
                                 </h4>
 
-                                <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', background: 'rgba(0,0,0,0.12)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px' }}>
+                                <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px' }}>
                                     {loadingComplaintComments ? (
                                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
                                             <LoadingSpinner text="Loading discussion..." size="sm" />
@@ -1836,12 +2126,12 @@ function ResidentPortalContent() {
                                                             borderRadius: '12px', 
                                                             borderBottomRightRadius: isMe ? '0' : '12px',
                                                             borderBottomLeftRadius: !isMe ? '0' : '12px',
-                                                            background: isMe ? 'var(--primary-600, #4f46e5)' : 'rgba(255,255,255,0.06)',
+                                                            background: isMe ? 'var(--primary-600, #059669)' : 'var(--bg-primary, #ffffff)',
                                                             color: isMe ? '#ffffff' : 'var(--text-primary)',
                                                             fontSize: '0.85rem',
                                                             lineHeight: 1.4,
                                                             wordBreak: 'break-word',
-                                                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                                                             border: isMe ? 'none' : '1px solid var(--border-color)'
                                                         }}
                                                     >
@@ -1861,7 +2151,7 @@ function ResidentPortalContent() {
                                     <input 
                                         type="text" 
                                         className={styles.formInput}
-                                        style={{ flex: 1, padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)' }}
+                                        style={{ flex: 1, padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem', background: 'var(--bg-primary, #ffffff)' }}
                                         placeholder="Type your message to the admins..."
                                         value={newComplaintComment}
                                         onChange={e => setNewComplaintComment(e.target.value)}
@@ -1885,11 +2175,11 @@ function ResidentPortalContent() {
             {/* QR Code Modal Display */}
             {selectedQR && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: '1rem' }} onClick={() => setSelectedQR(null)}>
-                    <div className="glass-card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center', padding: '2.5rem 1.5rem', background: 'var(--bg-secondary, #1a1a2e)' }} onClick={e => e.stopPropagation()}>
-                        <h2 style={{ marginBottom: '0.5rem' }}>E-Barangay Pass</h2>
+                    <div className="glass-card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center', padding: '2.5rem 1.5rem', background: 'var(--bg-primary, #ffffff)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-xl)' }} onClick={e => e.stopPropagation()}>
+                        <h2 style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>E-Barangay Pass</h2>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>{selectedQR.title}</p>
 
-                        <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1.5rem' }}>
+                        <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1.5rem', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
                             <QRCodeSVG value={selectedQR.ref} size={220} level="H" includeMargin={false} />
                         </div>
 
@@ -1908,8 +2198,8 @@ function ResidentPortalContent() {
             {/* Scanner Modal */}
             {showScanner && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', padding: '1rem' }} onClick={() => !scanning && setShowScanner(false)}>
-                    <div className="glass-card" style={{ maxWidth: '450px', width: '100%', padding: '2rem', background: 'var(--bg-secondary, #1a1a2e)', position: 'relative' }} onClick={e => e.stopPropagation()}>
-                        <h2 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Scan QR Code</h2>
+                    <div className="glass-card" style={{ maxWidth: '450px', width: '100%', padding: '2rem', background: 'var(--bg-primary, #ffffff)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-xl)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <h2 style={{ marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-primary)' }}>Scan QR Code</h2>
 
                         {!scanResult ? (
                             <>
@@ -1937,8 +2227,12 @@ function ResidentPortalContent() {
                             </>
                         ) : (
                             <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>
-                                    {scanResult.isValid ? '' : ''}
+                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+                                    {scanResult.isValid ? (
+                                        <CheckCircle size={56} color="#10b981" />
+                                    ) : (
+                                        <AlertCircle size={56} color="#ef4444" />
+                                    )}
                                 </div>
                                 <h3 style={{ color: scanResult.isValid ? 'var(--success-500)' : 'var(--error-500)', marginBottom: '0.5rem' }}>
                                     {scanResult.type || 'Unrecognized QR'}
@@ -1946,10 +2240,10 @@ function ResidentPortalContent() {
                                 <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{scanResult.message}</p>
 
                                 {scanResult.details && (
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
+                                    <div style={{ background: 'var(--bg-tertiary, #f8fafc)', borderRadius: '8px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem', border: '1px solid var(--border-color)' }}>
                                         {/* M3 FIX: Coerce all values to string to prevent unexpected React rendering behavior */}
                                         {Object.entries(scanResult.details).map(([key, value]) => (
-                                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                                                 <span style={{ color: 'var(--text-muted)' }}>{key}:</span>
                                                 <strong style={{ color: 'var(--text-primary)', textAlign: 'right' }}>{String(value ?? '')}</strong>
                                             </div>

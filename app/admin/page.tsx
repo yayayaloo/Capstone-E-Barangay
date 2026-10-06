@@ -469,11 +469,37 @@ function AdminDashboardContent() {
                 request.document_type
             )
             
-            // Update local state with returned data
-            if (updatedReq && newStatus === 'ready') {
-                request.issued_at = updatedReq.issued_at
-                request.expires_at = updatedReq.expires_at
-                request.qr_code_ref = updatedReq.qr_code_ref
+            // In-place local state update without unmounting the table or triggering full-page reload
+            setRequests(prev => prev.map(r => {
+                if (r.id !== requestId) return r
+                return {
+                    ...r,
+                    status: newStatus as any,
+                    notes: note !== undefined ? (note || null) : r.notes,
+                    ...(updatedReq ? {
+                        issued_at: updatedReq.issued_at ?? r.issued_at,
+                        expires_at: updatedReq.expires_at ?? r.expires_at,
+                        qr_code_ref: updatedReq.qr_code_ref ?? r.qr_code_ref,
+                        updated_at: updatedReq.updated_at ?? r.updated_at
+                    } : {})
+                }
+            }))
+
+            if (selectedRequest?.id === requestId) {
+                setSelectedRequest(prev => {
+                    if (!prev || prev.id !== requestId) return prev
+                    return {
+                        ...prev,
+                        status: newStatus as any,
+                        notes: note !== undefined ? (note || null) : prev.notes,
+                        ...(updatedReq ? {
+                            issued_at: updatedReq.issued_at ?? prev.issued_at,
+                            expires_at: updatedReq.expires_at ?? prev.expires_at,
+                            qr_code_ref: updatedReq.qr_code_ref ?? prev.qr_code_ref,
+                            updated_at: updatedReq.updated_at ?? prev.updated_at
+                        } : {})
+                    }
+                })
             }
 
             showToast(
@@ -487,7 +513,8 @@ function AdminDashboardContent() {
                 await logAdminAction('UPDATE_REQUEST', `Updated request ${requestId.slice(0, 8)} to ${newStatus}${newStatus === 'ready' ? ' (QR code generated)' : ''}`, profile.id);
             }
 
-            fetchDataForTab(activeTab, true)
+            // Silently refresh stats in the background without unmounting the table
+            fetchOverviewStats()
             setNoteModal(null)
             setAdminNote('')
         } catch (error: any) {
@@ -2087,38 +2114,44 @@ function AdminDashboardContent() {
                                                         <td>
                                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                                 {req.status === 'pending' && (
-                                                                    <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'processing')}>Process</button>
+                                                                    <button type="button" className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'processing')}>Process</button>
                                                                 )}
                                                                 {req.status === 'processing' && (
-                                                                    <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'ready')}>Mark Ready</button>
+                                                                    <button type="button" className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'ready')}>Mark Ready</button>
                                                                 )}
                                                                 {req.status === 'ready' && (
-                                                                    <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
+                                                                    <button type="button" className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => updateStatus(req.id, 'completed')}>Complete</button>
                                                                 )}
-                                                                <button
-                                                                    className={req.status === 'ready' || req.status === 'completed' ? "btn btn-primary" : "btn btn-outline"}
-                                                                    style={{
-                                                                        padding: '0.35rem 0.75rem',
-                                                                        fontSize: '0.8rem',
-                                                                        ...(req.status === 'ready' || req.status === 'completed' ? {
+                                                                {(req.status === 'ready' || req.status === 'completed') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-primary"
+                                                                        style={{
+                                                                            padding: '0.35rem 0.75rem',
+                                                                            fontSize: '0.8rem',
                                                                             backgroundColor: '#10b981',
                                                                             borderColor: '#10b981',
                                                                             color: '#fff',
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             gap: '0.25rem'
-                                                                        } : {})
-                                                                    }}
-                                                                    onClick={() => handleGeneratePdf(req)}
-                                                                    disabled={generatingPdfId === req.id}
+                                                                        }}
+                                                                        onClick={() => handleGeneratePdf(req)}
+                                                                        disabled={generatingPdfId === req.id}
+                                                                    >
+                                                                        {generatingPdfId === req.id ? 'Generating...' : 'PDF'}
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-outline"
+                                                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                                                                    onClick={() => setSelectedRequest(req)}
                                                                 >
-                                                                    {generatingPdfId === req.id 
-                                                                        ? 'Generating...' 
-                                                                        : (req.status === 'ready' || req.status === 'completed' ? 'PDF' : 'Details')
-                                                                    }
+                                                                    Details
                                                                 </button>
                                                                 {(req.status === 'pending' || req.status === 'processing') && (
-                                                                    <button className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setNoteModal({ id: req.id, status: 'rejected' })}>Reject</button>
+                                                                    <button type="button" className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setNoteModal({ id: req.id, status: 'rejected' })}>Reject</button>
                                                                 )}
                                                             </div>
                                                         </td>
@@ -2334,16 +2367,17 @@ function AdminDashboardContent() {
 
                                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))', paddingTop: '1.25rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                                             {req.status === 'pending' && (
-                                                <button className="btn btn-primary" onClick={() => { updateStatus(req.id, 'processing'); setSelectedRequest(null); }}>Process Request</button>
+                                                <button type="button" className="btn btn-primary" onClick={() => { updateStatus(req.id, 'processing'); setSelectedRequest(null); }}>Process Request</button>
                                             )}
                                             {req.status === 'processing' && (
-                                                <button className="btn btn-primary" onClick={() => { updateStatus(req.id, 'ready'); setSelectedRequest(null); }}>Mark as Ready</button>
+                                                <button type="button" className="btn btn-primary" onClick={() => { updateStatus(req.id, 'ready'); setSelectedRequest(null); }}>Mark as Ready</button>
                                             )}
                                             {req.status === 'ready' && (
-                                                <button className="btn btn-secondary" onClick={() => { updateStatus(req.id, 'completed'); setSelectedRequest(null); }}>Complete Request</button>
+                                                <button type="button" className="btn btn-secondary" onClick={() => { updateStatus(req.id, 'completed'); setSelectedRequest(null); }}>Complete Request</button>
                                             )}
                                             {(req.status === 'ready' || req.status === 'completed') && (
                                                 <button
+                                                    type="button"
                                                     className="btn btn-primary"
                                                     style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}
                                                     onClick={() => { handleGeneratePdf(req); setSelectedRequest(null); }}
@@ -2353,9 +2387,9 @@ function AdminDashboardContent() {
                                                 </button>
                                             )}
                                             {(req.status === 'pending' || req.status === 'processing') && (
-                                                <button className="btn btn-outline" onClick={() => { setNoteModal({ id: req.id, status: 'rejected' }); setSelectedRequest(null); }}>Reject Request</button>
+                                                <button type="button" className="btn btn-outline" onClick={() => { setNoteModal({ id: req.id, status: 'rejected' }); setSelectedRequest(null); }}>Reject Request</button>
                                             )}
-                                            <button className="btn btn-outline" style={{ borderColor: 'var(--border-color)' }} onClick={() => setSelectedRequest(null)}>Close</button>
+                                            <button type="button" className="btn btn-outline" style={{ borderColor: 'var(--border-color)' }} onClick={() => setSelectedRequest(null)}>Close</button>
                                         </div>
                                     </div>
                                 </div>
@@ -3221,8 +3255,8 @@ function AdminDashboardContent() {
                         />
 
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setNoteModal(null)}>Cancel</button>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateStatus(noteModal.id, noteModal.status, adminNote)}>Confirm Rejection</button>
+                            <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setNoteModal(null)}>Cancel</button>
+                            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateStatus(noteModal.id, noteModal.status, adminNote)}>Confirm Rejection</button>
                         </div>
                     </div>
                 </div>

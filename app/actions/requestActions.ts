@@ -111,7 +111,6 @@ export async function updateRequestStatus(
         throw new Error(error.message)
     }
 
-    revalidatePath('/admin')
     revalidatePath('/resident')
     return data
 }

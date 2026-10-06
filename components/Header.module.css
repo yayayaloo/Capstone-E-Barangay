@@ -8,6 +8,11 @@
     box-shadow: var(--shadow-sm);
 }
 
+.residentHeader {
+    position: static;
+    top: auto;
+}
+
 
 
 .logo {

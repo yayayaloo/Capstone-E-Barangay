@@ -83,6 +83,25 @@ PARA SA MGA BAGONG RESIDENTE:
 4. Hintayin ang approval ng admin (1–2 araw)
 5. Kapag na-verify na, pwede nang mag-request ng dokumento o mag-file ng reklamo
 
+PROSESO NG ACCOUNT VERIFICATION (ACCOUNT VERIFICATION GUIDANCE):
+Kapag nagtanong ang residente kung paano magpa-verify, paano maging verified resident, o ano ang verification process at requirements:
+Ipaliwanag nang malinaw ang umiiral na 3-step verification system ng portal:
+(Paalala: Ang pagiging Verified Resident ay kinakailangan bago makapag-request ng opisyal na dokumento tulad ng Barangay Clearance, Indigency, atbp., at makapag-file ng reklamo sa portal).
+
+1. Hakbang 1: Complete Your Profile (Kumpletuhin ang Profile)
+   - Pumunta sa "Profile" tab o i-click ang "Edit Profile".
+   - Tiyaking kumpleto at wasto ang iyong Buong Pangalan (Full Name), Tirahan sa Gordon Heights (Address), Contact Number, at Petsa ng Kapanganakan (Birthdate).
+
+2. Hakbang 2: Submit Valid ID (Mag-upload ng Valid ID)
+   - Sa Account Verification guide card sa dashboard o sa Profile tab, i-click ang "Upload Valid ID" o "Complete Verification & Upload ID".
+   - Mag-upload ng malinaw na litrato ng government-issued photo ID (hal. National ID, Driver's License, Voter's ID, Postal ID, Passport, PRC ID) o katibayan ng paninirahan (proof of residency) sa Barangay Gordon Heights.
+
+3. Hakbang 3: Barangay Admin Approval (Pagsusuri ng Admin)
+   - Susuriin ng Barangay Administrators ang iyong profile at isinumiteng ID (karaniwang 1–2 araw ng trabaho).
+   - Kapag na-aprubahan (Approved), magiging "Verified" ang iyong status at awtomatikong bibigyan ka ng opisyal na Resident ID Number at Verified Digital QR Pass sa iyong Profile.
+   - Pwede ka nang mag-request ng mga dokumento online at mag-file ng reklamo.
+   - Kung na-decline (Rejected), makikita ito sa dashboard; maaari kang mag-upload ng bagong valid ID sa Profile o pumunta sa Barangay Gordon Heights Hall (Block 12 Long Road).
+
 PARA MAG-REQUEST NG DOKUMENTO:
 1. Mag-login sa iyong account
 2. I-click ang "Request Document" button
@@ -123,6 +142,9 @@ FEEDBACK AT COMPLAINTS (National Agencies):
 - CCB (Contact Center ng Bayan): 0908-881-6565
 
 === MGA KARANIWANG TANONG AT SAGOT ===
+
+T: Paano magpa-verify ng account o maging verified resident? / How to verify my account?
+S: Sundin ang 3 hakbang: (1) Kumpletuhin ang Profile sa Profile tab (Name, Address, Contact, Birthdate), (2) Mag-upload ng Valid Government ID o proof of residency sa Verification card o Profile tab, at (3) Hintayin ang pagsusuri ng Barangay Admin (1–2 araw). Kapag verified na, magkakaroon ka ng opisyal na Resident ID Number at QR Code Pass para makakuha ng mga dokumento at makapag-file ng reklamo online.
 
 T: Paano makuha ang Barangay Clearance?
 S: Mag-login sa portal, i-click ang "Request Document", piliin ang "Barangay Clearance", ilagay ang layunin. Kailangan mo ng Valid ID. Bayad sa pick-up ay ₱50.00.
@@ -174,13 +196,14 @@ export async function POST(request: NextRequest) {
         if (userContext) {
             contextPrompt += `\n\n=== CURRENT USER INFO ===`
             contextPrompt += `\n- Pangalan: ${userContext.name || 'Residente'}`
-            contextPrompt += `\n- Verified: ${userContext.isVerified ? 'Oo (verified na ang account)' : 'Hindi pa (pending verification)'}`
+            contextPrompt += `\n- Verification Status: ${userContext.isVerified ? 'Verified Resident na (May Resident ID at QR Pass)' : userContext.isRejected ? 'Declined / Rejected (Kailangang mag-upload muli ng valid ID o bumisita sa Brgy Hall)' : 'Not Verified (Pending review o kailangan pang mag-upload ng valid ID)'}`
+            contextPrompt += `\n- May Na-upload na ID: ${userContext.hasIdUploaded ? 'Oo (may naka-upload nang ID document)' : 'Wala pa (kailangang mag-upload ng valid ID)'}`
             if (userContext.pendingRequests?.length > 0) {
                 contextPrompt += `\n- Mga aktibong request: ${userContext.pendingRequests.join(', ')}`
             } else {
                 contextPrompt += `\n- Mga aktibong request: Wala pa`
             }
-            contextPrompt += `\n(Gamitin ang impormasyon na ito para mas personalize ang sagot)`
+            contextPrompt += `\n(Gamitin ang impormasyon na ito para gabayan nang wasto at personalized ang residente)`
         }
 
         // Build conversation contents with history for multi-turn chat

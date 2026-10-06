@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import styles from './ChatBot.module.css'
 import { ServiceRequest, Profile } from '@/lib/types'
 
@@ -33,6 +34,7 @@ interface QuickChatOption {
 }
 
 const quickReplies: QuickChatOption[] = [
+    { label: 'Account Verification', prompt: 'Paano magpa-verify ng account at maging verified resident?' },
     { label: 'Barangay Clearance', prompt: 'Paano makuha ang Barangay Clearance at ano ang mga requirements?' },
     { label: 'Certificate of Residency', prompt: 'Ano ang requirements at proseso para sa Certificate of Residency?' },
     { label: 'Certificate of Indigency', prompt: 'Paano mag-apply para sa Certificate of Indigency at ano ang kailangan?' },
@@ -125,11 +127,30 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
             : 'The **Certificate of Indigency** is:\n• Proof of financial status for assistance\n• Fee: **Free**\n• Requirement: Valid ID\nClick "Request Document" to apply!'
     }
 
-    // 9. Barangay ID (Word boundary so "resident" or "valid" don't match)
+    // 9. Account Verification / How to become a verified resident
+    if (/\b(verify|verified|verification|pagpapatunay|ma-verify|magpa-verify|unverified)\b/i.test(lower)) {
+        if (userProfile?.is_verified) {
+            return tl
+                ? 'Ang iyong account ay **Verified Resident** na! Mayroon ka nang opisyal na **Resident ID Number** at **Verified Digital QR Pass**. Maaari ka nang mag-request ng mga dokumento at mag-file ng reklamo sa portal.'
+                : 'Your account is already a **Verified Resident**! You have an official **Resident ID Number** and **Verified Digital QR Pass**, allowing you to request documents and submit complaints online.'
+        }
+
+        if (userProfile?.is_rejected) {
+            return tl
+                ? 'Ang iyong nakaraang verification ay **Declined / Rejected** ng Barangay Admin. Upang maayos ito:\n\n1. Pumunta sa iyong **Profile** tab.\n2. I-click ang **"Edit Information & Upload ID"**.\n3. Mag-upload ng bago at malinaw na kopya ng government-issued photo ID (hal. National ID, Driver\'s License, Voter\'s ID).\n4. Maaari ring bisitahin ang Barangay Gordon Heights Hall (Block 12 Long Road) para sa tulong.'
+                : 'Your previous verification was **Declined / Rejected** by Barangay Administrators. To resolve this:\n\n1. Go to your **Profile** tab.\n2. Click **"Edit Information & Upload ID"**.\n3. Upload a new and clear copy of your government-issued ID (e.g., National ID, Driver\'s License, Voter\'s ID).\n4. You may also visit the Barangay Gordon Heights Hall (Block 12 Long Road) for assistance.'
+        }
+
+        return tl
+            ? 'Para maging **Verified Resident** sa E-Barangay Gordon Heights portal, sundin ang 3 simpleng hakbang:\n\n1. **Kumpletuhin ang Profile (Step 1)**\n   • Pumunta sa **Profile** tab o i-click ang "Edit Profile".\n   • Tiyaking kumpleto at wasto ang iyong Full Name, Gordon Heights Address, Contact Number, at Petsa ng Kapanganakan.\n\n2. **Mag-upload ng Valid ID (Step 2)**\n   • Sa Account Verification card sa dashboard o sa Profile tab, i-click ang **"Upload Valid ID"** o **"Complete Verification & Upload ID"**.\n   • Mag-upload ng malinaw na litrato ng government-issued ID (National ID, Driver\'s License, Voter\'s ID, Postal ID, Passport) o katibayan ng paninirahan sa Gordon Heights.\n\n3. **Barangay Admin Approval (Step 3)**\n   • Susuriin ng Barangay Administrators ang iyong impormasyon (karaniwang 1–2 araw ng trabaho).\n   • Kapag na-approve, awtomatikong ibibigay ang iyong opisyal na **Resident ID Number** at **Verified Digital QR Pass** para makapag-request ng dokumento at mag-file ng reklamo.'
+            : 'To become a **Verified Resident** in the E-Barangay Gordon Heights portal, follow these 3 steps:\n\n1. **Complete Your Profile (Step 1)**\n   • Go to your **Profile** tab or click "Edit Profile".\n   • Ensure your Full Name, Gordon Heights Address, Contact Number, and Birthdate are accurate.\n\n2. **Submit Valid ID (Step 2)**\n   • On the Account Verification card on your dashboard or Profile tab, click **"Upload Valid ID"** or **"Complete Verification & Upload ID"**.\n   • Upload a clear photo of a government-issued ID (National ID, Driver\'s License, Voter\'s ID, Postal ID, Passport) or proof of residency in Gordon Heights.\n\n3. **Barangay Admin Approval (Step 3)**\n   • Barangay Administrators will review your credentials (typically 1–2 business days).\n   • Once approved, you will be issued your official **Resident ID Number** and **Verified Digital QR Pass** to request documents and file complaints online.'
+    }
+
+    // 10. Barangay ID (Word boundary so "resident" or "valid" don't match)
     if (/\b(id|digital id|barangay id)\b/i.test(lower)) {
         return tl
-            ? (userProfile?.is_verified ? 'Aktibo na ang iyong Digital ID! Tingnan ang QR code sa Profile tab.' : 'Para makuha ang Barangay ID, kumpletuhin ang iyong profile at hintayin ang verification ng admin.')
-            : (userProfile?.is_verified ? 'Your Digital ID is active! View the QR code on your Profile tab.' : 'To get your Barangay ID, complete your profile and wait for admin verification.')
+            ? (userProfile?.is_verified ? 'Aktibo na ang iyong Digital ID! Tingnan ang QR code sa Profile tab.' : 'Para makuha ang Barangay ID, kumpletuhin ang iyong profile at mag-upload ng valid ID para sa admin verification.')
+            : (userProfile?.is_verified ? 'Your Digital ID is active! View the QR code on your Profile tab.' : 'To get your Barangay ID, complete your profile and upload a valid ID for admin verification.')
     }
 
     // 10. Office Hours & Location
@@ -247,7 +268,7 @@ function SlidableRow({
                     aria-label="Slide left"
                     title="Slide left"
                 >
-                    ‹
+                    <ChevronLeft size={16} />
                 </button>
             )}
             <div
@@ -271,7 +292,7 @@ function SlidableRow({
                     aria-label="Slide right"
                     title="Slide right"
                 >
-                    ›
+                    <ChevronRight size={16} />
                 </button>
             )}
         </div>
@@ -383,6 +404,8 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                     userContext: {
                         name: userProfile?.first_name || userProfile?.full_name || 'Resident',
                         isVerified: userProfile?.is_verified || false,
+                        isRejected: userProfile?.is_rejected || false,
+                        hasIdUploaded: !!userProfile?.id_document_url,
                         pendingRequests
                     }
                 })
@@ -452,7 +475,9 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                                 Bagong Chat
                             </button>
                         )}
-                        <button className={styles.closeButton} onClick={onClose}>✕</button>
+                        <button className={styles.closeButton} onClick={onClose} aria-label="Close AI Assistant">
+                            <X size={20} />
+                        </button>
                     </div>
                 </div>
 
