@@ -2,6 +2,21 @@
 .main {
     min-height: 100vh;
     overflow-x: hidden;
+    background: 
+        radial-gradient(circle at 15% 12%, rgba(16, 185, 129, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 28%, rgba(5, 150, 105, 0.09) 0%, transparent 45%),
+        radial-gradient(circle at 10% 55%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 75%, rgba(5, 150, 105, 0.10) 0%, transparent 45%),
+        radial-gradient(circle at 20% 95%, rgba(16, 185, 129, 0.12) 0%, transparent 45%),
+        linear-gradient(
+            180deg,
+            #e2f4e8 0%,
+            #edf7f0 18%,
+            #f4fbf6 38%,
+            #ebf5ee 60%,
+            #e2f4e8 82%,
+            #d8f0df 100%
+        );
 }
 
 /* Logo Image */
@@ -47,7 +62,9 @@
     left: 0;
     right: 0;
     z-index: 1000;
-    background: var(--bg-primary);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-color);
     padding: 1rem 0;
     box-shadow: var(--shadow-sm);
@@ -89,7 +106,7 @@
     display: flex;
     align-items: center;
     padding-top: 80px;
-    background: linear-gradient(to bottom, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    background: transparent;
 }
 
 
