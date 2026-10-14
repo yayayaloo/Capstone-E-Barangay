@@ -50,8 +50,10 @@ To ensure links never fail with "Invalid redirect URL":
    - For local development: `http://localhost:3000`
    - For production: `https://your-production-domain.vercel.app`
 3. Under **Redirect URLs**, add the following entries:
+   - `http://localhost:3000/auth/confirm`
    - `http://localhost:3000/auth/callback`
    - `http://localhost:3000/reset-password`
+   - `https://your-production-domain.vercel.app/auth/confirm`
    - `https://your-production-domain.vercel.app/auth/callback`
    - `https://your-production-domain.vercel.app/reset-password`
 4. Click **Save**.

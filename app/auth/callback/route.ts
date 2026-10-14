@@ -14,6 +14,16 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const next = searchParams.get('next') ?? '/login'
 
+    const token_hash = searchParams.get('token_hash')
+    const type = searchParams.get('type')
+
+    // If token_hash is provided, forward to /auth/confirm handler
+    if (token_hash && type) {
+        const confirmUrl = request.nextUrl.clone()
+        confirmUrl.pathname = '/auth/confirm'
+        return NextResponse.redirect(confirmUrl)
+    }
+
     if (!code) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'

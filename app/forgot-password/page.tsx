@@ -93,9 +93,9 @@ export default function ForgotPasswordPage() {
         setLoading(true)
         setError('')
 
-        // Use /auth/callback?next=/reset-password so Next.js server exchanges the PKCE code and sets session cookies reliably
+        // Use /auth/confirm so Next.js server validates token_hash and sets session cookies reliably across all browsers and PWAs
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-            redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+            redirectTo: `${window.location.origin}/auth/confirm`,
         })
 
         setLoading(false)
