@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { AlertTriangle, X, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react'
 import styles from './RequestModal.module.css'
 import { checkDocumentEligibility, DocumentEligibility } from '@/lib/documentLimits'
+import { ServiceRequest, Profile } from '@/lib/types'
 
 interface RequestModalProps {
     onClose: () => void
     onSubmit: (documentType: string, purpose: string, attachments: File[], formData?: Record<string, any>) => Promise<void>
     initialType?: string
-    profile?: any
-    existingRequests?: any[]
+    profile?: Profile | null
+    existingRequests?: ServiceRequest[]
 }
 
 const documentTypes = [

@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { submitDocumentRequest } from '@/app/actions/requestActions'
 import { checkDocumentEligibility, DocumentEligibility } from '@/lib/documentLimits'
+import { ServiceRequest } from '@/lib/types'
 import { 
     FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake,
     ChevronLeft, Info, ShieldAlert, AlertTriangle, CheckCircle2, 
@@ -93,22 +94,25 @@ export default function RequestPage() {
     const [globalError, setGlobalError] = useState('')
     const [success, setSuccess] = useState<{ id: string; docType: string } | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
-    const [existingRequests, setExistingRequests] = useState<any[]>([])
+    const [existingRequests, setExistingRequests] = useState<ServiceRequest[]>([])
 
     // Fetch existing requests to check for document request limitations/cooldowns
     useEffect(() => {
         if (!authProfile?.id) return
         let isMounted = true
 
-        supabase
-            .from('service_requests')
-            .select('id, document_type, status, created_at, updated_at, issued_at')
-            .eq('resident_id', authProfile.id)
-            .then(({ data, error }) => {
-                if (isMounted && data && !error) {
-                    setExistingRequests(data)
-                }
-            })
+        const fetchRequests = async () => {
+            const { data, error } = await supabase
+                .from('service_requests')
+                .select('*')
+                .eq('resident_id', authProfile.id)
+
+            if (isMounted && data && !error) {
+                setExistingRequests(data as ServiceRequest[])
+            }
+        }
+
+        fetchRequests()
 
         return () => {
             isMounted = false
