@@ -31,6 +31,7 @@ interface AuthContextType {
             phone?: string
             birthdate?: string
             id_document_url?: string
+            selfie_with_id_url?: string
             sectors?: string[]
         },
         emailRedirectTo?: string
@@ -257,6 +258,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                         gender: currentUser.user_metadata?.gender || null,
                         relationship_status: currentUser.user_metadata?.relationship_status || null,
                         id_document_url: currentUser.user_metadata?.id_document_url || null,
+                        selfie_with_id_url: currentUser.user_metadata?.selfie_with_id_url || null,
                         profile_picture_url: currentUser.user_metadata?.profile_picture_url || null,
                         email: currentUser.email || '',
                         address: currentUser.user_metadata?.address || '',
@@ -351,6 +353,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
             phone?: string
             birthdate?: string
             id_document_url?: string
+            selfie_with_id_url?: string
             sectors?: string[]
         },
         emailRedirectTo?: string
@@ -373,6 +376,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                         phone: metadata.phone || null,
                         birthdate: metadata.birthdate || null,
                         id_document_url: metadata.id_document_url || null,
+                        selfie_with_id_url: metadata.selfie_with_id_url || null,
                         sectors: metadata.sectors || [],
                         role: 'resident', // By default new signups are residents
                     }

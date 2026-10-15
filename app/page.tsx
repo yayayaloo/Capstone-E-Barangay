@@ -363,8 +363,8 @@ export default async function Home() {
                                 <ul>
                                     <li><a href="#services">Services</a></li>
                                     <li><a href="#about">About</a></li>
-                                    <li><Link href="/resident">Resident Portal</Link></li>
-                                    <li><Link href="/admin">Admin Login</Link></li>
+                                    <li><Link href="/login">Log In</Link></li>
+                                    <li><Link href="/register">Sign Up</Link></li>
                                 </ul>
                             </div>
 

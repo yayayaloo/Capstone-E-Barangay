@@ -966,19 +966,24 @@ function ResidentPortalContent() {
                         <div className={styles.stepRoadmapCard}>
                             <div className={styles.stepNumberBadge}>2</div>
                             <div className={styles.stepContent}>
-                                <h4>Submit Valid ID</h4>
-                                <p>Upload a government-issued photo ID (National ID, Driver&apos;s License, Voter&apos;s ID) or proof of residency.</p>
+                                <h4>Submit Valid ID &amp; Photo Verification</h4>
+                                <p>Upload a government-issued photo ID (National ID, Driver&apos;s License, Voter&apos;s ID) <strong>and</strong> a clear photo of yourself holding the ID beside your face.</p>
                                 <div className={styles.stepFooter}>
-                                    <span className={profile?.id_document_url ? styles.pillDone : styles.pillPending}>
-                                        {profile?.id_document_url ? (
+                                    <span className={profile?.id_document_url && profile?.selfie_with_id_url ? styles.pillDone : styles.pillPending}>
+                                        {profile?.id_document_url && profile?.selfie_with_id_url ? (
                                             <>
                                                 <Check size={12} strokeWidth={2.5} />
-                                                <span>ID Uploaded</span>
+                                                <span>Both Photos Uploaded</span>
+                                            </>
+                                        ) : profile?.id_document_url ? (
+                                            <>
+                                                <AlertCircle size={12} strokeWidth={2.5} />
+                                                <span>Selfie with ID Required</span>
                                             </>
                                         ) : (
                                             <>
                                                 <AlertCircle size={12} strokeWidth={2.5} />
-                                                <span>Valid ID Required</span>
+                                                <span>Valid ID &amp; Selfie Required</span>
                                             </>
                                         )}
                                     </span>
@@ -988,7 +993,7 @@ function ResidentPortalContent() {
                                         style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', background: '#ffffff' }}
                                         onClick={() => setShowProfileModal(true)}
                                     >
-                                        {profile?.id_document_url ? 'Update ID' : 'Upload Valid ID'}
+                                        {profile?.id_document_url && profile?.selfie_with_id_url ? 'Update Documents' : 'Upload Documents'}
                                     </button>
                                 </div>
                             </div>
@@ -1466,8 +1471,8 @@ function ResidentPortalContent() {
                             </div>
                             <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                                 {profile?.is_rejected 
-                                    ? 'Your registration was declined. Click below to review your information and upload a new valid ID, or visit the Barangay Gordon Heights Hall.'
-                                    : 'Click the button below to upload your government-issued ID (or submit proof of residency at the Barangay Hall). Once approved by an Administrator, your official Resident ID and Verified Digital Pass will be issued.'}
+                                    ? 'Your registration was declined. Click below to review your information and upload your valid ID and a selfie holding your ID, or visit the Barangay Gordon Heights Hall.'
+                                    : 'Click the button below to upload your government-issued ID and a photo of you holding your ID beside your face (or submit proof of residency at the Barangay Hall). Once approved by an Administrator, your official Resident ID and Verified Digital Pass will be issued.'}
                             </p>
                         </div>
                     )}
@@ -1478,7 +1483,7 @@ function ResidentPortalContent() {
                         onClick={() => setShowProfileModal(true)}
                     >
                         <Upload size={16} />
-                        {profile?.is_verified ? 'Edit Information' : 'Edit Information & Upload ID'}
+                        {profile?.is_verified ? 'Edit Information' : 'Edit Information & Upload Documents'}
                     </button>
                 </div>
             </div>

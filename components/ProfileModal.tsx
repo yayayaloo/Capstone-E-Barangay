@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Profile } from '@/lib/types'
-import { Check, Camera, AlertCircle, User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX } from 'lucide-react'
+import { Check, Camera, AlertCircle, User, Plane, Accessibility, UserPlus, Heart, Briefcase, UserMinus, HandHeart, Baby, Zap, Users, BookX, UserCheck } from 'lucide-react'
 
 const SECTOR_OPTIONS = [
     { value: 'Solo Parent', icon: <User size={16} /> },
@@ -38,6 +38,11 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
     // ID Document state
     const [idDocument, setIdDocument] = useState<File | null>(null)
     const [idDocumentUrl, setIdDocumentUrl] = useState<string | null>(profile.id_document_url || null)
+    
+    // Selfie with ID state
+    const [selfieWithId, setSelfieWithId] = useState<File | null>(null)
+    const [selfieWithIdUrl, setSelfieWithIdUrl] = useState<string | null>(profile.selfie_with_id_url || null)
+    const [selfiePreviewUrl, setSelfiePreviewUrl] = useState<string | null>(null)
     
     // Residency Information state
     const [residentSinceMode, setResidentSinceMode] = useState<'birth' | 'year'>(
@@ -76,6 +81,48 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
             setError('')
         }
     }
+
+    const handleSelfieWithIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                setError('Selfie with ID photo exceeds the 5MB limit. Please upload a smaller image.')
+                e.target.value = ''
+                return
+            }
+            if (!file.type.startsWith('image/')) {
+                setError('Please upload an image file for the selfie with ID.')
+                e.target.value = ''
+                return
+            }
+            setSelfieWithId(file)
+            setSelfiePreviewUrl(URL.createObjectURL(file))
+            setError('')
+        }
+    }
+
+    const viewCurrentSelfieWithId = async () => {
+        if (!selfieWithIdUrl) return;
+        try {
+            let urlToOpen: string | null = null;
+
+            const { data: reqData } = await supabase.storage
+                .from('resident-requirements')
+                .createSignedUrl(selfieWithIdUrl, 3600);
+
+            if (reqData?.signedUrl) {
+                urlToOpen = reqData.signedUrl;
+            }
+
+            if (urlToOpen) {
+                window.open(urlToOpen, '_blank');
+            } else {
+                setError('Could not open selfie with ID photo.');
+            }
+        } catch (err: any) {
+            setError(`Could not open selfie with ID photo: ${err.message || 'Unknown error'}`);
+        }
+    };
 
     const viewCurrentIdDocument = async () => {
         if (!idDocumentUrl) return;
@@ -126,11 +173,22 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
         setError('')
         setSubmitting(true)
 
+        // Requirement: Do not allow verification submission unless both the valid ID and selfie with ID are uploaded
+        const hasIdDoc = !!(idDocument || idDocumentUrl)
+        const hasSelfie = !!(selfieWithId || selfieWithIdUrl)
+
+        if ((hasIdDoc || hasSelfie) && (!hasIdDoc || !hasSelfie)) {
+            setError('Verification submission requires BOTH your valid government ID and a clear photo of yourself holding your ID beside your face. Please upload both files to proceed.')
+            setSubmitting(false)
+            return
+        }
+
         let photoUploadFailed = false
 
         try {
             let profile_picture_url = profile.profile_picture_url
             let updated_id_document_url = idDocumentUrl
+            let updated_selfie_with_id_url = selfieWithIdUrl
 
             if (profilePicture) {
                 try {
@@ -180,12 +238,34 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                 }
             }
 
+            if (selfieWithId) {
+                try {
+                    const fileName = `${profile.id}/selfie_with_id_${Date.now()}_${selfieWithId.name.replace(/\s+/g, '_')}`
+                    const { error: selfieUploadErr } = await supabase.storage
+                        .from('resident-requirements')
+                        .upload(fileName, selfieWithId, { upsert: true, contentType: selfieWithId.type })
+
+                    if (selfieUploadErr) {
+                        setError(`Selfie with ID upload failed: ${selfieUploadErr.message}`)
+                        setSubmitting(false)
+                        return
+                    } else {
+                        updated_selfie_with_id_url = fileName
+                    }
+                } catch (selfieErr: any) {
+                    setError(`Selfie with ID upload failed: ${selfieErr.message}`)
+                    setSubmitting(false)
+                    return
+                }
+            }
+
             await onSubmit({
                 email: email.trim(),
                 phone: phone.trim(),
                 sectors,
                 profile_picture_url,
                 id_document_url: updated_id_document_url,
+                selfie_with_id_url: updated_selfie_with_id_url,
                 resident_since: residentSinceMode === 'birth' ? 'Since Birth' : residentSinceYear
             })
 
@@ -471,7 +551,114 @@ export default function ProfileModal({ profile, onClose, onSubmit }: ProfileModa
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                    {/* Selfie with ID Photo Section */}
+                    <div style={{
+                        padding: '1.25rem',
+                        background: 'var(--bg-tertiary)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <UserCheck size={16} /> Photo of You Holding Your ID
+                            </label>
+                            {selfieWithIdUrl ? (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--primary-500, #059669)', fontWeight: 600 }}>
+                                    ✓ Photo Uploaded
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '0.75rem', color: '#eab308', fontWeight: 600 }}>
+                                    ⚠️ Required
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Instructions */}
+                        <div style={{ padding: '0.75rem', background: 'rgba(59, 130, 246, 0.06)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700 }}>
+                                <AlertCircle size={14} /> PHOTO REQUIREMENTS:
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.73rem', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                <li>Take a <strong>clear photo of yourself holding your submitted Valid ID beside your face</strong></li>
+                                <li>Your <strong>face must be clearly visible</strong> and well-lit</li>
+                                <li>The <strong>ID details (name, photo) must be readable</strong> in the photo</li>
+                                <li>Do not cover any part of the ID or your face</li>
+                                <li>Use a <strong>plain background</strong> with good lighting</li>
+                            </ul>
+                        </div>
+
+                        {selfieWithIdUrl && (
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={viewCurrentSelfieWithId}
+                                    className="btn btn-outline"
+                                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                                >
+                                    View Current Photo
+                                </button>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                            <label htmlFor="modal-selfie-with-id" style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {selfieWithIdUrl ? 'Upload New Photo (Image only):' : 'Upload Photo of You Holding Your ID (Image only):'}
+                            </label>
+                            <input
+                                id="modal-selfie-with-id"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleSelfieWithIdChange}
+                                style={{
+                                    fontSize: '0.8rem',
+                                    padding: '0.5rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-primary)',
+                                    color: 'var(--text-primary)'
+                                }}
+                            />
+                            {selfieWithId && (
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--primary-500, #059669)' }}>
+                                    Selected: {selfieWithId.name} ({(selfieWithId.size / 1024 / 1024).toFixed(2)} MB)
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Selfie Preview */}
+                        {selfiePreviewUrl && (
+                            <div style={{ marginTop: '0.25rem' }}>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Photo Preview:</label>
+                                <div style={{
+                                    width: '100%',
+                                    maxWidth: '280px',
+                                    aspectRatio: '3/4',
+                                    borderRadius: '10px',
+                                    border: '2px solid var(--border-color)',
+                                    overflow: 'hidden',
+                                    background: 'var(--bg-primary)'
+                                }}>
+                                    <img
+                                        src={selfiePreviewUrl}
+                                        alt="Selfie with ID Preview"
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {error && (
+                        <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '8px', color: '#ef4444', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <AlertCircle size={16} />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                         <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={onClose} disabled={submitting}>
                             Cancel
                         </button>

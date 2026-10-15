@@ -2404,6 +2404,7 @@ function AdminDashboardContent() {
                             const idDocBucket = 'resident-requirements';
 
                             const docPath = res.id_document_url || (res as any).raw_user_meta_data?.id_document_url || (res as any).user_metadata?.id_document_url;
+                            const selfiePath = (res as any).selfie_with_id_url || (res as any).raw_user_meta_data?.selfie_with_id_url || (res as any).user_metadata?.selfie_with_id_url;
 
                             const viewIdDocument = async () => {
                                 if (!docPath) return;
@@ -2440,6 +2441,23 @@ function AdminDashboardContent() {
                                     }
                                 } catch (err: any) {
                                     showToast(`Could not open ID document: ${err.message || 'Unknown error'}`, 'error');
+                                }
+                            };
+
+                            const viewSelfieWithId = async () => {
+                                if (!selfiePath) return;
+                                try {
+                                    const { data: reqData } = await supabase.storage
+                                        .from('resident-requirements')
+                                        .createSignedUrl(selfiePath, 3600);
+
+                                    if (reqData?.signedUrl) {
+                                        window.open(reqData.signedUrl, '_blank');
+                                    } else {
+                                        showToast('Could not generate URL for selfie with ID', 'error');
+                                    }
+                                } catch (err: any) {
+                                    showToast(`Could not open selfie with ID: ${err.message || 'Unknown error'}`, 'error');
                                 }
                             };
 
@@ -2572,6 +2590,26 @@ function AdminDashboardContent() {
                                             )}
                                         </div>
 
+                                        {/* Selfie with ID Section */}
+                                        <div style={{ padding: '1.25rem', background: 'rgba(59, 130, 246, 0.06)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.15)', marginBottom: '1.5rem' }}>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                                Photo Verification (Selfie with ID)
+                                            </label>
+                                            {selfiePath ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <span style={{ fontSize: '0.9rem', color: 'var(--success-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}> Photo uploaded</span>
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
+                                                        onClick={viewSelfieWithId}
+                                                    >
+                                                        View Selfie with ID
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--warning-500)' }}>No selfie with ID uploaded</p>
+                                            )}
+                                        </div>
                                         {/* Meta Info */}
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
                                             <div style={{ textAlign: 'center' }}>

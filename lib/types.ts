@@ -16,6 +16,7 @@ export interface Profile {
     gender: 'Male' | 'Female' | null
     relationship_status: string | null
     id_document_url: string | null
+    selfie_with_id_url: string | null
     email: string
     address: string | null
     phone: string | null

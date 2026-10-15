@@ -92,9 +92,12 @@ Ipaliwanag nang malinaw ang umiiral na 3-step verification system ng portal:
    - Pumunta sa "Profile" tab o i-click ang "Edit Profile".
    - Tiyaking kumpleto at wasto ang iyong Buong Pangalan (Full Name), Tirahan sa Gordon Heights (Address), Contact Number, at Petsa ng Kapanganakan (Birthdate).
 
-2. Hakbang 2: Submit Valid ID (Mag-upload ng Valid ID)
-   - Sa Account Verification guide card sa dashboard o sa Profile tab, i-click ang "Upload Valid ID" o "Complete Verification & Upload ID".
-   - Mag-upload ng malinaw na litrato ng government-issued photo ID (hal. National ID, Driver's License, Voter's ID, Postal ID, Passport, PRC ID) o katibayan ng paninirahan (proof of residency) sa Barangay Gordon Heights.
+2. Hakbang 2: Submit Valid ID & Selfie Verification (Mag-upload ng Valid ID at Selfie Hawak ang ID)
+   - Sa Account Verification guide card sa dashboard o sa Profile tab, i-click ang "Upload Documents" o "Edit Information & Upload Documents".
+   - Kinakailangan ang DALAWA (2) na litrato:
+     a) Malinaw na litrato ng government-issued photo ID (hal. National ID, Driver's License, Voter's ID, Postal ID, Passport, PRC ID).
+     b) Malinaw na litrato ng sarili hawak ang iyong valid ID katabi ng iyong mukha (selfie with ID). Dapat malinaw at nababasa ang mga detalye sa ID at kitang-kita ang mukha.
+   - Hindi tatanggapin ang verification kapag isa lang ang isinumite — kailangang kumpleto ang dalawa.
 
 3. Hakbang 3: Barangay Admin Approval (Pagsusuri ng Admin)
    - Susuriin ng Barangay Administrators ang iyong profile at isinumiteng ID (karaniwang 1–2 araw ng trabaho).
@@ -198,6 +201,7 @@ export async function POST(request: NextRequest) {
             contextPrompt += `\n- Pangalan: ${userContext.name || 'Residente'}`
             contextPrompt += `\n- Verification Status: ${userContext.isVerified ? 'Verified Resident na (May Resident ID at QR Pass)' : userContext.isRejected ? 'Declined / Rejected (Kailangang mag-upload muli ng valid ID o bumisita sa Brgy Hall)' : 'Not Verified (Pending review o kailangan pang mag-upload ng valid ID)'}`
             contextPrompt += `\n- May Na-upload na ID: ${userContext.hasIdUploaded ? 'Oo (may naka-upload nang ID document)' : 'Wala pa (kailangang mag-upload ng valid ID)'}`
+            contextPrompt += `\n- May Na-upload na Selfie hawak ang ID: ${userContext.hasSelfieUploaded ? 'Oo (may naka-upload nang photo holding ID)' : 'Wala pa (kailangang mag-upload ng photo holding ID)'}`
             if (userContext.pendingRequests?.length > 0) {
                 contextPrompt += `\n- Mga aktibong request: ${userContext.pendingRequests.join(', ')}`
             } else {
