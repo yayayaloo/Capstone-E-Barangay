@@ -6,10 +6,11 @@ import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { submitDocumentRequest } from '@/app/actions/requestActions'
+import { checkDocumentEligibility, DocumentEligibility } from '@/lib/documentLimits'
 import { 
     FileCheck, FileBadge, Store, Home, Briefcase, HeartHandshake,
     ChevronLeft, Info, ShieldAlert, AlertTriangle, CheckCircle2, 
-    UploadCloud, User, ClipboardList
+    UploadCloud, User, ClipboardList, Clock
 } from 'lucide-react'
 import styles from './request.module.css'
 
@@ -92,6 +93,31 @@ export default function RequestPage() {
     const [globalError, setGlobalError] = useState('')
     const [success, setSuccess] = useState<{ id: string; docType: string } | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [existingRequests, setExistingRequests] = useState<any[]>([])
+
+    // Fetch existing requests to check for document request limitations/cooldowns
+    useEffect(() => {
+        if (!authProfile?.id) return
+        let isMounted = true
+
+        supabase
+            .from('service_requests')
+            .select('id, document_type, status, created_at, updated_at, issued_at')
+            .eq('resident_id', authProfile.id)
+            .then(({ data, error }) => {
+                if (isMounted && data && !error) {
+                    setExistingRequests(data)
+                }
+            })
+
+        return () => {
+            isMounted = false
+        }
+    }, [authProfile?.id])
+
+    const docEligibility: DocumentEligibility = doc?.name
+        ? checkDocumentEligibility(existingRequests, doc.name)
+        : { allowed: true }
 
     // Pre-populate user and profile instantly from memory via useAuth()
     useEffect(() => {
@@ -299,6 +325,11 @@ export default function RequestPage() {
 
         if (!user || !profile) {
             setGlobalError('You must be logged in to submit a request.')
+            return
+        }
+
+        if (!docEligibility.allowed) {
+            setGlobalError(docEligibility.message || 'You cannot request this document at this time.')
             return
         }
 
@@ -584,6 +615,94 @@ export default function RequestPage() {
                             </Link>
                             <Link href="/services" className={styles.authBtnOutline}>
                                 Back to Services
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // ── Request Limitation / Cooldown Active Prompt ──
+    if (user && profile?.is_verified && !docEligibility.allowed) {
+        return (
+            <div className={styles.pageWrapper}>
+                <header className={styles.header}>
+                    <div className={styles.headerInner}>
+                        <Link href="/services" className={styles.backBtn}>
+                            <ChevronLeft size={16} />
+                            <span>Back</span>
+                        </Link>
+                        <div className={styles.headerInfo}>
+                            <h1 className={styles.headerTitle}>{doc.name}</h1>
+                            <p className={styles.headerSub}>E-Barangay Gordon Heights</p>
+                        </div>
+                    </div>
+                </header>
+
+                <div className={styles.docBanner}>
+                    <span className={styles.docBannerIcon}>{doc.icon}</span>
+                    <div className={styles.docBannerInfo}>
+                        <h2 className={styles.docBannerName}>{doc.name}</h2>
+                        <div className={styles.docBannerMeta}>
+                            <span className={`${styles.metaBadge} ${doc.feeType === 'free' ? styles.metaFree : styles.metaPaid}`}>
+                                {doc.fee}
+                            </span>
+                            <span className={`${styles.metaBadge} ${styles.metaReq}`}>Requirements: {doc.reqs}</span>
+                            <span className={`${styles.metaBadge} ${styles.metaReq}`}>
+                                Validity: {doc.validity}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className={styles.authPrompt}>
+                    <div className={styles.authCard}>
+                        <div className={styles.alertIconWrapper} style={{ color: docEligibility.reason === 'ready' ? '#16a34a' : '#d97706' }}>
+                            {docEligibility.reason === 'ready' ? (
+                                <CheckCircle2 size={56} />
+                            ) : docEligibility.reason === 'cooldown' ? (
+                                <ShieldAlert size={56} />
+                            ) : (
+                                <Clock size={56} />
+                            )}
+                        </div>
+                        <h2 className={styles.authTitle}>
+                            {docEligibility.reason === 'pending'
+                                ? 'Active Request Pending'
+                                : docEligibility.reason === 'processing'
+                                ? 'Request Currently In Progress'
+                                : docEligibility.reason === 'ready'
+                                ? 'Document Ready for Pickup'
+                                : 'Request Cooldown Active'}
+                        </h2>
+                        <p className={styles.authDesc}>
+                            {docEligibility.message}
+                        </p>
+                        {docEligibility.availableAt && (
+                            <div style={{
+                                margin: '1rem 0',
+                                padding: '0.85rem 1.25rem',
+                                background: 'rgba(254, 243, 199, 0.6)',
+                                border: '1px dashed #f59e0b',
+                                borderRadius: '10px',
+                                color: '#92400e',
+                                fontSize: '0.875rem',
+                                textAlign: 'center',
+                                lineHeight: '1.5'
+                            }}>
+                                📅 Next Eligible Request Date: <strong>{docEligibility.availableAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
+                                <div style={{ fontSize: '0.8rem', marginTop: '0.35rem', color: '#b45309', fontWeight: 600 }}>
+                                    ({docEligibility.daysRemaining} day{docEligibility.daysRemaining === 1 ? '' : 's'} remaining in {docEligibility.cooldownDays}-day cooldown)
+                                </div>
+                            </div>
+                        )}
+                        <div className={styles.authButtons}>
+                            <Link href="/resident" className={styles.authBtnPrimary}>
+                                View My Requests
+                            </Link>
+                            <Link href="/services" className={styles.authBtnOutline}>
+                                Browse Other Documents
                             </Link>
                         </div>
                     </div>

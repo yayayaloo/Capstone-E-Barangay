@@ -1,14 +1,14 @@
-'use client'
-
 import { useState } from 'react'
-import { AlertTriangle, X } from 'lucide-react'
+import { AlertTriangle, X, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react'
 import styles from './RequestModal.module.css'
+import { checkDocumentEligibility, DocumentEligibility } from '@/lib/documentLimits'
 
 interface RequestModalProps {
     onClose: () => void
     onSubmit: (documentType: string, purpose: string, attachments: File[], formData?: Record<string, any>) => Promise<void>
     initialType?: string
     profile?: any
+    existingRequests?: any[]
 }
 
 const documentTypes = [
@@ -20,10 +20,14 @@ const documentTypes = [
     { value: 'Certificate of Indigency', label: 'Certificate of Indigency', desc: 'Certification of financial status.', reqs: 'Valid ID (Free)' },
 ]
 
-export default function RequestModal({ onClose, onSubmit, initialType, profile }: RequestModalProps) {
+export default function RequestModal({ onClose, onSubmit, initialType, profile, existingRequests }: RequestModalProps) {
     const [selectedType, setSelectedType] = useState(initialType || '')
     const [purposeCategory, setPurposeCategory] = useState('')
     const [purposeOther, setPurposeOther] = useState('')
+
+    const selectedDocEligibility: DocumentEligibility = selectedType
+        ? checkDocumentEligibility(existingRequests || [], selectedType)
+        : { allowed: true }
     
     let initialAge = ''
     if (profile?.birthdate) {
@@ -108,6 +112,11 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
             return
         }
 
+        if (!selectedDocEligibility.allowed) {
+            setError(selectedDocEligibility.message || 'You cannot request this document at this time.')
+            return
+        }
+
         const finalPurpose = purposeCategory === 'Others' ? purposeOther.trim() : purposeCategory
 
         if (!finalPurpose) {
@@ -162,51 +171,114 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                     <div className={styles.inputGroup}>
                         <label>Document Type *</label>
                         <div className={styles.typeGrid}>
-                            {documentTypes.map((doc) => (
-                                <button
-                                    key={doc.value}
-                                    type="button"
-                                    className={`${styles.typeCard} ${selectedType === doc.value ? styles.typeSelected : ''}`}
-                                    onClick={() => setSelectedType(doc.value)}
-                                >
-                                    <span className={styles.typeLabel}>{doc.label}</span>
-                                    <span className={styles.typeDesc}>{doc.desc}</span>
-                                    <div className={styles.typeReqs}>
-                                        <strong>Requirements:</strong> {doc.reqs}
-                                    </div>
-                                </button>
-                            ))}
+                            {documentTypes.map((doc) => {
+                                const docEligibility = checkDocumentEligibility(existingRequests || [], doc.value)
+                                const isRestricted = !docEligibility.allowed
+
+                                return (
+                                    <button
+                                        key={doc.value}
+                                        type="button"
+                                        className={`${styles.typeCard} ${selectedType === doc.value ? styles.typeSelected : ''} ${isRestricted ? styles.typeCardRestricted : ''}`}
+                                        onClick={() => {
+                                            setSelectedType(doc.value)
+                                            setError('')
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '0.25rem' }}>
+                                            <span className={styles.typeLabel}>{doc.label}</span>
+                                            {docEligibility.reason === 'pending' && (
+                                                <span className={styles.cooldownBadge} title="Pending review by admin">
+                                                    <Clock size={11} /> Pending
+                                                </span>
+                                            )}
+                                            {docEligibility.reason === 'processing' && (
+                                                <span className={styles.cooldownBadge} title="Currently in progress">
+                                                    <Clock size={11} /> In Progress
+                                                </span>
+                                            )}
+                                            {docEligibility.reason === 'ready' && (
+                                                <span className={styles.cooldownBadge} style={{ background: '#dcfce7', color: '#15803d', borderColor: '#bbf7d0' }} title="Ready for pickup at Barangay Hall">
+                                                    <CheckCircle2 size={11} /> Ready
+                                                </span>
+                                            )}
+                                            {docEligibility.reason === 'cooldown' && (
+                                                <span className={styles.cooldownBadge} title={`Cooldown active: ${docEligibility.daysRemaining} days remaining`}>
+                                                    <ShieldAlert size={11} /> {docEligibility.daysRemaining}d Cooldown
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className={styles.typeDesc}>{doc.desc}</span>
+                                        <div className={styles.typeReqs}>
+                                            <strong>Requirements:</strong> {doc.reqs}
+                                        </div>
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
 
-                    <div className={styles.inputGroup}>
-                        <label>Purpose / Reason *</label>
-                        <select
-                            value={purposeCategory}
-                            onChange={(e) => setPurposeCategory(e.target.value)}
-                            required
-                            style={{ padding: '0.6rem', border: '1px solid var(--border-color)', borderRadius: '6px', width: '100%', marginTop: '0.2rem', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-                        >
-                            <option value="">Select Purpose</option>
-                            <option value="Employment Requirement">Employment Requirement</option>
-                            <option value="Business Registration">Business Registration</option>
-                            <option value="School Enrollment">School Enrollment</option>
-                            <option value="Loan Application">Loan Application</option>
-                            <option value="Record Purposes">Record Purposes</option>
-                            <option value="Financial Assistance">Financial Assistance</option>
-                            <option value="Others">Others</option>
-                        </select>
-                        {purposeCategory === 'Others' && (
-                            <textarea
-                                value={purposeOther}
-                                onChange={(e) => setPurposeOther(e.target.value)}
-                                placeholder="Please specify your purpose..."
-                                rows={2}
-                                style={{ padding: '0.6rem', border: '1px solid var(--border-color)', borderRadius: '6px', width: '100%', marginTop: '0.5rem', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-                                required
-                            />
-                        )}
-                    </div>
+                    {selectedType && !selectedDocEligibility.allowed && (
+                        <div className={styles.limitationAlert}>
+                            <div className={styles.limitationAlertHeader}>
+                                {selectedDocEligibility.reason === 'ready' ? (
+                                    <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                                ) : selectedDocEligibility.reason === 'cooldown' ? (
+                                    <ShieldAlert size={18} />
+                                ) : (
+                                    <Clock size={18} />
+                                )}
+                                <span>
+                                    {selectedDocEligibility.reason === 'pending'
+                                        ? 'Active Request Pending Review'
+                                        : selectedDocEligibility.reason === 'processing'
+                                        ? 'Request Currently In Progress'
+                                        : selectedDocEligibility.reason === 'ready'
+                                        ? 'Document Ready for Pickup'
+                                        : 'Request Limitation / Cooldown Active'}
+                                </span>
+                            </div>
+                            <p className={styles.limitationAlertMessage}>
+                                {selectedDocEligibility.message}
+                            </p>
+                            {selectedDocEligibility.availableAt && (
+                                <div className={styles.limitationAvailableDate}>
+                                    📅 Eligible to request again on: <strong>{selectedDocEligibility.availableAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong> ({selectedDocEligibility.daysRemaining} day{selectedDocEligibility.daysRemaining === 1 ? '' : 's'} remaining)
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {selectedDocEligibility.allowed && (
+                        <>
+                            <div className={styles.inputGroup}>
+                                <label>Purpose / Reason *</label>
+                                <select
+                                    value={purposeCategory}
+                                    onChange={(e) => setPurposeCategory(e.target.value)}
+                                    required
+                                    style={{ padding: '0.6rem', border: '1px solid var(--border-color)', borderRadius: '6px', width: '100%', marginTop: '0.2rem', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                                >
+                                    <option value="">Select Purpose</option>
+                                    <option value="Employment Requirement">Employment Requirement</option>
+                                    <option value="Business Registration">Business Registration</option>
+                                    <option value="School Enrollment">School Enrollment</option>
+                                    <option value="Loan Application">Loan Application</option>
+                                    <option value="Record Purposes">Record Purposes</option>
+                                    <option value="Financial Assistance">Financial Assistance</option>
+                                    <option value="Others">Others</option>
+                                </select>
+                                {purposeCategory === 'Others' && (
+                                    <textarea
+                                        value={purposeOther}
+                                        onChange={(e) => setPurposeOther(e.target.value)}
+                                        placeholder="Please specify your purpose..."
+                                        rows={2}
+                                        style={{ padding: '0.6rem', border: '1px solid var(--border-color)', borderRadius: '6px', width: '100%', marginTop: '0.5rem', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                                        required
+                                    />
+                                )}
+                            </div>
 
                     {(() => {
                         if (!selectedType) return null
@@ -468,6 +540,8 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                             </div>
                         )}
                     </div>
+                    </>
+                    )}
 
                     <div className={styles.actions}>
                         <button type="button" className="btn btn-outline" onClick={onClose}>
@@ -476,9 +550,13 @@ export default function RequestModal({ onClose, onSubmit, initialType, profile }
                         <button
                             type="submit"
                             className="btn btn-primary"
-                            disabled={submitting}
+                            disabled={submitting || !selectedDocEligibility.allowed}
                         >
-                            {submitting ? 'Submitting...' : ' Submit Request'}
+                            {!selectedDocEligibility.allowed
+                                ? 'Request Restricted'
+                                : submitting
+                                ? 'Submitting...'
+                                : ' Submit Request'}
                         </button>
                     </div>
                     </form>

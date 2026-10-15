@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
+import { checkDocumentEligibility } from '@/lib/documentLimits'
 
 export async function submitDocumentRequest(payload: {
     resident_id: string
@@ -22,6 +23,22 @@ export async function submitDocumentRequest(payload: {
     // 2. Enforce ownership: matching logged-in user ID with resident_id
     if (user.id !== payload.resident_id) {
         throw new Error('Unauthorized: You cannot submit a request on behalf of another resident.')
+    }
+
+    // 3. Enforce request limitations per resident and document type (pending check & cooldown)
+    const { data: existingRequests, error: historyError } = await supabase
+        .from('service_requests')
+        .select('id, document_type, status, created_at, updated_at, issued_at')
+        .eq('resident_id', payload.resident_id)
+
+    if (historyError) {
+        console.error('Error checking request eligibility:', historyError)
+        throw new Error('Unable to verify request eligibility. Please try again.')
+    }
+
+    const eligibility = checkDocumentEligibility(existingRequests || [], payload.document_type)
+    if (!eligibility.allowed) {
+        throw new Error(eligibility.message || 'You cannot request this document at this time.')
     }
 
     const { data, error } = await supabase

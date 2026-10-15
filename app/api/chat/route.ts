@@ -112,6 +112,9 @@ PARA MAG-REQUEST NG DOKUMENTO:
 4. Ilagay ang layunin ng request
 5. Mag-upload ng mga requirements (kung kinakailangan)
 6. I-click ang "Submit"
+PATAKARAN SA LIMITASYON NG REQUEST (REQUEST LIMITATION & COOLDOWN):
+- Hindi maaaring mag-request muli ng parehong dokumento habang may "Pending", "Processing", o "Ready for Pickup" pa na request.
+- May umiiral na cooldown period matapos ma-issue ang dokumento upang maiwasan ang paulit-ulit na pag-request: 30 araw para sa Barangay Clearance, Certificate of Residency, at Certificate of Indigency; 90 araw para sa Business Clearance at Lot Certification; 1 taon (365 araw) para sa First Time Job Seeker (RA 11261). Makikita sa portal ang petsa kung kailan maaaring mag-request muli.
 
 PARA MAG-FILE NG REKLAMO (COMPLAINTS) SA SYSTEM:
 1. Mag-login sa iyong verified resident account

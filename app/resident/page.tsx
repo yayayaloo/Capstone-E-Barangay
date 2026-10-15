@@ -164,18 +164,14 @@ function ResidentPortalContent() {
 
                         const attachmentUrl = uploadedPaths.length > 0 ? uploadedPaths.join(',') : null
 
-                        const { error } = await supabase
-                            .from('service_requests')
-                            .insert({
-                                resident_id: profile.id,
-                                document_type: item.payload.documentType!,
-                                purpose: item.payload.purpose!,
-                                attachment_url: attachmentUrl,
-                                status: 'pending',
-                                form_data: item.payload.formData || {}
-                            })
-
-                        if (error) throw error
+                        await submitDocumentRequest({
+                            resident_id: profile.id,
+                            document_type: item.payload.documentType!,
+                            purpose: item.payload.purpose!,
+                            attachment_url: attachmentUrl,
+                            status: 'pending',
+                            form_data: item.payload.formData || {}
+                        })
 
                     } else if (item.type === 'complaint') {
                         let attachmentUrl = null
@@ -1855,6 +1851,7 @@ function ResidentPortalContent() {
             {showRequestModal && (
                 <RequestModal
                     profile={profile}
+                    existingRequests={requests}
                     initialType={selectedServiceType}
                     onClose={() => { setShowRequestModal(false); setSelectedServiceType(''); }}
                     onSubmit={handleRequestSubmit}
