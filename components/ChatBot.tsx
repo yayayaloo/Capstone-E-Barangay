@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { ChevronDown, X } from 'lucide-react'
 import styles from './ChatBot.module.css'
 import { ServiceRequest, Profile } from '@/lib/types'
 
@@ -172,132 +172,6 @@ const getFallbackResponse = (message: string, userProfile?: Profile | null, user
         : "I can help with document requests, status tracking, and barangay info. Try asking: 'How to get Barangay Clearance?' or 'What are the office hours?'"
 }
 
-// Interactive Slidable Horizontal Row with Arrow Navigation, Mouse Wheel & Drag-to-Scroll
-function SlidableRow({
-    children,
-    className = ''
-}: {
-    children: React.ReactNode
-    className?: string
-}) {
-    const scrollRef = useRef<HTMLDivElement>(null)
-    const [canScrollLeft, setCanScrollLeft] = useState(false)
-    const [canScrollRight, setCanScrollRight] = useState(false)
-    const isDragging = useRef(false)
-    const startX = useRef(0)
-    const scrollStart = useRef(0)
-    const hasMoved = useRef(false)
-
-    const checkScroll = useCallback(() => {
-        if (!scrollRef.current) return
-        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
-        setCanScrollLeft(scrollLeft > 4)
-        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4)
-    }, [])
-
-    useEffect(() => {
-        checkScroll()
-        const timer = setTimeout(checkScroll, 120)
-        window.addEventListener('resize', checkScroll)
-        return () => {
-            clearTimeout(timer)
-            window.removeEventListener('resize', checkScroll)
-        }
-    }, [children, checkScroll])
-
-    const scroll = (direction: 'left' | 'right') => {
-        if (!scrollRef.current) return
-        const scrollAmount = Math.max(scrollRef.current.clientWidth * 0.7, 180)
-        scrollRef.current.scrollBy({
-            left: direction === 'left' ? -scrollAmount : scrollAmount,
-            behavior: 'smooth'
-        })
-        setTimeout(checkScroll, 280)
-    }
-
-    const handleWheel = (e: React.WheelEvent) => {
-        if (!scrollRef.current) return
-        // Translate vertical mouse wheel scroll to horizontal scroll
-        if (e.deltaY !== 0 && Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
-            scrollRef.current.scrollLeft += e.deltaY
-            checkScroll()
-        }
-    }
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        if (!scrollRef.current) return
-        isDragging.current = true
-        hasMoved.current = false
-        startX.current = e.pageX - scrollRef.current.offsetLeft
-        scrollStart.current = scrollRef.current.scrollLeft
-    }
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDragging.current || !scrollRef.current) return
-        const x = e.pageX - scrollRef.current.offsetLeft
-        const walk = (x - startX.current) * 1.3
-        if (Math.abs(walk) > 4) {
-            hasMoved.current = true
-        }
-        scrollRef.current.scrollLeft = scrollStart.current - walk
-        checkScroll()
-    }
-
-    const handleMouseUpOrLeave = () => {
-        isDragging.current = false
-        checkScroll()
-    }
-
-    const handleClickCapture = (e: React.MouseEvent) => {
-        if (hasMoved.current) {
-            e.stopPropagation()
-            e.preventDefault()
-            setTimeout(() => {
-                hasMoved.current = false
-            }, 60)
-        }
-    }
-
-    return (
-        <div className={styles.sliderWrapper}>
-            {canScrollLeft && (
-                <button
-                    type="button"
-                    className={`${styles.sliderArrow} ${styles.sliderArrowLeft}`}
-                    onClick={() => scroll('left')}
-                    aria-label="Slide left"
-                    title="Slide left"
-                >
-                    <ChevronLeft size={16} />
-                </button>
-            )}
-            <div
-                ref={scrollRef}
-                className={`${styles.sliderTrack} ${className}`}
-                onScroll={checkScroll}
-                onWheel={handleWheel}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUpOrLeave}
-                onMouseLeave={handleMouseUpOrLeave}
-                onClickCapture={handleClickCapture}
-            >
-                {children}
-            </div>
-            {canScrollRight && (
-                <button
-                    type="button"
-                    className={`${styles.sliderArrow} ${styles.sliderArrowRight}`}
-                    onClick={() => scroll('right')}
-                    aria-label="Slide right"
-                    title="Slide right"
-                >
-                    <ChevronRight size={16} />
-                </button>
-            )}
-        </div>
-    )
-}
 
 export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotProps) {
     const defaultMessage: Message = {
@@ -325,6 +199,7 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
     })
     const [inputValue, setInputValue] = useState('')
     const [isTyping, setIsTyping] = useState(false)
+    const [quickChatsOpen, setQuickChatsOpen] = useState(true)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const handleNewChat = () => {
@@ -538,20 +413,34 @@ export default function ChatBot({ onClose, userProfile, userRequests }: ChatBotP
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Unified Quick Chat Options Strip */}
+                {/* Quick Chat Vertical List */}
                 <div className={styles.quickChatStrip}>
-                    <SlidableRow>
-                        {quickReplies.map((reply, index) => (
-                            <button
-                                key={`quick-${index}`}
-                                className={styles.quickChatButton}
-                                onClick={() => handleSend(reply.prompt)}
-                                disabled={isTyping}
-                            >
-                                {reply.label}
-                            </button>
-                        ))}
-                    </SlidableRow>
+                    <div
+                        className={styles.quickChatHeader}
+                        onClick={() => setQuickChatsOpen(prev => !prev)}
+                        role="button"
+                        aria-expanded={quickChatsOpen}
+                        aria-label="Toggle quick chat options"
+                    >
+                        <span className={styles.quickChatHeaderLabel}>Quick Options</span>
+                        <span className={`${styles.quickChatToggleIcon}${quickChatsOpen ? ` ${styles.open}` : ''}`}>
+                            <ChevronDown size={14} />
+                        </span>
+                    </div>
+                    {quickChatsOpen && (
+                        <div className={styles.quickChatList}>
+                            {quickReplies.map((reply, index) => (
+                                <button
+                                    key={`quick-${index}`}
+                                    className={styles.quickChatButton}
+                                    onClick={() => handleSend(reply.prompt)}
+                                    disabled={isTyping}
+                                >
+                                    {reply.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Input */}
